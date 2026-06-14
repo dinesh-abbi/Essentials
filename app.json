@@ -1,0 +1,71 @@
+{
+  "expo": {
+    "name": "Essentials",
+    "slug": "Essentials",
+    "version": "1.0.0",
+    "owner": "dineshabbi",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "essentials",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/expo.icon"
+    },
+    "android": {
+      "package": "com.catalyst.essentials",
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0B10",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0A0B10",
+          "android": {
+            "image": "./assets/images/splash-icon.png",
+            "imageWidth": 200
+          }
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Catalyst to access your camera to capture attendance logs."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#D97706",
+          "sounds": [
+            "./assets/notification/water_remainder.mp3"
+          ]
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8f39a517-c223-498d-9928-fa8be2f28294"
+      }
+    }
+  }
+}
