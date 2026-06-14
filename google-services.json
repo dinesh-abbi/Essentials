@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "228016196",
+    "project_id": "essentials-77c5f",
+    "storage_bucket": "essentials-77c5f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:228016196:android:8568aed718784711737c11",
+        "android_client_info": {
+          "package_name": "com.catalyst.essentials"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "228016196-16e4ehtpsrgl27rghts9damggdp15nj0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.catalyst.essentials",
+            "certificate_hash": "737f04eb56910a7586750752ceff25bfb60f9af2"
+          }
+        },
+        {
+          "client_id": "228016196-9169trhbc5tr87vcqqq6fvqrkj164kil.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCNILGmlGfsPAop33qz-5Q7di6l59I1ml0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "228016196-9169trhbc5tr87vcqqq6fvqrkj164kil.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
