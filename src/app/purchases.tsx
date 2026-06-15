@@ -170,7 +170,7 @@ export default function PurchasesScreen() {
               CUMULATIVE SPEND
             </ThemedText>
             <ThemedText type="subtitle" style={[styles.totalCost, { color: theme.primary }]}>
-              ${totalSpent.toFixed(2)}
+              ₹{totalSpent.toFixed(2)}
             </ThemedText>
           </View>
         </View>
@@ -197,7 +197,7 @@ export default function PurchasesScreen() {
                 styles.costInput,
                 { color: theme.text, borderColor: theme.border, backgroundColor: theme.background },
               ]}
-              placeholder="Cost ($)"
+              placeholder="Cost (₹)"
               placeholderTextColor={theme.textSecondary}
               value={cost}
               onChangeText={setCost}
@@ -266,7 +266,7 @@ export default function PurchasesScreen() {
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => {
-              const formattedDate = new Date(item.timestamp).toLocaleDateString(undefined, {
+              const formattedDate = new Date(item.timestamp).toLocaleDateString('en-IN', {
                 month: 'short',
                 day: 'numeric',
                 hour: '2-digit',
@@ -289,7 +289,7 @@ export default function PurchasesScreen() {
                   </View>
                   <View style={styles.rightItemBlock}>
                     <ThemedText type="subtitle" style={[styles.itemPrice, { color: theme.text }]}>
-                      ${item.cost.toFixed(2)}
+                      ₹{item.cost.toFixed(2)}
                     </ThemedText>
                     <AnimatedPressable
                       onPress={() => handleDelete(item.id)}

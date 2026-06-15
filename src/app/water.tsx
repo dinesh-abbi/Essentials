@@ -29,6 +29,7 @@ export default function WaterScreen() {
   const [todayTotal, setTodayTotal] = useState(0);
   const [hourlyMap, setHourlyMap] = useState<Record<number, boolean>>({});
   const [recentLogs, setRecentLogs] = useState<WaterStorage.WaterLog[]>([]);
+  const [monthlyTotal, setMonthlyTotal] = useState(0);
 
   // Load water data
   useEffect(() => {
@@ -42,6 +43,9 @@ export default function WaterScreen() {
 
       const status = await WaterStorage.getTodayHourlyStatus();
       setHourlyMap(status);
+
+      const mTotal = await WaterStorage.getMonthlyTotalMl();
+      setMonthlyTotal(mTotal);
 
       const todayLogs = await WaterStorage.getTodayWaterLogs();
       // Sort newest first
@@ -140,6 +144,15 @@ export default function WaterScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
+          {/* Monthly Intake Summary */}
+          <View style={[styles.statusCard, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
+            <View style={styles.statusHeader}>
+              <ThemedText type="code" themeColor="textSecondary" style={{ fontSize: 11, fontWeight: '700' }}>
+                MONTHLY INTAKE: {(monthlyTotal / 1000).toFixed(2)}L
+              </ThemedText>
+            </View>
+          </View>
+
           {/* Daily Goal Visual Metric */}
           <View style={[styles.statusCard, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
             <View style={styles.statusHeader}>

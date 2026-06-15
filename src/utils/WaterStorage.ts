@@ -7,7 +7,7 @@ export interface WaterLog {
 }
 
 const WATER_STORAGE_KEY = '@catalyst_water_log';
-export const DEFAULT_DAILY_GOAL = 2000; // ml
+export const DEFAULT_DAILY_GOAL = 3000; // ml
 
 const generateId = () => {
   return `water_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -116,4 +116,21 @@ export async function clearWaterLogs(): Promise<void> {
     console.error('Failed to clear water storage', error);
     throw error;
   }
+}
+
+/**
+ * Get total ml drank this month
+ */
+export async function getMonthlyTotalMl(): Promise<number> {
+  const allLogs = await getWaterLogs();
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  const monthlyLogs = allLogs.filter((log) => {
+    const logDate = new Date(log.timestamp);
+    return logDate.getMonth() === currentMonth && logDate.getFullYear() === currentYear;
+  });
+
+  return monthlyLogs.reduce((acc, curr) => acc + curr.amountMl, 0);
 }

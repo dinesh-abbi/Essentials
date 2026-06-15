@@ -38,6 +38,7 @@ import {
 import * as AttendanceStorage from '@/utils/AttendanceStorage';
 import * as PurchasesStorage from '@/utils/PurchasesStorage';
 import * as WaterStorage from '@/utils/WaterStorage';
+import * as NotificationsUtil from '@/utils/notifications';
 import { useAuth } from '@/contexts/AuthContext';
 
 const { width } = Dimensions.get('window');
@@ -470,6 +471,11 @@ export default function HomeScreen() {
       const hourly = await WaterStorage.getTodayHourlyStatus();
       setWaterTotalMl(total);
       setWaterHourlyMap(hourly);
+      
+      // Trigger test notification when we hit the daily water goal
+      if (total >= WaterStorage.DEFAULT_DAILY_GOAL) {
+        await NotificationsUtil.triggerWaterGoalNotification();
+      }
     } catch (e) {
       console.error('Add water failed', e);
     }
@@ -499,7 +505,7 @@ export default function HomeScreen() {
     now.getHours() < 12 ? 'Good morning' : now.getHours() < 18 ? 'Good afternoon' : 'Good evening';
   const currentHour = now.getHours();
 
-  const dayStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const dayStr = now.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' });
   const displayName = user?.displayName ?? user?.email?.split('@')[0] ?? 'User';
 
   return (
