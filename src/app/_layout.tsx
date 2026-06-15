@@ -30,9 +30,14 @@ function AppStack() {
           }
         }
 
-        // Tap or Yes opens home and highlights water widget
+        // Tap or Yes opens home and highlights water widget, unless a specific route is provided
         if (actionIdentifier === 'YES_ACTION' || actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
-          router.replace('/(tabs)?highlight=water');
+          const route = response.notification.request.content.data?.route;
+          if (route) {
+            router.replace(route as any);
+          } else {
+            router.replace('/(tabs)?highlight=water');
+          }
         }
       });
 

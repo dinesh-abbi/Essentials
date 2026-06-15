@@ -85,9 +85,9 @@ export async function scheduleHourlyWaterReminder() {
       },
     },
     trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
       channelId: WATER_CHANNEL_ID,
-      seconds: 3600, // Every hour
+      minute: 0, // Every hour at minute 0
       repeats: true,
     },
   });
@@ -98,4 +98,29 @@ export async function scheduleHourlyWaterReminder() {
  */
 export async function cancelAllReminders() {
   await Notifications.cancelAllScheduledNotificationsAsync();
+}
+
+/**
+ * Test notification for hitting the daily water goal
+ */
+export async function triggerWaterGoalNotification() {
+  const isConfigured = await configureNotifications();
+  if (!isConfigured) return;
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'Daily Water Goal Reached! 🏆',
+      body: 'Congratulations! You have reached your daily hydration goal. Great job!',
+      sound: Platform.OS === 'android' ? undefined : 'water_remainder.mp3',
+      data: {
+        route: '/water',
+      },
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      channelId: WATER_CHANNEL_ID,
+      seconds: 1, // trigger almost immediately
+      repeats: false,
+    },
+  });
 }
