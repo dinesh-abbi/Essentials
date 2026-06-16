@@ -28,6 +28,7 @@ import Animated, {
 import { GlassView } from 'expo-glass-effect';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
+import { ConfettiRain } from '@/components/ui/confetti-rain';
 import {
   BottomTabInset,
   Colors,
@@ -414,6 +415,18 @@ export default function HomeScreen() {
         6,
         false
       );
+
+      // Refresh water metrics immediately to stay in sync with background notification additions
+      async function refresh() {
+        try {
+          setWaterTotalMl(await WaterStorage.getTodayTotalMl());
+          setWaterHourlyMap(await WaterStorage.getTodayHourlyStatus());
+        } catch (e) {
+          console.error('Failed to refresh water metrics on highlight', e);
+        }
+      }
+      refresh();
+
       router.setParams({ highlight: undefined });
     }
   }, [highlight]);
@@ -588,24 +601,40 @@ export default function HomeScreen() {
           <Animated.View entering={FadeInUp.delay(200).duration(600).springify()}>
             <Animated.View style={highlightStyle}>
               <GlassView style={[styles.widgetFullWidth, { backgroundColor: colors.surface, borderColor: 'transparent', borderWidth: 0 }]}>
+                {/* Celebration Confetti & Rain overlay */}
+                <ConfettiRain active={waterPct >= 100} />
+
                 <View style={styles.horizontalSplit}>
                   <View style={{ flex: 1, gap: 10 }}>
                     <AnimatedPressable onPress={() => router.push('/water')} style={{ width: '100%' }}>
                       <View style={styles.widgetHeader}>
-                        <Label text="WATER & TIMELINE" color={isDark ? '#94A3B8' : '#64748B'} />
-                        <Feather name="droplet" size={14} color={colors.primary} />
+                        <Label
+                          text={waterPct >= 100 ? "🎉 WATER GOAL REACHED! 🎉" : "WATER & TIMELINE"}
+                          color={waterPct >= 100 ? (isDark ? '#34D399' : '#059669') : (isDark ? '#94A3B8' : '#64748B')}
+                        />
+                        <Feather
+                          name={waterPct >= 100 ? "award" : "droplet"}
+                          size={14}
+                          color={waterPct >= 100 ? (isDark ? '#34D399' : '#059669') : colors.primary}
+                        />
                       </View>
                       
                       <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
                         <AnimatedNumber
                           value={waterTotalMl}
                           prefix=""
-                          style={[styles.widgetNumber, { color: colors.primary }]}
+                          style={[styles.widgetNumber, { color: waterPct >= 100 ? (isDark ? '#34D399' : '#059669') : colors.primary }]}
                         />
-                        <Text style={[styles.widgetNumberUnit, { color: colors.primary }]}>ml</Text>
-                        <Text style={[styles.statusText, { color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, marginLeft: 8 }]}>
-                          ({waterPct}% of goal)
-                        </Text>
+                        <Text style={[styles.widgetNumberUnit, { color: waterPct >= 100 ? (isDark ? '#34D399' : '#059669') : colors.primary }]}>ml</Text>
+                        {waterPct >= 100 ? (
+                          <Animated.View entering={FadeInDown.duration(400)} style={[styles.congratsBadge, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.15)' : 'rgba(5, 150, 105, 0.1)' }]}>
+                            <Text style={[styles.congratsText, { color: isDark ? '#34D399' : '#059669' }]}>🏆 Target Met!</Text>
+                          </Animated.View>
+                        ) : (
+                          <Text style={[styles.statusText, { color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, marginLeft: 8 }]}>
+                            ({waterPct}% of goal)
+                          </Text>
+                        )}
                       </View>
                     </AnimatedPressable>
 
@@ -935,5 +964,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     bottom: 0,
     left: '50%',
+  },
+  congratsBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginLeft: 10,
+    alignSelf: 'center',
+  },
+  congratsText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
 });

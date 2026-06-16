@@ -1,13 +1,12 @@
 import { useEffect } from 'react';
 import { DarkTheme, DefaultTheme, Redirect, ThemeProvider, Stack, router } from 'expo-router';
 import { useColorScheme, ActivityIndicator, View } from 'react-native';
-import * as Notifications from 'expo-notifications';
+import { Notifications, scheduleHourlyWaterReminder } from '@/utils/notifications';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/theme';
 import * as WaterStorage from '@/utils/WaterStorage';
-import { scheduleHourlyWaterReminder } from '@/utils/notifications';
 
 // ── Inner layout that can access AuthContext ───────────────────────────────────
 function AppStack() {
@@ -19,20 +18,28 @@ function AppStack() {
     if (user) {
       scheduleHourlyWaterReminder().catch((err) => console.error('Schedule reminders failed', err));
 
-      const subscription = Notifications.addNotificationResponseReceivedListener(async (response) => {
+      const subscription = Notifications.addNotificationResponseReceivedListener(async (response: any) => {
         const { actionIdentifier } = response;
+        const notification = response.notification;
+        const categoryIdentifier = notification.request.content.categoryIdentifier;
+        const data = notification.request.content.data;
 
-        if (actionIdentifier === 'YES_ACTION') {
-          try {
-            await WaterStorage.logWaterIntake(250);
-          } catch (e) {
-            console.error('Failed to log water from notification', e);
+        // Check if this is a water reminder notification
+        const isWaterReminder = categoryIdentifier === 'WATER_REMINDER_CATEGORY' || data?.highlight === 'water';
+
+        if (isWaterReminder) {
+          if (actionIdentifier === 'YES_ACTION' || actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
+            try {
+              await WaterStorage.logWaterIntake(250);
+            } catch (e) {
+              console.error('Failed to log water from notification', e);
+            }
           }
         }
 
         // Tap or Yes opens home and highlights water widget, unless a specific route is provided
         if (actionIdentifier === 'YES_ACTION' || actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
-          const route = response.notification.request.content.data?.route;
+          const route = data?.route;
           if (route) {
             router.replace(route as any);
           } else {

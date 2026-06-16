@@ -3,7 +3,7 @@
 # ============================================================
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 $logFile = "$env:TEMP\essentials_build.log"
 $apkSrc  = "android\app\build\outputs\apk\release\app-release.apk"
@@ -54,7 +54,10 @@ $nodeVer = & node --version
 Write-Host "  Node.js : $nodeVer" -ForegroundColor Green
 
 # Java
-$javaExe = "C:\Program Files\Java\jre1.8.0_481\bin\java.exe"
+$javaExe = "C:\Users\abbid\AppData\Local\Java\jdk-17\bin\java.exe"
+if (-not (Test-Path $javaExe)) {
+    $javaExe = "C:\Program Files\Java\jre1.8.0_481\bin\java.exe"
+}
 if (-not (Test-Path $javaExe)) {
     # Fallback: search PATH (PS5 compatible)
     $javaCmd = Get-Command java -ErrorAction SilentlyContinue
@@ -105,7 +108,7 @@ Write-Host ""
 Write-Host "STEP 3/4  Running expo prebuild (generates Android project)" -ForegroundColor White
 
 Invoke-Step "expo prebuild --platform android --clean" {
-    & cmd.exe /c "npx expo prebuild --platform android --clean --no-interactive"
+    & cmd.exe /c "npx expo prebuild --platform android --clean"
 }
 
 if (-not (Test-Path "android")) {

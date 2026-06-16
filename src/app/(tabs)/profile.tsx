@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Alert,
   ScrollView,
@@ -11,12 +11,21 @@ import {
   TouchableOpacity,
   View,
   useColorScheme,
+  Switch,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { BottomTabInset, Colors, Radius, Spacing } from '@/constants/theme';
+import {
+  triggerHourlyWaterReminderTest,
+  triggerWaterGoalNotification,
+  isOneMinuteReminderEnabled,
+  setOneMinuteReminderEnabled,
+  scheduleHourlyWaterReminder,
+} from '@/utils/notifications';
 
 function Row({
   icon,
@@ -52,6 +61,31 @@ export default function ProfileScreen() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState('');
+  const [isOneMinuteEnabled, setIsOneMinuteEnabled] = useState(false);
+
+  useEffect(() => {
+    async function loadSettings() {
+      const enabled = await isOneMinuteReminderEnabled();
+      setIsOneMinuteEnabled(enabled);
+    }
+    loadSettings();
+  }, []);
+
+  const handleToggleOneMinute = async (value: boolean) => {
+    try {
+      await setOneMinuteReminderEnabled(value);
+      await scheduleHourlyWaterReminder(true); // force reschedule to apply changes immediately
+      setIsOneMinuteEnabled(value);
+      Alert.alert(
+        'Success',
+        value
+          ? '1-Minute Hydration Reminders enabled! You should receive them every minute now.'
+          : 'Hourly Hydration Reminders restored.'
+      );
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to update reminder settings.');
+    }
+  };
 
   const displayName = user?.displayName ?? user?.email?.split('@')[0] ?? 'User';
   const email = user?.email ?? '—';
@@ -182,8 +216,75 @@ export default function ProfileScreen() {
             </View>
           </Animated.View>
 
-          {/* ── Sign Out ────────────────────────────────────────────────────── */}
+          {/* ── Notification Testing ─────────────────────────────────────────── */}
           <Animated.View entering={FadeInDown.delay(240).duration(400)}>
+            <View style={[styles.section, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
+              <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>NOTIFICATION TESTING</Text>
+              
+              <View style={[styles.row, { borderColor: colors.border }]}>
+                <View style={[styles.rowIcon, { backgroundColor: colors.backgroundSelected }]}>
+                  <Feather name="clock" size={15} color={colors.primary} />
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={[styles.rowValue, { color: colors.text }]}>1-Minute Reminders</Text>
+                  <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>Trigger notifications every 1 min (Test Mode)</Text>
+                </View>
+                <Switch
+                  value={isOneMinuteEnabled}
+                  onValueChange={handleToggleOneMinute}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? (isOneMinuteEnabled ? colors.primary : '#f4f3f4') : undefined}
+                />
+              </View>
+
+              <TouchableOpacity
+                onPress={async () => {
+                  try {
+                    await triggerHourlyWaterReminderTest();
+                    Alert.alert('Success', 'Hourly reminder notification triggered! You should receive it in a second.');
+                  } catch (e: any) {
+                    Alert.alert('Error', e.message || 'Failed to trigger notification.');
+                  }
+                }}
+                style={[styles.row, { borderColor: colors.border }]}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.rowIcon, { backgroundColor: colors.backgroundSelected }]}>
+                  <Feather name="bell" size={15} color={colors.primary} />
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={[styles.rowValue, { color: colors.text }]}>Test Hydration Reminder</Text>
+                  <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>Trigger reminder popup immediately</Text>
+                </View>
+                <Feather name="chevron-right" size={16} color={colors.textSecondary} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={async () => {
+                  try {
+                    await triggerWaterGoalNotification();
+                    Alert.alert('Success', 'Goal reached notification triggered! You should receive it in a second.');
+                  } catch (e: any) {
+                    Alert.alert('Error', e.message || 'Failed to trigger notification.');
+                  }
+                }}
+                style={[styles.row, { borderColor: colors.border }]}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.rowIcon, { backgroundColor: colors.backgroundSelected }]}>
+                  <Feather name="award" size={15} color={colors.primary} />
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={[styles.rowValue, { color: colors.text }]}>Test Goal Reached</Text>
+                  <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>Trigger goal milestone popup immediately</Text>
+                </View>
+                <Feather name="chevron-right" size={16} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+
+          {/* ── Sign Out ────────────────────────────────────────────────────── */}
+          <Animated.View entering={FadeInDown.delay(320).duration(400)}>
             <TouchableOpacity
               id="signout-button"
               style={[styles.signOutBtn, { borderColor: colors.alert }]}
