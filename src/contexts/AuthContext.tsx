@@ -8,6 +8,7 @@ import {
   signOut as firebaseSignOut,
   updateProfile,
 } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -29,28 +30,36 @@ if (!isExpoGo) {
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 
-import { auth } from '@/utils/firebase';
+import { auth, db } from '@/utils/firebase';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
+  /** The user's saved Discord webhook URL (null if not set yet) */
+  discordWebhookUrl: string | null;
+  /** Whether the Firestore profile has been fetched yet */
+  profileLoaded: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateDisplayName: (name: string) => Promise<void>;
+  updateDiscordWebhook: (url: string) => Promise<void>;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
+  discordWebhookUrl: null,
+  profileLoaded: false,
   signInWithGoogle: async () => {},
   signInWithEmail: async () => {},
   signUpWithEmail: async () => {},
   signOut: async () => {},
   updateDisplayName: async () => {},
+  updateDiscordWebhook: async () => {},
 });
 
 // ─── Configure Google Sign-In (run once at module load) ───────────────────────
@@ -61,15 +70,53 @@ if (!isExpoGo && GoogleSignin) {
   });
 }
 
+// ─── Firestore helpers ────────────────────────────────────────────────────────
+
+/** Ensure a user document exists in the `users` collection. Creates one on first login. */
+async function ensureUserDocument(u: User): Promise<string | null> {
+  const userRef = doc(db, 'users', u.uid);
+  const snap = await getDoc(userRef);
+
+  if (!snap.exists()) {
+    // First-time registration — create the document
+    await setDoc(userRef, {
+      uid: u.uid,
+      email: u.email ?? null,
+      discordWebhookUrl: null,
+      createdAt: serverTimestamp(),
+    });
+    return null; // no webhook yet
+  }
+
+  return snap.data()?.discordWebhookUrl ?? null;
+}
+
 // ─── Provider ─────────────────────────────────────────────────────────────────
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [discordWebhookUrl, setDiscordWebhookUrl] = useState<string | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
 
   // ── Firebase auth state listener ──────────────────────────────────────────────
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
+
+      if (u) {
+        try {
+          const webhookUrl = await ensureUserDocument(u);
+          setDiscordWebhookUrl(webhookUrl);
+        } catch (err) {
+          console.error('Failed to load user profile from Firestore:', err);
+          setDiscordWebhookUrl(null);
+        }
+        setProfileLoaded(true);
+      } else {
+        setDiscordWebhookUrl(null);
+        setProfileLoaded(false);
+      }
+
       setLoading(false);
     });
     return unsub;
@@ -143,9 +190,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const updateDiscordWebhook = useCallback(async (url: string) => {
+    if (!auth.currentUser) return;
+    const userRef = doc(db, 'users', auth.currentUser.uid);
+    await updateDoc(userRef, { discordWebhookUrl: url });
+    setDiscordWebhookUrl(url);
+  }, []);
+
   return (
     <AuthContext.Provider
-      value={{ user, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, updateDisplayName }}
+      value={{
+        user,
+        loading,
+        discordWebhookUrl,
+        profileLoaded,
+        signInWithGoogle,
+        signInWithEmail,
+        signUpWithEmail,
+        signOut,
+        updateDisplayName,
+        updateDiscordWebhook,
+      }}
     >
       {children}
     </AuthContext.Provider>

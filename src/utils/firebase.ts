@@ -1,5 +1,5 @@
 /**
- * Firebase App + Auth initializer.
+ * Firebase App + Auth + Firestore initializer.
  * Uses EXPO_PUBLIC_ env vars — safe to use in client bundle.
  */
 import { getApp, getApps, initializeApp } from 'firebase/app';
@@ -7,6 +7,7 @@ import { initializeAuth } from 'firebase/auth';
 import * as Auth from 'firebase/auth';
 const getReactNativePersistence = (Auth as any).getReactNativePersistence;
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY!,
@@ -25,5 +26,8 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = initializeAuth(app, {
   persistence: getReactNativePersistence(AsyncStorage),
 });
+
+// Firestore for user profile data (webhook URLs, etc.)
+export const db = getFirestore(app);
 
 export { app };

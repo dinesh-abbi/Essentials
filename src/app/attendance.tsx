@@ -1,16 +1,12 @@
 import { Feather } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Platform,
-  Pressable,
   StyleSheet,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,18 +15,20 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useAuth } from '@/contexts/AuthContext';
 import * as AttendanceStorage from '@/utils/AttendanceStorage';
 import { File, UploadType } from 'expo-file-system';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
-
-const WEBHOOK_KEY = '@attendance_discord_webhook_url';
-const DEFAULT_MOCK_WEBHOOK = 'https://discord.com/api/webhooks/mock';
 
 export default function AttendanceScreen() {
   const router = useRouter();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraView>(null);
+  const { discordWebhookUrl } = useAuth();
+
+  // The webhook URL from Firestore (via AuthContext)
+  const webhookUrl = discordWebhookUrl ?? '';
 
   // Permissions
   const [permission, requestPermission] = useCameraPermissions();
@@ -44,9 +42,6 @@ export default function AttendanceScreen() {
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [offlineCount, setOfflineCount] = useState(0);
-  const [webhookUrl, setWebhookUrl] = useState('');
-  const [showConfigModal, setShowConfigModal] = useState(false);
-  const [tempWebhookUrl, setTempWebhookUrl] = useState('');
 
   const toggleCameraFacing = () => {
     setFacing((prev) => (prev === 'back' ? 'front' : 'back'));
@@ -68,15 +63,9 @@ export default function AttendanceScreen() {
     }
   };
 
-  // Load configuration and queue count
+  // Load offline queue count
   useEffect(() => {
     async function init() {
-      const savedWebhook = await AsyncStorage.getItem(WEBHOOK_KEY);
-      const defaultWebhook = process.env.EXPO_PUBLIC_DISCORD_WEBHOOK_KEY || '';
-      const url = savedWebhook !== null ? savedWebhook : defaultWebhook;
-      setWebhookUrl(url);
-      setTempWebhookUrl(url);
-
       const queue = await AttendanceStorage.getOfflineQueue();
       setOfflineCount(queue.length);
     }
@@ -85,7 +74,7 @@ export default function AttendanceScreen() {
 
   // Auto-sync on mount if internet is available and queue has items
   useEffect(() => {
-    if (offlineCount > 0 && webhookUrl && webhookUrl !== DEFAULT_MOCK_WEBHOOK) {
+    if (offlineCount > 0 && webhookUrl) {
       handleAutoSync();
     }
   }, [offlineCount, webhookUrl]);
@@ -106,7 +95,7 @@ export default function AttendanceScreen() {
 
   const handleManualSync = async () => {
     if (!webhookUrl) {
-      Alert.alert('Config Required', 'Please configure your Discord Webhook URL first.');
+      Alert.alert('Webhook Required', 'Please set up your Discord Webhook URL from your profile settings.');
       return;
     }
 
@@ -131,6 +120,14 @@ export default function AttendanceScreen() {
   const capturePhoto = async () => {
     if (!cameraRef.current) return;
 
+    if (!webhookUrl) {
+      Alert.alert('Webhook Required', 'Please set up your Discord Webhook URL to use check-in.', [
+        { text: 'Set Up', onPress: () => router.push('/discord-setup') },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+      return;
+    }
+
     setLoading(true);
     setLoadingMessage('[ CAPTURING_ATTENDANCE_LOG ]');
     const timestamp = Date.now();
@@ -148,14 +145,15 @@ export default function AttendanceScreen() {
 
       // 2. Try upload
       setLoadingMessage('[ UPLOADING_TO_DISCORD ]');
-      
-      if (!webhookUrl) {
-        // Force offline mode if webhook is missing
-        throw new Error('Webhook unconfigured');
-      }
+
+      const formattedTime = new Date(timestamp).toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        dateStyle: 'medium',
+        timeStyle: 'medium',
+      }) + ' IST';
 
       const payload = {
-        content: `📸 **Attendance Log Captured**\n**Captured at**: ${new Date(timestamp).toUTCString()}\n**Status**: Online Upload`,
+        content: `📸 **Attendance Log Captured**\n**Captured at**: ${formattedTime}\n**Status**: Online Upload`,
       };
 
       const file = new File(photo.uri);
@@ -202,11 +200,7 @@ export default function AttendanceScreen() {
     }
   };
 
-  const saveWebhookConfig = async () => {
-    await AsyncStorage.setItem(WEBHOOK_KEY, tempWebhookUrl);
-    setWebhookUrl(tempWebhookUrl);
-    setShowConfigModal(false);
-  };
+
 
   // Check permissions state
   if (!permission) {
@@ -284,14 +278,6 @@ export default function AttendanceScreen() {
             <Feather name="arrow-left" size={20} color="#FFF" />
           </AnimatedPressable>
 
-          <AnimatedPressable
-            onPress={() => setShowConfigModal(true)}
-            style={[
-              styles.roundBtn,
-              { backgroundColor: 'rgba(15, 23, 42, 0.6)' },
-            ]}>
-            <Feather name="settings" size={20} color="#FFF" />
-          </AnimatedPressable>
         </View>
 
         {/* Offline Warning Banner */}
@@ -405,75 +391,7 @@ export default function AttendanceScreen() {
         </View>
       )}
 
-      {/* Webhook Config Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={showConfigModal}
-        onRequestClose={() => setShowConfigModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-            <ThemedText type="smallBold" style={styles.modalTitle} themeColor="text">
-              Discord Webhook URL
-            </ThemedText>
-            
-            <TextInput
-              style={[
-                styles.webhookInput,
-                { 
-                  color: theme.text,
-                  borderColor: theme.border,
-                  backgroundColor: theme.background
-                }
-              ]}
-              placeholder="Paste Discord Webhook URL here..."
-              placeholderTextColor={theme.textSecondary}
-              value={tempWebhookUrl}
-              onChangeText={setTempWebhookUrl}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
 
-            <ThemedText type="small" themeColor="textSecondary" style={styles.modalHelpText}>
-              Leaving this empty forces Offline-First local storage mode, allowing you to test sync functionality.
-            </ThemedText>
-
-            <View style={styles.modalBtnRow}>
-              <AnimatedPressable
-                onPress={() => setShowConfigModal(false)}
-                style={[
-                  styles.modalBtn,
-                  { 
-                    borderColor: theme.border,
-                    backgroundColor: 'transparent'
-                  }
-                ]}>
-                <ThemedText type="smallBold" themeColor="textSecondary">
-                  Cancel
-                </ThemedText>
-              </AnimatedPressable>
-
-              <AnimatedPressable
-                onPress={saveWebhookConfig}
-                style={[
-                  styles.modalBtn,
-                  { 
-                    borderColor: theme.primary,
-                    backgroundColor: theme.primary,
-                  }
-                ]}>
-                <ThemedText 
-                  type="smallBold" 
-                  style={{ 
-                    color: '#FFF' 
-                  }}>
-                  Save Configuration
-                </ThemedText>
-              </AnimatedPressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -615,48 +533,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15,23,42,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.four,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 400,
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: Spacing.four,
-    gap: Spacing.three,
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  webhookInput: {
-    borderWidth: 1,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: 8,
-    fontSize: 13,
-  },
-  modalHelpText: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  modalBtnRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: Spacing.two,
-    marginTop: Spacing.two,
-  },
-  modalBtn: {
-    borderWidth: 1,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: 8,
-  },
+
   hudOverlay: {
     ...StyleSheet.absoluteFill,
     justifyContent: 'center',

@@ -1,25 +1,23 @@
 import { useEffect } from 'react';
 import { DarkTheme, DefaultTheme, Redirect, ThemeProvider, Stack, router } from 'expo-router';
 import { useColorScheme, ActivityIndicator, View } from 'react-native';
-import * as Notifications from 'expo-notifications';
-
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/theme';
 import * as WaterStorage from '@/utils/WaterStorage';
-import { scheduleHourlyWaterReminder } from '@/utils/notifications';
+import { ensureNotificationsScheduled, Notifications } from '@/utils/notifications';
 
 // ── Inner layout that can access AuthContext ───────────────────────────────────
 function AppStack() {
-  const { user, loading } = useAuth();
+  const { user, loading, discordWebhookUrl, profileLoaded } = useAuth();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = Colors[scheme];
 
   useEffect(() => {
     if (user) {
-      scheduleHourlyWaterReminder().catch((err) => console.error('Schedule reminders failed', err));
+      ensureNotificationsScheduled().catch((err) => console.error('Ensure notifications failed', err));
 
-      const subscription = Notifications.addNotificationResponseReceivedListener(async (response) => {
+      const subscription = Notifications.addNotificationResponseReceivedListener(async (response: any) => {
         const { actionIdentifier } = response;
 
         if (actionIdentifier === 'YES_ACTION') {
@@ -46,7 +44,7 @@ function AppStack() {
   }, [user]);
 
   // Show a neutral spinner while Firebase resolves the persisted session
-  if (loading) {
+  if (loading || (user && !profileLoaded)) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -60,6 +58,12 @@ function AppStack() {
       <Stack.Screen
         name="login"
         options={{ headerShown: false, animation: 'fade' }}
+      />
+
+      {/* Discord webhook onboarding — shown after registration if webhook is missing */}
+      <Stack.Screen
+        name="discord-setup"
+        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: false }}
       />
 
       {/* Protected tabs */}
@@ -81,6 +85,8 @@ function AppStack() {
 
       {/* Auth guard redirect */}
       {!user && <Redirect href="/login" />}
+      {/* If user is logged in but has no webhook URL, redirect to setup */}
+      {user && profileLoaded && !discordWebhookUrl && <Redirect href="/discord-setup" />}
     </Stack>
   );
 }

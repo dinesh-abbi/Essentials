@@ -38,7 +38,7 @@ import {
 import * as AttendanceStorage from '@/utils/AttendanceStorage';
 import * as PurchasesStorage from '@/utils/PurchasesStorage';
 import * as WaterStorage from '@/utils/WaterStorage';
-import * as NotificationsUtil from '@/utils/notifications';
+import * as NotificationsUtil from '@/utils/notifications'; // kept for future use
 import { useAuth } from '@/contexts/AuthContext';
 
 const { width } = Dimensions.get('window');
@@ -472,10 +472,10 @@ export default function HomeScreen() {
       setWaterTotalMl(total);
       setWaterHourlyMap(hourly);
       
-      // Trigger test notification when we hit the daily water goal
-      if (total >= WaterStorage.DEFAULT_DAILY_GOAL) {
-        await NotificationsUtil.triggerWaterGoalNotification();
-      }
+      // COMMENTED OUT — goal notification disabled for now
+      // if (total >= WaterStorage.DEFAULT_DAILY_GOAL) {
+      //   await NotificationsUtil.triggerWaterGoalNotification();
+      // }
     } catch (e) {
       console.error('Add water failed', e);
     }

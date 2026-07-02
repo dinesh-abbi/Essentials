@@ -271,6 +271,7 @@ export default function PurchasesScreen() {
                 day: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit',
+                timeZone: 'Asia/Kolkata',
               });
               return (
                 <View style={[styles.itemCard, { borderColor: theme.border }]}>

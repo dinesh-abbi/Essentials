@@ -105,7 +105,7 @@ Write-Host ""
 Write-Host "STEP 3/4  Running expo prebuild (generates Android project)" -ForegroundColor White
 
 Invoke-Step "expo prebuild --platform android --clean" {
-    & cmd.exe /c "npx expo prebuild --platform android --clean --no-interactive"
+    & cmd.exe /c "npx expo prebuild --platform android --clean"
 }
 
 if (-not (Test-Path "android")) {

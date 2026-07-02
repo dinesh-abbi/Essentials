@@ -47,18 +47,25 @@ clear
 
 # --- ASCII Art Header ---
 echo -e "${CYAN}${BOLD}"
-echo "=================================================="
-echo "  ______  ______  ______  ______  __      __  __  "
-echo " /\  ___\/\  __ \/\__  _\/\  __ \/\ \    /\ \/\ \ "
-echo " \ \ \___\ \  __ \/_/\ \/\ \  __ \ \ \___\ \ \_\ \ "
-echo "  \ \_____\ \_\ \_\ \ \_\ \ \_\ \_\ \_____\ \____/ "
-echo "   \/_____/\/_/\/_/  \/_/  \/_/\/_/\/_____/\/___/  "
-echo "                                                  "
-echo "        E N G I N E   B U I L D E R   v1.0        "
-echo "=================================================="
+cat <<'EOF'
+====================================================================
+
+███████╗███████╗███████╗███████╗███╗   ██╗████████╗██╗ █████╗ ██╗     ███████╗
+██╔════╝██╔════╝██╔════╝██╔════╝████╗  ██║╚══██╔══╝██║██╔══██╗██║     ██╔════╝
+█████╗  ███████╗███████╗█████╗  ██╔██╗ ██║   ██║   ██║███████║██║     ███████╗
+██╔══╝  ╚════██║╚════██║██╔══╝  ██║╚██╗██║   ██║   ██║██╔══██║██║     ╚════██║
+███████╗███████║███████║███████╗██║ ╚████║   ██║   ██║██║  ██║███████╗███████║
+╚══════╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝╚═╝  ╚═╝╚══════╝╚══════╝
+
+====================================================================
+EOF
 echo -e "${RESET}"
 
 echo -e "${CYAN}// CORE_BUILD_SEQUENCE: STARTING${RESET}\n"
+
+# Force the build to use JDK 17 (LTS) to prevent Java 25 native-access prefab compilation errors
+export JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
+export PATH="$JAVA_HOME/bin:$PATH"
 
 # --- STEP 1: Environment Checks ---
 echo -e "${BOLD}[ STEP 1/4 ] Verifying build environment...${RESET}"
@@ -113,7 +120,7 @@ fi
 
 # --- STEP 2: Expo Prebuild ---
 echo -e "\n${BOLD}[ STEP 3/4 ] Generating Native Android Project wrapper...${RESET}"
-run_with_spinner "Generating native project (expo prebuild)" npx expo prebuild --platform android --clean --no-interactive
+run_with_spinner "Generating native project (expo prebuild)" npx expo prebuild --platform android --clean
 
 # --- STEP 3: Gradle Compilation ---
 echo -e "\n${BOLD}[ STEP 4/4 ] Compiling Production-level APK...${RESET}"

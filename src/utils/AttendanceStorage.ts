@@ -103,9 +103,15 @@ export async function syncQueue(webhookUrl: string): Promise<{ successCount: num
         continue;
       }
 
+      const formattedTime = new Date(log.timestamp).toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        dateStyle: 'medium',
+        timeStyle: 'medium',
+      }) + ' IST';
+
       // Prepare payload JSON
       const payload = {
-        content: `📸 **Attendance Log Synced (Offline Mode)**\n**Captured at**: ${new Date(log.timestamp).toUTCString()}\n**Log ID**: \`${log.id}\``,
+        content: `📸 **Attendance Log Synced (Offline Mode)**\n**Captured at**: ${formattedTime}\n**Log ID**: \`${log.id}\``,
       };
 
       const result = await file.upload(webhookUrl, {
