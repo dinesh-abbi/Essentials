@@ -60,11 +60,7 @@ function AppStack() {
         options={{ headerShown: false, animation: 'fade' }}
       />
 
-      {/* Discord webhook onboarding — shown after registration if webhook is missing */}
-      <Stack.Screen
-        name="discord-setup"
-        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: false }}
-      />
+
 
       {/* Protected tabs */}
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -85,8 +81,7 @@ function AppStack() {
 
       {/* Auth guard redirect */}
       {!user && <Redirect href="/login" />}
-      {/* If user is logged in but has no webhook URL, redirect to setup */}
-      {user && profileLoaded && !discordWebhookUrl && <Redirect href="/discord-setup" />}
+
     </Stack>
   );
 }

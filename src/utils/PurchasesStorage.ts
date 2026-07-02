@@ -9,7 +9,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 
-import { auth, db } from '@/utils/firebase';
+import { auth, db, waitForAuth } from '@/utils/firebase';
 
 export interface PurchaseLog {
   id: string;
@@ -21,21 +21,19 @@ export interface PurchaseLog {
 
 /**
  * Returns the current authenticated user's UID.
- * Throws if no user is signed in.
+ * Waits for auth state to be restored on cold-start before accessing uid.
  */
-function getCurrentUserId(): string {
-  const uid = auth.currentUser?.uid;
-  if (!uid) {
-    throw new Error('User is not authenticated. Cannot access purchases.');
-  }
-  return uid;
+async function getCurrentUserId(): Promise<string> {
+  if (auth.currentUser?.uid) return auth.currentUser.uid;
+  const user = await waitForAuth();
+  return user.uid;
 }
 
 /**
  * Returns a reference to the user's purchases subcollection.
  */
-function purchasesCollection() {
-  const uid = getCurrentUserId();
+async function purchasesCollection() {
+  const uid = await getCurrentUserId();
   return collection(db, 'users', uid, 'purchases');
 }
 
@@ -44,7 +42,7 @@ function purchasesCollection() {
  */
 export async function getPurchases(): Promise<PurchaseLog[]> {
   try {
-    const q = query(purchasesCollection(), orderBy('timestamp', 'desc'));
+    const q = query(await purchasesCollection(), orderBy('timestamp', 'desc'));
     const snapshot = await getDocs(q);
     return snapshot.docs.map((d) => ({
       id: d.id,
@@ -70,7 +68,7 @@ export async function savePurchase(
   const timestamp = Date.now();
 
   try {
-    const docRef = await addDoc(purchasesCollection(), {
+    const docRef = await addDoc(await purchasesCollection(), {
       name: name.trim(),
       cost,
       category,
@@ -95,7 +93,7 @@ export async function savePurchase(
  */
 export async function deletePurchase(id: string): Promise<void> {
   try {
-    const uid = getCurrentUserId();
+    const uid = await getCurrentUserId();
     await deleteDoc(doc(db, 'users', uid, 'purchases', id));
   } catch (error) {
     console.error('Failed to delete purchase from Firestore', error);
@@ -111,7 +109,7 @@ export async function clearPurchases(): Promise<void> {
     const allPurchases = await getPurchases();
     if (allPurchases.length === 0) return;
 
-    const uid = getCurrentUserId();
+    const uid = await getCurrentUserId();
     const batch = writeBatch(db);
 
     allPurchases.forEach((purchase) => {

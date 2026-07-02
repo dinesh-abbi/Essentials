@@ -9,7 +9,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 
-import { auth, db } from '@/utils/firebase';
+import { auth, db, waitForAuth } from '@/utils/firebase';
 
 export interface WaterLog {
   id: string;
@@ -21,21 +21,19 @@ export const DEFAULT_DAILY_GOAL = 3000; // ml
 
 /**
  * Returns the current authenticated user's UID.
- * Throws if no user is signed in.
+ * Waits for auth state to be restored on cold-start before accessing uid.
  */
-function getCurrentUserId(): string {
-  const uid = auth.currentUser?.uid;
-  if (!uid) {
-    throw new Error('User is not authenticated. Cannot access water logs.');
-  }
-  return uid;
+async function getCurrentUserId(): Promise<string> {
+  if (auth.currentUser?.uid) return auth.currentUser.uid;
+  const user = await waitForAuth();
+  return user.uid;
 }
 
 /**
  * Returns a reference to the user's waterLogs subcollection.
  */
-function waterLogsCollection() {
-  const uid = getCurrentUserId();
+async function waterLogsCollection() {
+  const uid = await getCurrentUserId();
   return collection(db, 'users', uid, 'waterLogs');
 }
 
@@ -44,7 +42,7 @@ function waterLogsCollection() {
  */
 export async function getWaterLogs(): Promise<WaterLog[]> {
   try {
-    const snapshot = await getDocs(waterLogsCollection());
+    const snapshot = await getDocs(await waterLogsCollection());
     return snapshot.docs.map((d) => ({
       id: d.id,
       amountMl: d.data().amountMl,
@@ -63,7 +61,7 @@ export async function logWaterIntake(amountMl: number): Promise<WaterLog> {
   const timestamp = Date.now();
 
   try {
-    const docRef = await addDoc(waterLogsCollection(), {
+    const docRef = await addDoc(await waterLogsCollection(), {
       amountMl,
       timestamp,
     });
@@ -89,7 +87,7 @@ export async function getTodayWaterLogs(): Promise<WaterLog[]> {
 
   try {
     const q = query(
-      waterLogsCollection(),
+      await waterLogsCollection(),
       where('timestamp', '>=', startOfTodayMs)
     );
     const snapshot = await getDocs(q);
@@ -142,7 +140,7 @@ export async function getTodayHourlyStatus(): Promise<Record<number, boolean>> {
  */
 export async function deleteWaterLog(id: string): Promise<void> {
   try {
-    const uid = getCurrentUserId();
+    const uid = await getCurrentUserId();
     await deleteDoc(doc(db, 'users', uid, 'waterLogs', id));
   } catch (error) {
     console.error('Failed to delete water log from Firestore', error);
@@ -158,7 +156,7 @@ export async function clearWaterLogs(): Promise<void> {
     const todayLogs = await getTodayWaterLogs();
     if (todayLogs.length === 0) return;
 
-    const uid = getCurrentUserId();
+    const uid = await getCurrentUserId();
     const batch = writeBatch(db);
 
     todayLogs.forEach((log) => {
@@ -182,7 +180,7 @@ export async function getMonthlyTotalMl(): Promise<number> {
 
   try {
     const q = query(
-      waterLogsCollection(),
+      await waterLogsCollection(),
       where('timestamp', '>=', startOfMonthMs)
     );
     const snapshot = await getDocs(q);
@@ -204,7 +202,7 @@ export async function getMonthlyDaysTracked(): Promise<number> {
 
   try {
     const q = query(
-      waterLogsCollection(),
+      await waterLogsCollection(),
       where('timestamp', '>=', startOfMonthMs)
     );
     const snapshot = await getDocs(q);
@@ -221,3 +219,84 @@ export async function getMonthlyDaysTracked(): Promise<number> {
     return 0;
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Weekly & Monthly Data for Redesigned Views
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Get water logs between two timestamps (inclusive).
+ */
+export async function getWaterLogsBetween(startMs: number, endMs: number): Promise<WaterLog[]> {
+  try {
+    const col = await waterLogsCollection();
+    const q = query(col, where('timestamp', '>=', startMs), where('timestamp', '<=', endMs));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => ({
+      id: d.id,
+      amountMl: d.data().amountMl,
+      timestamp: d.data().timestamp,
+    }));
+  } catch (error) {
+    console.error('Failed to get water logs between dates', error);
+    return [];
+  }
+}
+
+/**
+ * Get daily intake totals for the current week (Monday to Sunday).
+ */
+export async function getWeeklyData(): Promise<{ date: Date; totalMl: number; logsCount: number }[]> {
+  const now = new Date();
+  // Find Monday of the current week
+  const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon...
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+
+  const logs = await getWaterLogsBetween(monday.getTime(), sunday.getTime());
+
+  // Build 7-day result array
+  const result: { date: Date; totalMl: number; logsCount: number }[] = [];
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(monday);
+    day.setDate(monday.getDate() + i);
+    const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
+    const dayEnd = dayStart + 86400000 - 1; // end of that day
+
+    const dayLogs = logs.filter((l) => l.timestamp >= dayStart && l.timestamp <= dayEnd);
+    result.push({
+      date: day,
+      totalMl: dayLogs.reduce((sum, l) => sum + l.amountMl, 0),
+      logsCount: dayLogs.length,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Get per-day intake totals for a given month as a Map<dayOfMonth, totalMl>.
+ */
+export async function getMonthlyCalendarData(
+  year: number,
+  month: number // 0-indexed (0=Jan, 11=Dec)
+): Promise<Map<number, number>> {
+  const startOfMonth = new Date(year, month, 1);
+  const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999);
+
+  const logs = await getWaterLogsBetween(startOfMonth.getTime(), endOfMonth.getTime());
+
+  const dayMap = new Map<number, number>();
+  logs.forEach((l) => {
+    const day = new Date(l.timestamp).getDate();
+    dayMap.set(day, (dayMap.get(day) || 0) + l.amountMl);
+  });
+
+  return dayMap;
+}
+

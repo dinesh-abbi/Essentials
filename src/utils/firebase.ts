@@ -3,7 +3,7 @@
  * Uses EXPO_PUBLIC_ env vars — safe to use in client bundle.
  */
 import { getApp, getApps, initializeApp } from 'firebase/app';
-import { initializeAuth } from 'firebase/auth';
+import { initializeAuth, onAuthStateChanged, type User } from 'firebase/auth';
 import * as Auth from 'firebase/auth';
 const getReactNativePersistence = (Auth as any).getReactNativePersistence;
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -29,5 +29,25 @@ export const auth = initializeAuth(app, {
 
 // Firestore for user profile data (webhook URLs, etc.)
 export const db = getFirestore(app);
+
+/**
+ * Returns a promise that resolves with the current Firebase user once auth
+ * state has been restored from AsyncStorage.  If the user is already
+ * authenticated it resolves immediately, avoiding the race condition where
+ * storage utils access `auth.currentUser` before the persisted session loads.
+ */
+export function waitForAuth(): Promise<User> {
+  return new Promise((resolve, reject) => {
+    if (auth.currentUser) {
+      resolve(auth.currentUser);
+      return;
+    }
+    const unsub = onAuthStateChanged(auth, (user) => {
+      unsub();
+      if (user) resolve(user);
+      else reject(new Error('No authenticated user'));
+    });
+  });
+}
 
 export { app };

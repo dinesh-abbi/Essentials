@@ -1,9 +1,10 @@
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Alert,
+  LayoutAnimation,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,24 +12,41 @@ import {
   TouchableOpacity,
   View,
   useColorScheme,
-  Switch,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { BottomTabInset, Colors, Radius, Spacing } from '@/constants/theme';
-import {
-  // isTestModeEnabled,     // COMMENTED OUT — test mode disabled
-  // setTestModeEnabled,    // COMMENTED OUT — test mode disabled
-  // setupWaterReminders,   // COMMENTED OUT — test mode disabled
-  getNotificationHealthStatus,
-  openBatteryOptimizationSettings,
-  markBatteryOptimizationDismissed,
-  openExactAlarmSettings,
-  ensureNotificationsScheduled,
-} from '@/utils/notifications';
+
+// ── Instruction Steps (inline for Discord setup) ──────────────────────────────
+const DISCORD_STEPS = [
+  {
+    number: '1',
+    title: 'Open Discord & Pick a Server',
+    detail: 'Open the Discord app (or discord.com) and navigate to the server where you want logs posted.',
+  },
+  {
+    number: '2',
+    title: 'Open Channel Settings',
+    detail: 'Right-click (or long-press on mobile) the text channel → select "Edit Channel".',
+  },
+  {
+    number: '3',
+    title: 'Go to Integrations → Webhooks',
+    detail: 'In the channel settings sidebar, tap "Integrations", then "Webhooks".',
+  },
+  {
+    number: '4',
+    title: 'Create a New Webhook',
+    detail: 'Tap "New Webhook". Optionally rename it (e.g. "Essentials"). Then tap "Copy Webhook URL".',
+  },
+  {
+    number: '5',
+    title: 'Paste Below & Save',
+    detail: 'Come back here, paste the URL in the field above, and tap "Save".',
+  },
+];
 
 function Row({
   icon,
@@ -60,92 +78,20 @@ export default function ProfileScreen() {
   const { user, signOut, updateDisplayName, discordWebhookUrl, updateDiscordWebhook } = useAuth();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = Colors[scheme];
+  const isDark = scheme === 'dark';
   const router = useRouter();
 
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState('');
-  // const [testMode, setTestMode] = useState(false); // COMMENTED OUT — test mode disabled
+
+  // Discord panel state
+  const [discordExpanded, setDiscordExpanded] = useState(false);
   const [isEditingWebhook, setIsEditingWebhook] = useState(false);
   const [newWebhookUrl, setNewWebhookUrl] = useState('');
   const [savingWebhook, setSavingWebhook] = useState(false);
-  const [notifHealth, setNotifHealth] = useState<{
-    notificationPermission: boolean;
-    batteryOptimizationDismissed: boolean;
-    scheduledCount: number;
-    expectedCount: number;
-    isHealthy: boolean;
-  } | null>(null);
-  const [fixingNotifs, setFixingNotifs] = useState(false);
-
-  useEffect(() => {
-    // isTestModeEnabled().then(setTestMode); // COMMENTED OUT — test mode disabled
-    refreshNotificationHealth();
-  }, []);
-
-  async function refreshNotificationHealth() {
-    try {
-      const health = await getNotificationHealthStatus();
-      setNotifHealth(health);
-    } catch (e) {
-      console.error('Failed to get notification health:', e);
-    }
-  }
-
-  async function handleFixNotifications() {
-    setFixingNotifs(true);
-    try {
-      // Step 1: Ensure notifications are scheduled
-      await ensureNotificationsScheduled();
-
-      // Step 2: Open battery optimization settings on Android
-      if (Platform.OS === 'android') {
-        Alert.alert(
-          'Optimize Notification Delivery ⚡',
-          'To ensure notifications arrive exactly on time:\n\n'
-          + '1. Tap "Allow" on the next screen to exempt Essentials from battery optimization.\n\n'
-          + '2. This prevents Android from delaying your water reminders during Doze mode.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Open Settings',
-              onPress: async () => {
-                await openBatteryOptimizationSettings();
-                await markBatteryOptimizationDismissed();
-                await refreshNotificationHealth();
-              },
-            },
-          ]
-        );
-      }
-    } catch (e) {
-      console.error('Fix notifications failed:', e);
-      Alert.alert('Error', 'Failed to configure notifications. Please try again.');
-    } finally {
-      setFixingNotifs(false);
-      await refreshNotificationHealth();
-    }
-  }
-
-  // COMMENTED OUT — test mode disabled
-  // async function handleToggleTestMode(value: boolean) {
-  //   setTestMode(value);
-  //   await setTestModeEnabled(value);
-  //   await setupWaterReminders();
-  //   if (value) {
-  //     Alert.alert(
-  //       'Test Mode Enabled 💧',
-  //       'Water reminders are now scheduled to fire every 1 minute with custom sound for testing purposes.'
-  //     );
-  //   } else {
-  //     Alert.alert(
-  //       'Test Mode Disabled',
-  //       'Normal hourly water reminders (8:00 AM to 10:00 PM) have been restored.'
-  //     );
-  //   }
-  // }
+  const [showHelp, setShowHelp] = useState(false);
 
   function maskWebhookUrl(url: string): string {
-    // Show first 40 chars + ...masked
     if (url.length <= 45) return url;
     return url.substring(0, 40) + '...••••';
   }
@@ -206,6 +152,21 @@ export default function ProfileScreen() {
       Alert.alert('Update failed', err.message ?? 'Could not update name.');
     }
   }
+
+  function toggleDiscordPanel() {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setDiscordExpanded(!discordExpanded);
+    if (!discordExpanded) {
+      setNewWebhookUrl(discordWebhookUrl ?? '');
+    }
+  }
+
+  function toggleHelp() {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setShowHelp(!showHelp);
+  }
+
+  const isLinked = !!discordWebhookUrl;
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -301,189 +262,151 @@ export default function ProfileScreen() {
             </View>
           </Animated.View>
 
-          {/* ── Notification Settings ──────────────────────────────────────── */}
-          <Animated.View entering={FadeInDown.delay(200).duration(400)}>
-            <View style={[styles.section, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-              <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>NOTIFICATION SETTINGS</Text>
-              
-              {/* COMMENTED OUT — test mode disabled
-              <View style={[styles.row, { borderColor: colors.border, paddingRight: 8, borderTopWidth: 0 }]}>
-                <View style={[styles.rowIcon, { backgroundColor: colors.backgroundSelected }]}>
-                  <Feather name="bell" size={15} color={colors.textSecondary} />
-                </View>
-                <View style={styles.rowText}>
-                  <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>1-Minute Reminders</Text>
-                  <Text style={[styles.rowValue, { color: colors.text }]}>
-                    {testMode ? 'Enabled' : 'Disabled'}
-                  </Text>
-                </View>
-                <Switch
-                  value={testMode}
-                  onValueChange={handleToggleTestMode}
-                  trackColor={{ false: colors.border, true: colors.primary }}
-                  thumbColor={Platform.OS === 'android' ? (testMode ? '#FFFFFF' : '#F4F3F4') : undefined}
-                />
-              </View>
-              */}
-
-              {/* ── Notification Health Status ─────────────────────────────── */}
-              {Platform.OS === 'android' && notifHealth && (
-                <>
-                  <View style={[styles.row, { borderColor: colors.border }]}>
-                    <View style={[styles.rowIcon, { backgroundColor: notifHealth.isHealthy ? '#10B98120' : '#F59E0B20' }]}>
-                      <Feather
-                        name={notifHealth.isHealthy ? 'check-circle' : 'alert-triangle'}
-                        size={15}
-                        color={notifHealth.isHealthy ? '#10B981' : '#F59E0B'}
-                      />
-                    </View>
-                    <View style={styles.rowText}>
-                      <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>Delivery Status</Text>
-                      <Text style={[styles.rowValue, { color: notifHealth.isHealthy ? '#10B981' : '#F59E0B' }]}>
-                        {notifHealth.isHealthy ? 'Optimized ✓' : 'Action Needed'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Scheduled count */}
-                  <View style={[styles.row, { borderColor: colors.border }]}>
-                    <View style={[styles.rowIcon, { backgroundColor: colors.backgroundSelected }]}>
-                      <Feather name="clock" size={15} color={colors.textSecondary} />
-                    </View>
-                    <View style={styles.rowText}>
-                      <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>Scheduled Alarms</Text>
-                      <Text style={[styles.rowValue, { color: colors.text }]}>
-                        {notifHealth.scheduledCount} / {notifHealth.expectedCount} active
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Battery optimization status */}
-                  <View style={[styles.row, { borderColor: colors.border }]}>
-                    <View style={[styles.rowIcon, { backgroundColor: notifHealth.batteryOptimizationDismissed ? '#10B98120' : '#EF444420' }]}>
-                      <Feather
-                        name={notifHealth.batteryOptimizationDismissed ? 'battery-charging' : 'battery'}
-                        size={15}
-                        color={notifHealth.batteryOptimizationDismissed ? '#10B981' : '#EF4444'}
-                      />
-                    </View>
-                    <View style={styles.rowText}>
-                      <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>Battery Optimization</Text>
-                      <Text style={[styles.rowValue, { color: notifHealth.batteryOptimizationDismissed ? '#10B981' : '#EF4444' }]}>
-                        {notifHealth.batteryOptimizationDismissed ? 'Unrestricted ✓' : 'Restricted — may delay notifications'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Fix Notifications Button */}
-                  {!notifHealth.isHealthy && (
-                    <TouchableOpacity
-                      id="fix-notifications-button"
-                      onPress={handleFixNotifications}
-                      disabled={fixingNotifs}
-                      activeOpacity={0.8}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 8,
-                        backgroundColor: '#F59E0B',
-                        borderRadius: Radius.md,
-                        paddingVertical: 12,
-                        marginTop: 8,
-                        marginBottom: 8,
-                        opacity: fixingNotifs ? 0.6 : 1,
-                      }}
-                    >
-                      <Feather name="zap" size={16} color="#FFFFFF" />
-                      <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>
-                        {fixingNotifs ? 'Fixing...' : 'Fix Notifications'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </>
-              )}
-            </View>
-          </Animated.View>
-
-          {/* ── Integrations ──────────────────────────────────────────────── */}
+          {/* ── Discord Integration (Single Expandable Row) ─────────────────── */}
           <Animated.View entering={FadeInDown.delay(220).duration(400)}>
             <View style={[styles.section, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
               <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>INTEGRATIONS</Text>
 
-              {isEditingWebhook ? (
-                <View style={[styles.editRow, { borderColor: colors.border }]}>
-                  <View style={[styles.rowIcon, { backgroundColor: '#5865F2' + '20' }]}>
-                    <Feather name="link" size={15} color="#5865F2" />
-                  </View>
-                  <View style={{ flex: 1, gap: 8 }}>
-                    <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>Discord Webhook URL</Text>
-                    <TextInput
-                      value={newWebhookUrl}
-                      onChangeText={setNewWebhookUrl}
-                      style={[styles.editInput, { color: colors.text, borderBottomColor: '#5865F2' }]}
-                      placeholder="https://discord.com/api/webhooks/..."
-                      placeholderTextColor={colors.textSecondary}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="url"
-                      autoFocus
-                    />
-                    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                      <TouchableOpacity
-                        onPress={handleSaveWebhook}
-                        disabled={savingWebhook}
-                        style={[styles.editBtn, { backgroundColor: '#5865F2', width: 'auto' as any, paddingHorizontal: 12, borderRadius: 8, flexDirection: 'row', gap: 4 }]}
-                        activeOpacity={0.8}
-                      >
-                        <Feather name="check" size={13} color="#FFFFFF" />
-                        <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>Save</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => setIsEditingWebhook(false)} style={[styles.editBtn, { backgroundColor: colors.backgroundSelected }]} activeOpacity={0.8}>
-                        <Feather name="x" size={14} color={colors.textSecondary} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              ) : (
-                <View style={[styles.row, { borderColor: colors.border, borderTopWidth: 0 }]}>
-                  <View style={[styles.rowIcon, { backgroundColor: '#5865F2' + '20' }]}>
-                    <Feather name="link" size={15} color="#5865F2" />
-                  </View>
-                  <View style={styles.rowText}>
-                    <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>Discord Webhook</Text>
-                    <Text style={[styles.rowValue, { color: discordWebhookUrl ? colors.text : colors.alert }]} numberOfLines={1}>
-                      {discordWebhookUrl ? maskWebhookUrl(discordWebhookUrl) : 'Not configured'}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setNewWebhookUrl(discordWebhookUrl ?? '');
-                      setIsEditingWebhook(true);
-                    }}
-                    style={{ padding: 6 }}
-                    activeOpacity={0.7}
-                  >
-                    <Feather name={discordWebhookUrl ? 'edit-2' : 'plus-circle'} size={14} color="#5865F2" />
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* Link to full instructions page */}
+              {/* Main Discord Row — tappable to expand */}
               <TouchableOpacity
-                onPress={() => router.push('/discord-setup')}
-                style={[styles.row, { borderColor: colors.border }]}
+                onPress={toggleDiscordPanel}
                 activeOpacity={0.7}
+                style={[styles.row, { borderColor: colors.border, borderTopWidth: 0 }]}
               >
-                <View style={[styles.rowIcon, { backgroundColor: colors.backgroundSelected }]}>
-                  <Feather name="help-circle" size={15} color={colors.textSecondary} />
+                <View style={[styles.rowIcon, { backgroundColor: '#5865F2' + '18' }]}>
+                  <Feather name="message-circle" size={15} color="#5865F2" />
                 </View>
                 <View style={styles.rowText}>
-                  <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>Need Help?</Text>
-                  <Text style={[styles.rowValue, { color: colors.primary }]}>How to get a Webhook URL</Text>
+                  <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>Discord</Text>
+                  <Text
+                    style={[
+                      styles.rowValue,
+                      { color: isLinked ? '#10B981' : isDark ? '#F59E0B' : '#D97706' },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {isLinked ? 'Connected ✓' : 'Not linked'}
+                  </Text>
                 </View>
-                <Feather name="chevron-right" size={16} color={colors.textSecondary} />
+                <View style={[styles.statusDot, { backgroundColor: isLinked ? '#10B981' : '#F59E0B' }]} />
+                <Feather
+                  name={discordExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={colors.textSecondary}
+                  style={{ marginLeft: 4 }}
+                />
               </TouchableOpacity>
+
+              {/* Expanded Discord Panel */}
+              {discordExpanded && (
+                <View style={[styles.discordPanel, { borderColor: colors.border }]}>
+                  {/* Current status */}
+                  {isLinked && !isEditingWebhook && (
+                    <View style={styles.discordStatusRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.discordLabel, { color: colors.textSecondary }]}>WEBHOOK URL</Text>
+                        <Text style={[styles.discordValue, { color: colors.text }]} numberOfLines={1}>
+                          {maskWebhookUrl(discordWebhookUrl!)}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setNewWebhookUrl(discordWebhookUrl ?? '');
+                          setIsEditingWebhook(true);
+                        }}
+                        style={[styles.discordActionBtn, { backgroundColor: '#5865F2' + '18' }]}
+                        activeOpacity={0.7}
+                      >
+                        <Feather name="edit-2" size={13} color="#5865F2" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Edit / Add mode */}
+                  {(isEditingWebhook || !isLinked) && (
+                    <View style={styles.discordEditBlock}>
+                      <Text style={[styles.discordLabel, { color: colors.textSecondary }]}>
+                        {isLinked ? 'UPDATE WEBHOOK URL' : 'ENTER YOUR WEBHOOK URL'}
+                      </Text>
+                      <TextInput
+                        value={newWebhookUrl}
+                        onChangeText={setNewWebhookUrl}
+                        style={[
+                          styles.discordInput,
+                          {
+                            color: colors.text,
+                            borderColor: '#5865F2' + '50',
+                            backgroundColor: isDark ? '#1C1C2E' : '#F0F0FF',
+                          },
+                        ]}
+                        placeholder="https://discord.com/api/webhooks/..."
+                        placeholderTextColor={colors.textSecondary}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="url"
+                      />
+                      <View style={styles.discordBtnRow}>
+                        <TouchableOpacity
+                          onPress={handleSaveWebhook}
+                          disabled={savingWebhook}
+                          style={[styles.discordSaveBtn, { backgroundColor: '#5865F2', opacity: savingWebhook ? 0.6 : 1 }]}
+                          activeOpacity={0.8}
+                        >
+                          <Feather name="check" size={14} color="#FFFFFF" />
+                          <Text style={styles.discordSaveBtnText}>
+                            {savingWebhook ? 'Saving...' : 'Save'}
+                          </Text>
+                        </TouchableOpacity>
+                        {isLinked && isEditingWebhook && (
+                          <TouchableOpacity
+                            onPress={() => setIsEditingWebhook(false)}
+                            style={[styles.discordCancelBtn, { backgroundColor: colors.backgroundSelected }]}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.discordCancelText, { color: colors.textSecondary }]}>Cancel</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Help toggle */}
+                  <TouchableOpacity onPress={toggleHelp} activeOpacity={0.7} style={styles.helpToggle}>
+                    <Feather name={showHelp ? 'chevron-up' : 'help-circle'} size={14} color={colors.textSecondary} />
+                    <Text style={[styles.helpToggleText, { color: colors.primary }]}>
+                      {showHelp ? 'Hide instructions' : 'How to get a Webhook URL'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Inline help steps */}
+                  {showHelp && (
+                    <View style={styles.helpSteps}>
+                      {DISCORD_STEPS.map((step, idx) => (
+                        <View
+                          key={step.number}
+                          style={[
+                            styles.helpStepRow,
+                            {
+                              borderBottomWidth: idx < DISCORD_STEPS.length - 1 ? StyleSheet.hairlineWidth : 0,
+                              borderBottomColor: colors.border,
+                            },
+                          ]}
+                        >
+                          <View style={[styles.helpStepBadge, { backgroundColor: '#5865F2' }]}>
+                            <Text style={styles.helpStepBadgeText}>{step.number}</Text>
+                          </View>
+                          <View style={{ flex: 1, gap: 2 }}>
+                            <Text style={[styles.helpStepTitle, { color: colors.text }]}>{step.title}</Text>
+                            <Text style={[styles.helpStepDetail, { color: colors.textSecondary }]}>
+                              {step.detail}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
             </View>
           </Animated.View>
 
@@ -650,6 +573,125 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  // ── Discord Panel ───────────────────────────────────────────────────────────
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  discordPanel: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 12,
+    paddingBottom: 14,
+    gap: 14,
+  },
+  discordStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  discordLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  discordValue: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  discordActionBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  discordEditBlock: {
+    gap: 8,
+  },
+  discordInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  discordBtnRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  discordSaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  discordSaveBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  discordCancelBtn: {
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  discordCancelText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  helpToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingTop: 2,
+  },
+  helpToggleText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  helpSteps: {
+    gap: 0,
+    marginTop: 4,
+  },
+  helpStepRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingVertical: 10,
+    alignItems: 'flex-start',
+  },
+  helpStepBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 1,
+  },
+  helpStepBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  helpStepTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  helpStepDetail: {
+    fontSize: 12,
+    fontWeight: '400',
+    lineHeight: 17,
   },
 
   // ── Sign out ────────────────────────────────────────────────────────────────
