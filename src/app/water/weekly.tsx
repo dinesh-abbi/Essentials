@@ -2,6 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -135,18 +136,19 @@ export default function WeeklyWaterScreen() {
           <ThemedText type="smallBold" themeColor="textSecondary" style={styles.headerTitle}>
             HYDRATION
           </ThemedText>
-          <View style={{ width: 40 }} />
+          {loading ? (
+            <ActivityIndicator size="small" color={colors.primary} style={{ width: 40 }} />
+          ) : (
+            <View style={{ width: 40 }} />
+          )}
         </View>
 
         {/* Tab Selector */}
         <WaterTabs activeTab="weekly" />
 
-        {loading ? (
-          <AppLoader />
-        ) : (
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            {/* Weekly Bar Chart Card */}
-            <Animated.View entering={FadeInDown.duration(400)}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Weekly Bar Chart Card */}
+          <Animated.View entering={FadeInDown.duration(400)}>
               <View style={[styles.chartCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
                 <View style={styles.chartHeader}>
                   <Text style={[styles.chartTitle, { color: colors.textSecondary }]}>WEEKLY HISTORY</Text>
@@ -237,7 +239,6 @@ export default function WeeklyWaterScreen() {
               </View>
             </Animated.View>
           </ScrollView>
-        )}
       </SafeAreaView>
     </ThemedView>
   );

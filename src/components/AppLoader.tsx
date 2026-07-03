@@ -5,81 +5,48 @@ import Animated, {
   useAnimatedStyle,
   withRepeat,
   withTiming,
-  withSequence,
   Easing,
 } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
- * AppLoader — branded full-screen loading overlay.
- *
- * Replaces raw <ActivityIndicator> throughout the app with a
- * premium pulsing animation tied to the app's primary colour.
+ * AppLoader — elegant, clean, and simple minimalist loading spinner.
  */
 export default function AppLoader({ label = 'Loading…' }: { label?: string }) {
   const theme = useTheme();
-
-  // Outer ring pulse
-  const outerScale = useSharedValue(1);
-  const outerOpacity = useSharedValue(0.3);
-
-  // Inner dot breathe
-  const innerScale = useSharedValue(0.85);
+  const rotation = useSharedValue(0);
 
   useEffect(() => {
-    outerScale.value = withRepeat(
-      withSequence(
-        withTiming(1.5, { duration: 900, easing: Easing.out(Easing.ease) }),
-        withTiming(1, { duration: 600, easing: Easing.in(Easing.ease) }),
-      ),
+    rotation.value = withRepeat(
+      withTiming(360, {
+        duration: 1000,
+        easing: Easing.linear,
+      }),
       -1,
-      false,
-    );
-    outerOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0, { duration: 900 }),
-        withTiming(0.3, { duration: 600 }),
-      ),
-      -1,
-      false,
-    );
-    innerScale.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 900, easing: Easing.out(Easing.ease) }),
-        withTiming(0.85, { duration: 600, easing: Easing.in(Easing.ease) }),
-      ),
-      -1,
-      false,
+      false
     );
   }, []);
 
-  const outerStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: outerScale.value }],
-    opacity: outerOpacity.value,
-  }));
-
-  const innerStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: innerScale.value }],
+  const spinnerStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
   }));
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      {/* Pulsing outer ring */}
-      <Animated.View
-        style={[
-          styles.outerRing,
-          outerStyle,
-          { borderColor: theme.primary },
-        ]}
-      />
-      {/* Inner filled dot */}
-      <Animated.View
-        style={[
-          styles.innerDot,
-          innerStyle,
-          { backgroundColor: theme.primary },
-        ]}
-      />
+      <View style={styles.spinnerContainer}>
+        {/* Simple elegant spinning ring */}
+        <Animated.View
+          style={[
+            styles.spinner,
+            spinnerStyle,
+            {
+              borderWidth: 3,
+              borderColor: theme.primary,
+              borderTopColor: 'transparent',
+            },
+          ]}
+        />
+      </View>
       {label ? (
         <Text style={[styles.label, { color: theme.textSecondary }]}>
           {label}
@@ -89,30 +56,28 @@ export default function AppLoader({ label = 'Loading…' }: { label?: string }) 
   );
 }
 
-const DOT = 18;
-const RING = 48;
+const SPINNER_SIZE = 36;
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 20,
+    padding: 24,
   },
-  outerRing: {
-    position: 'absolute',
-    width: RING,
-    height: RING,
-    borderRadius: RING / 2,
-    borderWidth: 2,
+  spinnerContainer: {
+    width: SPINNER_SIZE,
+    height: SPINNER_SIZE,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  innerDot: {
-    width: DOT,
-    height: DOT,
-    borderRadius: DOT / 2,
+  spinner: {
+    width: SPINNER_SIZE,
+    height: SPINNER_SIZE,
+    borderRadius: SPINNER_SIZE / 2,
   },
   label: {
-    marginTop: 36,
+    marginTop: 16,
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.5,

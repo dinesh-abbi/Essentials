@@ -122,7 +122,7 @@ export default function AttendanceScreen() {
 
     if (!webhookUrl) {
       Alert.alert('Webhook Required', 'Please set up your Discord Webhook URL to use check-in.', [
-        { text: 'Set Up', onPress: () => router.push('/discord-setup') },
+        { text: 'Set Up', onPress: () => router.push('/discord') },
         { text: 'Cancel', style: 'cancel' },
       ]);
       return;

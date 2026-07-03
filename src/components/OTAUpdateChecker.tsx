@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { Feather } from '@expo/vector-icons';
 

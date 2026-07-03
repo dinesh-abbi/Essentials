@@ -2,6 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -116,16 +117,17 @@ export default function MonthlyWaterScreen() {
           <ThemedText type="smallBold" themeColor="textSecondary" style={styles.headerTitle}>
             HYDRATION
           </ThemedText>
-          <View style={{ width: 40 }} />
+          {loading ? (
+            <ActivityIndicator size="small" color={colors.primary} style={{ width: 40 }} />
+          ) : (
+            <View style={{ width: 40 }} />
+          )}
         </View>
 
         {/* Tab Selector */}
         <WaterTabs activeTab="monthly" />
 
-        {loading && dayMap.size === 0 ? (
-          <AppLoader />
-        ) : (
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             {/* Month Navigation Control */}
             <View style={styles.navRow}>
               <TouchableOpacity onPress={handlePrevMonth} style={[styles.navBtn, { borderColor: colors.border }]}>
@@ -218,7 +220,6 @@ export default function MonthlyWaterScreen() {
               </View>
             </Animated.View>
           </ScrollView>
-        )}
       </SafeAreaView>
     </ThemedView>
   );
