@@ -2,7 +2,7 @@
   "expo": {
     "name": "Essentials",
     "slug": "Essentials",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "owner": "dineshabbi",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -23,7 +23,8 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.SCHEDULE_EXACT_ALARM"
-      ]
+      ],
+      "versionCode": 2
     },
     "web": {
       "output": "static",
