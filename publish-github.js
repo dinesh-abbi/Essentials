@@ -2,20 +2,16 @@
 /**
  * publish-github.js
  *
- * Builds the Android release APK and publishes it as a GitHub Release asset.
+ * Automatically increments the version and versionCode, builds the Android release APK,
+ * commits/pushes the version bump, and publishes it as a GitHub Release asset.
  *
  * Prerequisites:
  *   - `gh` CLI authenticated: gh auth login
  *   - Gradle wrapper present at ./android/gradlew
- *   - JDK 17 active (required by this project's Android build)
+ *   - JDK 17 active (configured via android/gradle.properties)
  *
  * Usage:
  *   npm run publish
- *
- * Before every run:
- *   1. Bump "version" in app.json       (e.g. "1.0.0" → "1.0.1")
- *   2. Bump "android.versionCode"       (e.g. 2 → 3)
- *   3. Commit and push the version bump to the repo
  */
 
 'use strict';
@@ -24,33 +20,83 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
+// Helper to run shell commands safely
+function runCmd(cmd, options = {}) {
+  try {
+    return execSync(cmd, { encoding: 'utf8', ...options });
+  } catch (err) {
+    throw new Error(err.stderr || err.message || `Command failed: ${cmd}`);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// 1. Read version from app.json
+// 1. Read files and backup initial state
 // ─────────────────────────────────────────────────────────────────────────────
 const appJsonPath = path.join(__dirname, 'app.json');
+const packageJsonPath = path.join(__dirname, 'package.json');
+
 if (!fs.existsSync(appJsonPath)) {
   console.error('❌  Error: app.json not found in project root.');
   process.exit(1);
 }
 
-const appJson = JSON.parse(fs.readFileSync(appJsonPath, 'utf8'));
-const version = appJson.expo?.version;
-const versionCode = appJson.expo?.android?.versionCode;
+const originalAppJsonRaw = fs.readFileSync(appJsonPath, 'utf8');
+const appJson = JSON.parse(originalAppJsonRaw);
 
-if (!version) {
-  console.error('❌  Error: expo.version not found in app.json.');
-  process.exit(1);
-}
-if (!versionCode) {
-  console.warn('⚠️   Warning: expo.android.versionCode not set in app.json.');
-  console.warn('    Android will reject the update if versionCode is not incremented.');
+let originalPackageJsonRaw = null;
+let packageJson = null;
+if (fs.existsSync(packageJsonPath)) {
+  originalPackageJsonRaw = fs.readFileSync(packageJsonPath, 'utf8');
+  packageJson = JSON.parse(originalPackageJsonRaw);
 }
 
-const tag = `v${version}`;
-console.log(`\n📦  Publishing Essentials ${tag}  (versionCode: ${versionCode ?? 'unset'})\n`);
+const currentVersion = appJson.expo?.version || '1.0.0';
+const currentVersionCode = appJson.expo?.android?.versionCode || 1;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. Build the Android release APK
+// 2. Compute and apply version increment
+// ─────────────────────────────────────────────────────────────────────────────
+const versionParts = currentVersion.split('.').map(Number);
+if (versionParts.length >= 3 && !versionParts.some(isNaN)) {
+  versionParts[2] += 1;
+} else {
+  versionParts[0] = 1;
+  versionParts[1] = 0;
+  versionParts[2] = 1;
+}
+const newVersion = versionParts.join('.');
+const newVersionCode = currentVersionCode + 1;
+
+// Apply changes in memory
+appJson.expo = appJson.expo || {};
+appJson.expo.version = newVersion;
+appJson.expo.android = appJson.expo.android || {};
+appJson.expo.android.versionCode = newVersionCode;
+
+if (packageJson) {
+  packageJson.version = newVersion;
+}
+
+const tag = `v${newVersion}`;
+console.log(`\n📦  Incrementing version: ${currentVersion} (code: ${currentVersionCode}) ➡️  ${newVersion} (code: ${newVersionCode})\n`);
+
+// Save updated configs to disk
+fs.writeFileSync(appJsonPath, JSON.stringify(appJson, null, 2) + '\n', 'utf8');
+if (packageJson) {
+  fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n', 'utf8');
+}
+
+// Revert function in case of compile failure
+function revertVersionBump() {
+  console.log('🔄  Reverting version bump changes to app.json / package.json...');
+  fs.writeFileSync(appJsonPath, originalAppJsonRaw, 'utf8');
+  if (originalPackageJsonRaw) {
+    fs.writeFileSync(packageJsonPath, originalPackageJsonRaw, 'utf8');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. Build the Android release APK
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('🔨  Building release APK via Gradle...\n');
 try {
@@ -62,11 +108,12 @@ try {
   console.log('\n✅  Gradle build completed successfully.');
 } catch (err) {
   console.error('\n❌  Gradle build failed.', err.message ?? err);
+  revertVersionBump();
   process.exit(1);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. Validate the compiled APK exists
+// 4. Validate the compiled APK exists
 // ─────────────────────────────────────────────────────────────────────────────
 const apkPath = path.join(
   __dirname,
@@ -81,7 +128,7 @@ const apkPath = path.join(
 
 if (!fs.existsSync(apkPath)) {
   console.error(`❌  Error: Compiled APK not found at:\n    ${apkPath}`);
-  console.error('    Make sure the Gradle build succeeded and signing is configured.');
+  revertVersionBump();
   process.exit(1);
 }
 
@@ -89,23 +136,41 @@ const apkSizeMB = (fs.statSync(apkPath).size / 1024 / 1024).toFixed(1);
 console.log(`\n📂  APK ready: ${apkPath}  (${apkSizeMB} MB)`);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. Verify gh CLI is available and authenticated
+// 5. Verify gh CLI is available and authenticated
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n🔐  Verifying GitHub CLI authentication...');
 try {
-  // `gh auth token` only checks the *active* account — exits 0 with a valid token.
-  // `gh auth status` is intentionally avoided: it exits 1 when *any* secondary
-  // account in the keyring has an invalid token, causing false "not authenticated" errors.
   const token = execSync('gh auth token', { encoding: 'utf8', stdio: 'pipe' }).trim();
   if (!token) throw new Error('Empty token');
   console.log('✅  GitHub CLI authenticated as active account.');
 } catch {
   console.error('❌  GitHub CLI is not authenticated. Run: gh auth login');
+  revertVersionBump();
   process.exit(1);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 5. Create the GitHub Release and upload the APK
+// 6. Commit version bump and push changes to git
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n💾  Committing version bump to git...');
+try {
+  runCmd('git add app.json');
+  if (packageJson) {
+    runCmd('git add package.json');
+  }
+  runCmd(`git commit -m "chore: bump version to ${tag}"`);
+  console.log('✅  Version bump committed.');
+
+  console.log('📤  Pushing commit to git upstream...');
+  runCmd('git push');
+  console.log('✅  Git push completed.');
+} catch (err) {
+  console.error('⚠️   Warning: Git commit/push failed.', err.message);
+  console.log('Continuing with release creation using built assets...');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. Create the GitHub Release and upload the APK
 // ─────────────────────────────────────────────────────────────────────────────
 console.log(`\n🚀  Creating GitHub Release ${tag} and uploading APK...\n`);
 
@@ -126,7 +191,6 @@ try {
 
   if (stderr.includes('already exists')) {
     console.error(`\n❌  Release ${tag} already exists on GitHub.`);
-    console.error('    Bump the version in app.json before publishing again.');
   } else {
     console.error('\n❌  Failed to create GitHub Release:', stderr || err.message);
   }
