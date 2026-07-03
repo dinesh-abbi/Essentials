@@ -1,17 +1,16 @@
 import { useEffect } from 'react';
 import { DarkTheme, DefaultTheme, Redirect, ThemeProvider, Stack, router } from 'expo-router';
-import { useColorScheme, ActivityIndicator, View } from 'react-native';
+import { useColorScheme } from 'react-native';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import { Colors } from '@/constants/theme';
 import * as WaterStorage from '@/utils/WaterStorage';
 import { ensureNotificationsScheduled, Notifications } from '@/utils/notifications';
+import OTAUpdateChecker from '@/components/OTAUpdateChecker';
+import AppLoader from '@/components/AppLoader';
 
 // ── Inner layout that can access AuthContext ───────────────────────────────────
 function AppStack() {
-  const { user, loading, discordWebhookUrl, profileLoaded } = useAuth();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = Colors[scheme];
+  const { user, loading, profileLoaded } = useAuth();
 
   useEffect(() => {
     if (user) {
@@ -43,13 +42,11 @@ function AppStack() {
     }
   }, [user]);
 
-  // Show a neutral spinner while Firebase resolves the persisted session
+  // Block all rendering until Firebase resolves the persisted session.
+  // Rendering AppLoader *before* <Stack> prevents the tabs from flashing
+  // briefly before the <Redirect href="/login" /> fires.
   if (loading || (user && !profileLoaded)) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
+    return <AppLoader label="Signing in…" />;
   }
 
   return (
@@ -60,12 +57,25 @@ function AppStack() {
         options={{ headerShown: false, animation: 'fade' }}
       />
 
-
-
       {/* Protected tabs */}
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 
       {/* Feature modals */}
+      {/* Water screens — plain fade push so opening from home feels like a
+          page transition, not a modal sheet. Weekly/Monthly use none so
+          tab-switching is instant with no blank-screen flash. */}
+      <Stack.Screen
+        name="water/index"
+        options={{ headerShown: false, animation: 'fade' }}
+      />
+      <Stack.Screen
+        name="water/weekly"
+        options={{ headerShown: false, animation: 'none' }}
+      />
+      <Stack.Screen
+        name="water/monthly"
+        options={{ headerShown: false, animation: 'none' }}
+      />
       <Stack.Screen
         name="attendance"
         options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }}
@@ -74,12 +84,10 @@ function AppStack() {
         name="purchases"
         options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }}
       />
-      <Stack.Screen
-        name="water"
-        options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }}
-      />
 
-      {/* Auth guard redirect */}
+      {/* Auth guard redirect — safe here because AppLoader fully blocks
+          the Stack from rendering while loading === true, so the tabs
+          never flash before this redirect fires. */}
       {!user && <Redirect href="/login" />}
 
     </Stack>
@@ -94,6 +102,7 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AuthProvider>
         <AnimatedSplashOverlay />
+        <OTAUpdateChecker />
         <AppStack />
       </AuthProvider>
     </ThemeProvider>
