@@ -60,21 +60,12 @@ function AppStack() {
       {/* Protected tabs */}
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 
-      {/* Feature modals */}
-      {/* Water screens — plain fade push so opening from home feels like a
-          page transition, not a modal sheet. Weekly/Monthly use none so
-          tab-switching is instant with no blank-screen flash. */}
+
+
+      {/* Feature modals & Groups */}
       <Stack.Screen
-        name="water/index"
+        name="water"
         options={{ headerShown: false, animation: 'fade' }}
-      />
-      <Stack.Screen
-        name="water/weekly"
-        options={{ headerShown: false, animation: 'none' }}
-      />
-      <Stack.Screen
-        name="water/monthly"
-        options={{ headerShown: false, animation: 'none' }}
       />
       <Stack.Screen
         name="attendance"
