@@ -162,7 +162,11 @@ try {
   console.log('✅  Version bump committed.');
 
   console.log('📤  Pushing commit to git upstream...');
-  runCmd('git push');
+  let branchName = 'main';
+  try {
+    branchName = execSync('git branch --show-current', { encoding: 'utf8' }).trim();
+  } catch {}
+  runCmd(`git push origin ${branchName || 'main'}`);
   console.log('✅  Git push completed.');
 } catch (err) {
   console.error('⚠️   Warning: Git commit/push failed.', err.message);
