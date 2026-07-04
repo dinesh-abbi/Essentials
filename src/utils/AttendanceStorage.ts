@@ -1,5 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Paths, Directory, File, UploadType } from 'expo-file-system';
+<<<<<<< HEAD
+=======
+import { auth, db, waitForAuth } from '@/utils/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
+import * as SyncManager from './SyncManager';
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 
 export interface OfflineLog {
   id: string;
@@ -26,6 +32,58 @@ function ensureDirectoryExists(): void {
 }
 
 /**
+<<<<<<< HEAD
+=======
+ * Gets the last check-in time, resetting daily
+ */
+export async function getLastCheckInTime(): Promise<number | null> {
+  try {
+    const timeStr = await AsyncStorage.getItem('@last_check_in_time');
+    if (!timeStr) return null;
+    const lastTime = parseInt(timeStr, 10);
+    if (isNaN(lastTime)) return null;
+
+    // Check if it's from a previous day (resets daily)
+    const lastDate = new Date(lastTime);
+    const today = new Date();
+    if (
+      lastDate.getDate() !== today.getDate() ||
+      lastDate.getMonth() !== today.getMonth() ||
+      lastDate.getFullYear() !== today.getFullYear()
+    ) {
+      await AsyncStorage.removeItem('@last_check_in_time');
+      return null;
+    }
+    return lastTime;
+  } catch (error) {
+    console.error('Failed to get last check in time', error);
+    return null;
+  }
+}
+
+/**
+ * Saves the last check-in time locally and to Firestore user document
+ */
+export async function saveLastCheckInTime(timestamp: number): Promise<void> {
+  try {
+    await AsyncStorage.setItem('@last_check_in_time', timestamp.toString());
+
+    const isOnline = await SyncManager.isOnline();
+    if (isOnline) {
+      await waitForAuth();
+      const user = auth.currentUser;
+      if (user) {
+        const userRef = doc(db, 'users', user.uid);
+        await updateDoc(userRef, { lastCheckInTime: timestamp });
+      }
+    }
+  } catch (error) {
+    console.error('Failed to save last check in time', error);
+  }
+}
+
+/**
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
  * Moves temporary camera file to persistent directory and logs to AsyncStorage queue
  */
 export async function saveOfflineLog(tempUri: string, timestamp: number): Promise<void> {
@@ -48,6 +106,12 @@ export async function saveOfflineLog(tempUri: string, timestamp: number): Promis
   });
 
   await AsyncStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(queue));
+<<<<<<< HEAD
+=======
+
+  // Save check-in timestamp offline too
+  await saveLastCheckInTime(timestamp);
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 }
 
 /**
@@ -103,9 +167,21 @@ export async function syncQueue(webhookUrl: string): Promise<{ successCount: num
         continue;
       }
 
+<<<<<<< HEAD
       // Prepare payload JSON
       const payload = {
         content: `📸 **Attendance Log Synced (Offline Mode)**\n**Captured at**: ${new Date(log.timestamp).toUTCString()}\n**Log ID**: \`${log.id}\``,
+=======
+      const formattedTime = new Date(log.timestamp).toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        dateStyle: 'medium',
+        timeStyle: 'medium',
+      }) + ' IST';
+
+      // Prepare payload JSON
+      const payload = {
+        content: `📸 **Attendance Log Synced (Offline Mode)**\n**Captured at**: ${formattedTime}\n**Log ID**: \`${log.id}\``,
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
       };
 
       const result = await file.upload(webhookUrl, {
@@ -120,6 +196,10 @@ export async function syncQueue(webhookUrl: string): Promise<{ successCount: num
       if (result.status >= 200 && result.status < 300) {
         successCount++;
         await removeOfflineLog(log.id, log.fileUri);
+<<<<<<< HEAD
+=======
+        await saveLastCheckInTime(log.timestamp);
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
       } else {
         failCount++;
         console.warn(`Sync failed for log ${log.id} with status code ${result.status}`);

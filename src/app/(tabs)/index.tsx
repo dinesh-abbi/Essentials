@@ -28,7 +28,10 @@ import Animated, {
 import { GlassView } from 'expo-glass-effect';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
+<<<<<<< HEAD
 import { ConfettiRain } from '@/components/ui/confetti-rain';
+=======
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 import {
   BottomTabInset,
   Colors,
@@ -39,7 +42,11 @@ import {
 import * as AttendanceStorage from '@/utils/AttendanceStorage';
 import * as PurchasesStorage from '@/utils/PurchasesStorage';
 import * as WaterStorage from '@/utils/WaterStorage';
+<<<<<<< HEAD
 import * as NotificationsUtil from '@/utils/notifications';
+=======
+import * as NotificationsUtil from '@/utils/notifications'; // kept for future use
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 import { useAuth } from '@/contexts/AuthContext';
 
 const { width } = Dimensions.get('window');
@@ -415,6 +422,7 @@ export default function HomeScreen() {
         6,
         false
       );
+<<<<<<< HEAD
 
       // Refresh water metrics immediately to stay in sync with background notification additions
       async function refresh() {
@@ -427,6 +435,8 @@ export default function HomeScreen() {
       }
       refresh();
 
+=======
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
       router.setParams({ highlight: undefined });
     }
   }, [highlight]);
@@ -450,6 +460,10 @@ export default function HomeScreen() {
   });
 
   const [offlineCount, setOfflineCount] = useState(0);
+<<<<<<< HEAD
+=======
+  const [lastCheckInTime, setLastCheckInTime] = useState<number | null>(null);
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
   const [todaySpend, setTodaySpend] = useState(0);
   const [waterTotalMl, setWaterTotalMl] = useState(0);
   const [waterHourlyMap, setWaterHourlyMap] = useState<Record<number, boolean>>({});
@@ -461,6 +475,12 @@ export default function HomeScreen() {
           const queue = await AttendanceStorage.getOfflineQueue();
           setOfflineCount(queue.length);
 
+<<<<<<< HEAD
+=======
+          const checkInTime = await AttendanceStorage.getLastCheckInTime();
+          setLastCheckInTime(checkInTime);
+
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
           const purchases = await PurchasesStorage.getPurchases();
           const midnight = new Date();
           midnight.setHours(0, 0, 0, 0);
@@ -485,10 +505,17 @@ export default function HomeScreen() {
       setWaterTotalMl(total);
       setWaterHourlyMap(hourly);
       
+<<<<<<< HEAD
       // Trigger test notification when we hit the daily water goal
       if (total >= WaterStorage.DEFAULT_DAILY_GOAL) {
         await NotificationsUtil.triggerWaterGoalNotification();
       }
+=======
+      // COMMENTED OUT — goal notification disabled for now
+      // if (total >= WaterStorage.DEFAULT_DAILY_GOAL) {
+      //   await NotificationsUtil.triggerWaterGoalNotification();
+      // }
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
     } catch (e) {
       console.error('Add water failed', e);
     }
@@ -577,6 +604,7 @@ export default function HomeScreen() {
             </AnimatedPressable>
 
             {/* Attendance Viewfinder widget */}
+<<<<<<< HEAD
             <AnimatedPressable onPress={() => router.push('/attendance')} style={{ flex: 1 }}>
               <GlassView style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border, alignItems: 'center' }]}>
                 <View style={[styles.widgetHeader, { width: '100%' }]}>
@@ -593,6 +621,41 @@ export default function HomeScreen() {
                   </Text>
                 </View>
               </GlassView>
+=======
+            <AnimatedPressable
+              onPress={() => router.push('/attendance')}
+              style={{ flex: 1 }}
+            >
+              {(() => {
+                const checkInTimeStr = lastCheckInTime
+                  ? new Date(lastCheckInTime).toLocaleTimeString('en-IN', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      timeZone: 'Asia/Kolkata',
+                    })
+                  : null;
+
+                return (
+                  <GlassView style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border, alignItems: 'center' }]}>
+                    <View style={[styles.widgetHeader, { width: '100%' }]}>
+                      <Label text="CHECK-IN" color={isDark ? '#94A3B8' : '#64748B'} />
+                      <Feather name="aperture" size={13} color={colors.accent} />
+                    </View>
+                    
+                    <CameraViewfinder offlineCount={offlineCount} colors={colors} isDark={isDark} />
+
+                    <View style={styles.statusRow}>
+                      <Dot color={offlineCount > 0 ? themeColors.alert : themeColors.success} />
+                      <Text style={[styles.statusText, { color: offlineCount > 0 ? themeColors.alert : themeColors.success, fontSize: 12 }]} numberOfLines={1}>
+                        {offlineCount > 0
+                          ? (checkInTimeStr ? `Pending • ${checkInTimeStr}` : `${offlineCount} log pending`)
+                          : (checkInTimeStr ? `Synced • ${checkInTimeStr}` : 'Synced')}
+                      </Text>
+                    </View>
+                  </GlassView>
+                );
+              })()}
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
             </AnimatedPressable>
 
           </Animated.View>
@@ -601,13 +664,17 @@ export default function HomeScreen() {
           <Animated.View entering={FadeInUp.delay(200).duration(600).springify()}>
             <Animated.View style={highlightStyle}>
               <GlassView style={[styles.widgetFullWidth, { backgroundColor: colors.surface, borderColor: 'transparent', borderWidth: 0 }]}>
+<<<<<<< HEAD
                 {/* Celebration Confetti & Rain overlay */}
                 <ConfettiRain active={waterPct >= 100} />
 
+=======
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
                 <View style={styles.horizontalSplit}>
                   <View style={{ flex: 1, gap: 10 }}>
                     <AnimatedPressable onPress={() => router.push('/water')} style={{ width: '100%' }}>
                       <View style={styles.widgetHeader}>
+<<<<<<< HEAD
                         <Label
                           text={waterPct >= 100 ? "🎉 WATER GOAL REACHED! 🎉" : "WATER & TIMELINE"}
                           color={waterPct >= 100 ? (isDark ? '#34D399' : '#059669') : (isDark ? '#94A3B8' : '#64748B')}
@@ -617,12 +684,17 @@ export default function HomeScreen() {
                           size={14}
                           color={waterPct >= 100 ? (isDark ? '#34D399' : '#059669') : colors.primary}
                         />
+=======
+                        <Label text="WATER & TIMELINE" color={isDark ? '#94A3B8' : '#64748B'} />
+                        <Feather name="droplet" size={14} color={colors.primary} />
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
                       </View>
                       
                       <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
                         <AnimatedNumber
                           value={waterTotalMl}
                           prefix=""
+<<<<<<< HEAD
                           style={[styles.widgetNumber, { color: waterPct >= 100 ? (isDark ? '#34D399' : '#059669') : colors.primary }]}
                         />
                         <Text style={[styles.widgetNumberUnit, { color: waterPct >= 100 ? (isDark ? '#34D399' : '#059669') : colors.primary }]}>ml</Text>
@@ -635,6 +707,14 @@ export default function HomeScreen() {
                             ({waterPct}% of goal)
                           </Text>
                         )}
+=======
+                          style={[styles.widgetNumber, { color: colors.primary }]}
+                        />
+                        <Text style={[styles.widgetNumberUnit, { color: colors.primary }]}>ml</Text>
+                        <Text style={[styles.statusText, { color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, marginLeft: 8 }]}>
+                          ({waterPct}% of goal)
+                        </Text>
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
                       </View>
                     </AnimatedPressable>
 
@@ -965,6 +1045,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: '50%',
   },
+<<<<<<< HEAD
   congratsBadge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -977,4 +1058,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.3,
   },
+=======
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 });

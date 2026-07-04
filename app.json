@@ -2,7 +2,11 @@
   "expo": {
     "name": "Essentials",
     "slug": "Essentials",
+<<<<<<< HEAD
     "version": "1.0.0",
+=======
+    "version": "1.0.10",
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
     "owner": "dineshabbi",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -21,8 +25,18 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.CAMERA",
+<<<<<<< HEAD
         "android.permission.RECORD_AUDIO"
       ]
+=======
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_EXACT_ALARM",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.REQUEST_INSTALL_PACKAGES"
+      ],
+      "versionCode": 11
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
     },
     "web": {
       "output": "static",

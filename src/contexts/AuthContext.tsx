@@ -8,6 +8,10 @@ import {
   signOut as firebaseSignOut,
   updateProfile,
 } from 'firebase/auth';
+<<<<<<< HEAD
+=======
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -29,28 +33,52 @@ if (!isExpoGo) {
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 
+<<<<<<< HEAD
 import { auth } from '@/utils/firebase';
+=======
+import { auth, db } from '@/utils/firebase';
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
+<<<<<<< HEAD
+=======
+  /** The user's saved Discord webhook URL (null if not set yet) */
+  discordWebhookUrl: string | null;
+  /** Whether the Firestore profile has been fetched yet */
+  profileLoaded: boolean;
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateDisplayName: (name: string) => Promise<void>;
+<<<<<<< HEAD
+=======
+  updateDiscordWebhook: (url: string) => Promise<void>;
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
+<<<<<<< HEAD
+=======
+  discordWebhookUrl: null,
+  profileLoaded: false,
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
   signInWithGoogle: async () => {},
   signInWithEmail: async () => {},
   signUpWithEmail: async () => {},
   signOut: async () => {},
   updateDisplayName: async () => {},
+<<<<<<< HEAD
+=======
+  updateDiscordWebhook: async () => {},
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 });
 
 // ─── Configure Google Sign-In (run once at module load) ───────────────────────
@@ -61,15 +89,64 @@ if (!isExpoGo && GoogleSignin) {
   });
 }
 
+<<<<<<< HEAD
+=======
+// ─── Firestore helpers ────────────────────────────────────────────────────────
+
+/** Ensure a user document exists in the `users` collection. Creates one on first login. */
+async function ensureUserDocument(u: User): Promise<string | null> {
+  const userRef = doc(db, 'users', u.uid);
+  const snap = await getDoc(userRef);
+
+  if (!snap.exists()) {
+    // First-time registration — create the document
+    await setDoc(userRef, {
+      uid: u.uid,
+      email: u.email ?? null,
+      discordWebhookUrl: null,
+      createdAt: serverTimestamp(),
+    });
+    return null; // no webhook yet
+  }
+
+  return snap.data()?.discordWebhookUrl ?? null;
+}
+
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 // ─── Provider ─────────────────────────────────────────────────────────────────
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+<<<<<<< HEAD
 
   // ── Firebase auth state listener ──────────────────────────────────────────────
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
+=======
+  const [discordWebhookUrl, setDiscordWebhookUrl] = useState<string | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+
+  // ── Firebase auth state listener ──────────────────────────────────────────────
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+
+      if (u) {
+        try {
+          const webhookUrl = await ensureUserDocument(u);
+          setDiscordWebhookUrl(webhookUrl);
+        } catch (err) {
+          console.error('Failed to load user profile from Firestore:', err);
+          setDiscordWebhookUrl(null);
+        }
+        setProfileLoaded(true);
+      } else {
+        setDiscordWebhookUrl(null);
+        setProfileLoaded(false);
+      }
+
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
       setLoading(false);
     });
     return unsub;
@@ -143,9 +220,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+<<<<<<< HEAD
   return (
     <AuthContext.Provider
       value={{ user, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, updateDisplayName }}
+=======
+  const updateDiscordWebhook = useCallback(async (url: string) => {
+    if (!auth.currentUser) return;
+    const userRef = doc(db, 'users', auth.currentUser.uid);
+    await updateDoc(userRef, { discordWebhookUrl: url });
+    setDiscordWebhookUrl(url);
+  }, []);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        discordWebhookUrl,
+        profileLoaded,
+        signInWithGoogle,
+        signInWithEmail,
+        signUpWithEmail,
+        signOut,
+        updateDisplayName,
+        updateDiscordWebhook,
+      }}
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
     >
       {children}
     </AuthContext.Provider>

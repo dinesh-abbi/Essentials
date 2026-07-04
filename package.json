@@ -1,6 +1,7 @@
 {
   "name": "essentials",
   "main": "expo-router/entry",
+<<<<<<< HEAD
   "version": "1.0.0",
   "dependencies": {
     "@expo/ui": "~56.0.17",
@@ -11,16 +12,37 @@
     "expo-auth-session": "~56.0.14",
     "expo-camera": "~56.0.8",
     "expo-constants": "~56.0.18",
+=======
+  "version": "1.0.10",
+  "dependencies": {
+    "@expo/ui": "~56.0.20",
+    "@expo/vector-icons": "^15.0.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-google-signin/google-signin": "^16.1.2",
+    "expo": "~56.0.14",
+    "expo-auth-session": "~56.0.15",
+    "expo-camera": "~56.0.8",
+    "expo-constants": "~56.0.20",
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
     "expo-crypto": "~56.0.4",
     "expo-device": "~56.0.4",
     "expo-file-system": "~56.0.8",
     "expo-font": "~56.0.6",
     "expo-glass-effect": "~56.0.4",
     "expo-image": "~56.0.11",
+<<<<<<< HEAD
     "expo-linking": "~56.0.14",
     "expo-notifications": "~56.0.17",
     "expo-router": "~56.2.10",
     "expo-splash-screen": "~56.0.10",
+=======
+    "expo-intent-launcher": "~56.0.4",
+    "expo-linking": "~56.0.15",
+    "expo-local-authentication": "~56.0.4",
+    "expo-notifications": "~56.0.19",
+    "expo-router": "~56.2.13",
+    "expo-splash-screen": "~56.0.12",
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
     "expo-status-bar": "~56.0.4",
     "expo-symbols": "~56.0.6",
     "expo-system-ui": "~56.0.5",
@@ -46,7 +68,15 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+<<<<<<< HEAD
     "lint": "expo lint"
   },
   "private": true
+=======
+    "lint": "expo lint",
+    "publish": "node publish-github.js"
+  },
+  "private": true,
+  "packageManager": "yarn@4.9.0+sha512.5f5f00843eae735dfab6f0442524603e987ceca55e98b36eb0120f4e58908e5b1406545321e46627dca97d15d562f23dc13fb96cabd4e6bc92d379f619001e4e"
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 }

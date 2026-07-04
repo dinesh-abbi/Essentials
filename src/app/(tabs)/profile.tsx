@@ -1,9 +1,16 @@
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+<<<<<<< HEAD
 import { useState, useEffect } from 'react';
 import {
   Alert,
+=======
+import { useState } from 'react';
+import {
+  Alert,
+  LayoutAnimation,
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
   ScrollView,
   StyleSheet,
   Text,
@@ -11,12 +18,16 @@ import {
   TouchableOpacity,
   View,
   useColorScheme,
+<<<<<<< HEAD
   Switch,
   Platform,
+=======
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
+<<<<<<< HEAD
 import { useAuth } from '@/contexts/AuthContext';
 import { BottomTabInset, Colors, Radius, Spacing } from '@/constants/theme';
 import {
@@ -26,6 +37,42 @@ import {
   setOneMinuteReminderEnabled,
   scheduleHourlyWaterReminder,
 } from '@/utils/notifications';
+=======
+import * as Application from 'expo-application';
+import Constants from 'expo-constants';
+
+import { useAuth } from '@/contexts/AuthContext';
+import { BottomTabInset, Colors, Radius, Spacing } from '@/constants/theme';
+
+// ── Instruction Steps (inline for Discord setup) ──────────────────────────────
+const DISCORD_STEPS = [
+  {
+    number: '1',
+    title: 'Open Discord & Pick a Server',
+    detail: 'Open the Discord app (or discord.com) and navigate to the server where you want logs posted.',
+  },
+  {
+    number: '2',
+    title: 'Open Channel Settings',
+    detail: 'Right-click (or long-press on mobile) the text channel → select "Edit Channel".',
+  },
+  {
+    number: '3',
+    title: 'Go to Integrations → Webhooks',
+    detail: 'In the channel settings sidebar, tap "Integrations", then "Webhooks".',
+  },
+  {
+    number: '4',
+    title: 'Create a New Webhook',
+    detail: 'Tap "New Webhook". Optionally rename it (e.g. "Essentials"). Then tap "Copy Webhook URL".',
+  },
+  {
+    number: '5',
+    title: 'Paste Below & Save',
+    detail: 'Come back here, paste the URL in the field above, and tap "Save".',
+  },
+];
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 
 function Row({
   icon,
@@ -54,6 +101,7 @@ function Row({
 }
 
 export default function ProfileScreen() {
+<<<<<<< HEAD
   const { user, signOut, updateDisplayName } = useAuth();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = Colors[scheme];
@@ -86,6 +134,51 @@ export default function ProfileScreen() {
       Alert.alert('Error', e.message || 'Failed to update reminder settings.');
     }
   };
+=======
+  const { user, signOut, updateDisplayName, discordWebhookUrl, updateDiscordWebhook } = useAuth();
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const colors = Colors[scheme];
+  const isDark = scheme === 'dark';
+  const router = useRouter();
+  const currentVersion = Application.nativeApplicationVersion || Constants.expoConfig?.version || '1.0.0';
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [newName, setNewName] = useState('');
+
+  // Discord panel state
+  const [discordExpanded, setDiscordExpanded] = useState(false);
+  const [isEditingWebhook, setIsEditingWebhook] = useState(false);
+  const [newWebhookUrl, setNewWebhookUrl] = useState('');
+  const [savingWebhook, setSavingWebhook] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+
+  function maskWebhookUrl(url: string): string {
+    if (url.length <= 45) return url;
+    return url.substring(0, 40) + '...••••';
+  }
+
+  async function handleSaveWebhook() {
+    const trimmed = newWebhookUrl.trim();
+    if (!trimmed) {
+      Alert.alert('URL Required', 'Please enter your Discord Webhook URL.');
+      return;
+    }
+    if (!trimmed.startsWith('https://discord.com/api/webhooks/')) {
+      Alert.alert('Invalid URL', 'The URL must start with https://discord.com/api/webhooks/');
+      return;
+    }
+    setSavingWebhook(true);
+    try {
+      await updateDiscordWebhook(trimmed);
+      setIsEditingWebhook(false);
+      Alert.alert('Saved', 'Discord Webhook URL updated successfully.');
+    } catch (err: any) {
+      Alert.alert('Save Failed', err?.message ?? 'Could not update webhook URL.');
+    } finally {
+      setSavingWebhook(false);
+    }
+  }
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 
   const displayName = user?.displayName ?? user?.email?.split('@')[0] ?? 'User';
   const email = user?.email ?? '—';
@@ -122,6 +215,24 @@ export default function ProfileScreen() {
     }
   }
 
+<<<<<<< HEAD
+=======
+  function toggleDiscordPanel() {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setDiscordExpanded(!discordExpanded);
+    if (!discordExpanded) {
+      setNewWebhookUrl(discordWebhookUrl ?? '');
+    }
+  }
+
+  function toggleHelp() {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setShowHelp(!showHelp);
+  }
+
+  const isLinked = !!discordWebhookUrl;
+
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -213,6 +324,7 @@ export default function ProfileScreen() {
                   )}
                 </View>
               )}
+<<<<<<< HEAD
             </View>
           </Animated.View>
 
@@ -280,11 +392,166 @@ export default function ProfileScreen() {
                 </View>
                 <Feather name="chevron-right" size={16} color={colors.textSecondary} />
               </TouchableOpacity>
+=======
+              <Row icon="info" label="App Version" value={currentVersion} colors={colors} />
+            </View>
+          </Animated.View>
+
+          {/* ── Discord Integration (Single Expandable Row) ─────────────────── */}
+          <Animated.View entering={FadeInDown.delay(220).duration(400)}>
+            <View style={[styles.section, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
+              <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>INTEGRATIONS</Text>
+
+              {/* Main Discord Row — tappable to expand */}
+              <TouchableOpacity
+                onPress={toggleDiscordPanel}
+                activeOpacity={0.7}
+                style={[styles.row, { borderColor: colors.border, borderTopWidth: 0 }]}
+              >
+                <View style={[styles.rowIcon, { backgroundColor: '#5865F2' + '18' }]}>
+                  <Feather name="message-circle" size={15} color="#5865F2" />
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>Discord</Text>
+                  <Text
+                    style={[
+                      styles.rowValue,
+                      { color: isLinked ? '#10B981' : isDark ? '#F59E0B' : '#D97706' },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {isLinked ? 'Connected ✓' : 'Not linked'}
+                  </Text>
+                </View>
+                <View style={[styles.statusDot, { backgroundColor: isLinked ? '#10B981' : '#F59E0B' }]} />
+                <Feather
+                  name={discordExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={colors.textSecondary}
+                  style={{ marginLeft: 4 }}
+                />
+              </TouchableOpacity>
+
+              {/* Expanded Discord Panel */}
+              {discordExpanded && (
+                <View style={[styles.discordPanel, { borderColor: colors.border }]}>
+                  {/* Current status */}
+                  {isLinked && !isEditingWebhook && (
+                    <View style={styles.discordStatusRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.discordLabel, { color: colors.textSecondary }]}>WEBHOOK URL</Text>
+                        <Text style={[styles.discordValue, { color: colors.text }]} numberOfLines={1}>
+                          {maskWebhookUrl(discordWebhookUrl!)}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setNewWebhookUrl(discordWebhookUrl ?? '');
+                          setIsEditingWebhook(true);
+                        }}
+                        style={[styles.discordActionBtn, { backgroundColor: '#5865F2' + '18' }]}
+                        activeOpacity={0.7}
+                      >
+                        <Feather name="edit-2" size={13} color="#5865F2" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Edit / Add mode */}
+                  {(isEditingWebhook || !isLinked) && (
+                    <View style={styles.discordEditBlock}>
+                      <Text style={[styles.discordLabel, { color: colors.textSecondary }]}>
+                        {isLinked ? 'UPDATE WEBHOOK URL' : 'ENTER YOUR WEBHOOK URL'}
+                      </Text>
+                      <TextInput
+                        value={newWebhookUrl}
+                        onChangeText={setNewWebhookUrl}
+                        style={[
+                          styles.discordInput,
+                          {
+                            color: colors.text,
+                            borderColor: '#5865F2' + '50',
+                            backgroundColor: isDark ? '#1C1C2E' : '#F0F0FF',
+                          },
+                        ]}
+                        placeholder="https://discord.com/api/webhooks/..."
+                        placeholderTextColor={colors.textSecondary}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="url"
+                      />
+                      <View style={styles.discordBtnRow}>
+                        <TouchableOpacity
+                          onPress={handleSaveWebhook}
+                          disabled={savingWebhook}
+                          style={[styles.discordSaveBtn, { backgroundColor: '#5865F2', opacity: savingWebhook ? 0.6 : 1 }]}
+                          activeOpacity={0.8}
+                        >
+                          <Feather name="check" size={14} color="#FFFFFF" />
+                          <Text style={styles.discordSaveBtnText}>
+                            {savingWebhook ? 'Saving...' : 'Save'}
+                          </Text>
+                        </TouchableOpacity>
+                        {isLinked && isEditingWebhook && (
+                          <TouchableOpacity
+                            onPress={() => setIsEditingWebhook(false)}
+                            style={[styles.discordCancelBtn, { backgroundColor: colors.backgroundSelected }]}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[styles.discordCancelText, { color: colors.textSecondary }]}>Cancel</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Help toggle */}
+                  <TouchableOpacity onPress={toggleHelp} activeOpacity={0.7} style={styles.helpToggle}>
+                    <Feather name={showHelp ? 'chevron-up' : 'help-circle'} size={14} color={colors.textSecondary} />
+                    <Text style={[styles.helpToggleText, { color: colors.primary }]}>
+                      {showHelp ? 'Hide instructions' : 'How to get a Webhook URL'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Inline help steps */}
+                  {showHelp && (
+                    <View style={styles.helpSteps}>
+                      {DISCORD_STEPS.map((step, idx) => (
+                        <View
+                          key={step.number}
+                          style={[
+                            styles.helpStepRow,
+                            {
+                              borderBottomWidth: idx < DISCORD_STEPS.length - 1 ? StyleSheet.hairlineWidth : 0,
+                              borderBottomColor: colors.border,
+                            },
+                          ]}
+                        >
+                          <View style={[styles.helpStepBadge, { backgroundColor: '#5865F2' }]}>
+                            <Text style={styles.helpStepBadgeText}>{step.number}</Text>
+                          </View>
+                          <View style={{ flex: 1, gap: 2 }}>
+                            <Text style={[styles.helpStepTitle, { color: colors.text }]}>{step.title}</Text>
+                            <Text style={[styles.helpStepDetail, { color: colors.textSecondary }]}>
+                              {step.detail}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
             </View>
           </Animated.View>
 
           {/* ── Sign Out ────────────────────────────────────────────────────── */}
+<<<<<<< HEAD
           <Animated.View entering={FadeInDown.delay(320).duration(400)}>
+=======
+          <Animated.View entering={FadeInDown.delay(300).duration(400)}>
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
             <TouchableOpacity
               id="signout-button"
               style={[styles.signOutBtn, { borderColor: colors.alert }]}
@@ -448,6 +715,128 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
+<<<<<<< HEAD
+=======
+  // ── Discord Panel ───────────────────────────────────────────────────────────
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  discordPanel: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 12,
+    paddingBottom: 14,
+    gap: 14,
+  },
+  discordStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  discordLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  discordValue: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  discordActionBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  discordEditBlock: {
+    gap: 8,
+  },
+  discordInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  discordBtnRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  discordSaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  discordSaveBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  discordCancelBtn: {
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  discordCancelText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  helpToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingTop: 2,
+  },
+  helpToggleText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  helpSteps: {
+    gap: 0,
+    marginTop: 4,
+  },
+  helpStepRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingVertical: 10,
+    alignItems: 'flex-start',
+  },
+  helpStepBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 1,
+  },
+  helpStepBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  helpStepTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  helpStepDetail: {
+    fontSize: 12,
+    fontWeight: '400',
+    lineHeight: 17,
+  },
+
+>>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
   // ── Sign out ────────────────────────────────────────────────────────────────
   signOutBtn: {
     flexDirection: 'row',
