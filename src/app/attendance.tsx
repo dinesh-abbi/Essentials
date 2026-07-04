@@ -167,6 +167,7 @@ export default function AttendanceScreen() {
       });
 
       if (result.status >= 200 && result.status < 300) {
+        await AttendanceStorage.saveLastCheckInTime(timestamp);
         setLoading(false);
         Alert.alert('[ SUCCESS ]', 'Attendance logged successfully.');
         router.back();

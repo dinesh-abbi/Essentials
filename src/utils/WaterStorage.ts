@@ -7,9 +7,13 @@ import {
   query,
   where,
   writeBatch,
+  setDoc,
 } from 'firebase/firestore';
 
 import { auth, db, waitForAuth } from '@/utils/firebase';
+import * as SyncManager from './SyncManager';
+
+const generateId = () => `water_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
 export interface WaterLog {
   id: string;
@@ -38,20 +42,45 @@ async function waterLogsCollection() {
 }
 
 /**
+ * Applies pending offline actions to the water logs array to keep UI updated.
+ */
+export async function applyWaterOfflineMutations(logs: WaterLog[]): Promise<WaterLog[]> {
+  const queue = await SyncManager.getSyncQueue();
+  let result = [...logs];
+
+  for (const action of queue) {
+    if (action.type === 'water_clear') {
+      result = [];
+    } else if (action.type === 'water_log') {
+      const { id, amountMl, timestamp } = action.payload;
+      if (!result.some((r) => r.id === id)) {
+        result.push({ id, amountMl, timestamp });
+      }
+    } else if (action.type === 'water_delete') {
+      const { id } = action.payload;
+      result = result.filter((r) => r.id !== id);
+    }
+  }
+
+  return result.sort((a, b) => b.timestamp - a.timestamp);
+}
+
+/**
  * Retrieve all water logs for the current user.
  */
 export async function getWaterLogs(): Promise<WaterLog[]> {
+  let dbLogs: WaterLog[] = [];
   try {
     const snapshot = await getDocs(await waterLogsCollection());
-    return snapshot.docs.map((d) => ({
+    dbLogs = snapshot.docs.map((d) => ({
       id: d.id,
       amountMl: d.data().amountMl,
       timestamp: d.data().timestamp,
     }));
   } catch (error) {
-    console.error('Failed to get water logs from Firestore', error);
-    return [];
+    console.warn('Failed to get water logs from Firestore, using offline logs', error);
   }
+  return applyWaterOfflineMutations(dbLogs);
 }
 
 /**
@@ -59,22 +88,40 @@ export async function getWaterLogs(): Promise<WaterLog[]> {
  */
 export async function logWaterIntake(amountMl: number): Promise<WaterLog> {
   const timestamp = Date.now();
+  const id = generateId();
 
-  try {
-    const docRef = await addDoc(await waterLogsCollection(), {
-      amountMl,
-      timestamp,
-    });
+  const isOnline = await SyncManager.isOnline();
+  if (isOnline) {
+    try {
+      const coll = await waterLogsCollection();
+      const docRef = doc(coll, id);
+      await setDoc(docRef, {
+        amountMl,
+        timestamp,
+      });
 
-    return {
-      id: docRef.id,
-      amountMl,
-      timestamp,
-    };
-  } catch (error) {
-    console.error('Failed to log water intake to Firestore', error);
-    throw error;
+      return {
+        id,
+        amountMl,
+        timestamp,
+      };
+    } catch (error) {
+      console.warn('Failed to log water intake directly to Firestore, queueing offline', error);
+    }
   }
+
+  // Save offline fallback
+  await SyncManager.queueAction({
+    id: `action_${id}`,
+    type: 'water_log',
+    payload: { id, amountMl, timestamp },
+  });
+
+  return {
+    id,
+    amountMl,
+    timestamp,
+  };
 }
 
 /**
@@ -85,21 +132,26 @@ export async function getTodayWaterLogs(): Promise<WaterLog[]> {
   startOfToday.setHours(0, 0, 0, 0);
   const startOfTodayMs = startOfToday.getTime();
 
+  let dbLogs: WaterLog[] = [];
   try {
     const q = query(
       await waterLogsCollection(),
       where('timestamp', '>=', startOfTodayMs)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((d) => ({
+    dbLogs = snapshot.docs.map((d) => ({
       id: d.id,
       amountMl: d.data().amountMl,
       timestamp: d.data().timestamp,
     }));
   } catch (error) {
-    console.error('Failed to get today water logs from Firestore', error);
-    return [];
+    console.warn('Failed to get today water logs from Firestore, merging with offline', error);
   }
+
+  // Merge with offline actions
+  const merged = await applyWaterOfflineMutations(dbLogs);
+  // Filter for today
+  return merged.filter((log) => log.timestamp >= startOfTodayMs);
 }
 
 /**
@@ -139,35 +191,55 @@ export async function getTodayHourlyStatus(): Promise<Record<number, boolean>> {
  * Delete a specific water log by ID from Firestore.
  */
 export async function deleteWaterLog(id: string): Promise<void> {
-  try {
-    const uid = await getCurrentUserId();
-    await deleteDoc(doc(db, 'users', uid, 'waterLogs', id));
-  } catch (error) {
-    console.error('Failed to delete water log from Firestore', error);
-    throw error;
+  const isOnline = await SyncManager.isOnline();
+  if (isOnline) {
+    try {
+      const uid = await getCurrentUserId();
+      await deleteDoc(doc(db, 'users', uid, 'waterLogs', id));
+      return;
+    } catch (error) {
+      console.warn('Failed to delete water log directly from Firestore, queueing offline', error);
+    }
   }
+
+  // Save offline delete action
+  await SyncManager.queueAction({
+    id: `action_delete_${id}_${Date.now()}`,
+    type: 'water_delete',
+    payload: { id },
+  });
 }
 
 /**
  * Clear all water logs for today from Firestore (batch delete).
  */
 export async function clearWaterLogs(): Promise<void> {
-  try {
-    const todayLogs = await getTodayWaterLogs();
-    if (todayLogs.length === 0) return;
+  const isOnline = await SyncManager.isOnline();
+  if (isOnline) {
+    try {
+      const todayLogs = await getTodayWaterLogs();
+      if (todayLogs.length === 0) return;
 
-    const uid = await getCurrentUserId();
-    const batch = writeBatch(db);
+      const uid = await getCurrentUserId();
+      const batch = writeBatch(db);
 
-    todayLogs.forEach((log) => {
-      batch.delete(doc(db, 'users', uid, 'waterLogs', log.id));
-    });
+      todayLogs.forEach((log) => {
+        batch.delete(doc(db, 'users', uid, 'waterLogs', log.id));
+      });
 
-    await batch.commit();
-  } catch (error) {
-    console.error('Failed to clear water logs from Firestore', error);
-    throw error;
+      await batch.commit();
+      return;
+    } catch (error) {
+      console.warn('Failed to clear water logs directly from Firestore, queueing offline', error);
+    }
   }
+
+  // Save offline clear action
+  await SyncManager.queueAction({
+    id: `action_clear_water_${Date.now()}`,
+    type: 'water_clear',
+    payload: {},
+  });
 }
 
 /**

@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  useDerivedValue,
   withTiming,
   withRepeat,
   Easing,
@@ -31,6 +32,8 @@ import * as WaterStorage from '@/utils/WaterStorage';
 
 // ── Water Wave Animation Component ──────────────────────────────────────────
 function WaterWave({ percent, colors }: { percent: number; colors: any }) {
+  const animatedPercent = useSharedValue(0);
+
   const rotation1 = useSharedValue(0);
   const rotation2 = useSharedValue(0);
 
@@ -40,7 +43,7 @@ function WaterWave({ percent, colors }: { percent: number; colors: any }) {
   const bubbleY3 = useSharedValue(0);
 
   useEffect(() => {
-    // Wave rotation loop — withLoop was removed in Reanimated v4; use withRepeat(-1, false)
+    // Wave rotation loop
     rotation1.value = withRepeat(
       withTiming(360, { duration: 9000, easing: Easing.linear }),
       -1,
@@ -70,31 +73,62 @@ function WaterWave({ percent, colors }: { percent: number; colors: any }) {
     );
   }, []);
 
-  const waveHeight = interpolate(Math.min(percent, 1), [0, 1], [180, -30]);
+  // Update animated percentage when prop changes
+  useEffect(() => {
+    animatedPercent.value = withTiming(Math.min(percent, 1), {
+      duration: 1000,
+      easing: Easing.out(Easing.quad),
+    });
+  }, [percent]);
+
+  // TranslateY: 320 is empty, 110 is full
+  const waveHeight = useDerivedValue(() => {
+    return interpolate(animatedPercent.value, [0, 1], [320, 110]);
+  });
 
   const waveStyle1 = useAnimatedStyle(() => ({
     transform: [
-      { translateY: waveHeight },
+      { translateY: waveHeight.value },
       { rotate: `${rotation1.value}deg` },
     ],
   }));
 
   const waveStyle2 = useAnimatedStyle(() => ({
     transform: [
-      { translateY: waveHeight - 10 },
+      { translateY: waveHeight.value - 10 },
       { rotate: `${rotation2.value}deg` },
     ],
   }));
 
-  const bubbleStyle1 = useAnimatedStyle(() => ({
-    transform: [{ translateY: bubbleY1.value }],
-  }));
-  const bubbleStyle2 = useAnimatedStyle(() => ({
-    transform: [{ translateY: bubbleY2.value }],
-  }));
-  const bubbleStyle3 = useAnimatedStyle(() => ({
-    transform: [{ translateY: bubbleY3.value }],
-  }));
+  const bubbleStyle1 = useAnimatedStyle(() => {
+    const bubbleY = 190 + bubbleY1.value;
+    const waterY = 210 * (1 - animatedPercent.value);
+    const opacity = bubbleY < waterY ? 0 : 1;
+    return {
+      transform: [{ translateY: bubbleY1.value }],
+      opacity,
+    };
+  });
+
+  const bubbleStyle2 = useAnimatedStyle(() => {
+    const bubbleY = 200 + bubbleY2.value;
+    const waterY = 210 * (1 - animatedPercent.value);
+    const opacity = bubbleY < waterY ? 0 : 1;
+    return {
+      transform: [{ translateY: bubbleY2.value }],
+      opacity,
+    };
+  });
+
+  const bubbleStyle3 = useAnimatedStyle(() => {
+    const bubbleY = 180 + bubbleY3.value;
+    const waterY = 210 * (1 - animatedPercent.value);
+    const opacity = bubbleY < waterY ? 0 : 1;
+    return {
+      transform: [{ translateY: bubbleY3.value }],
+      opacity,
+    };
+  });
 
   return (
     <View style={[styles.waveContainer, { borderColor: colors.border }]}>

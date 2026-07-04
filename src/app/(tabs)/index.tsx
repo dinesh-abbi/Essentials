@@ -437,6 +437,7 @@ export default function HomeScreen() {
   });
 
   const [offlineCount, setOfflineCount] = useState(0);
+  const [lastCheckInTime, setLastCheckInTime] = useState<number | null>(null);
   const [todaySpend, setTodaySpend] = useState(0);
   const [waterTotalMl, setWaterTotalMl] = useState(0);
   const [waterHourlyMap, setWaterHourlyMap] = useState<Record<number, boolean>>({});
@@ -447,6 +448,9 @@ export default function HomeScreen() {
         try {
           const queue = await AttendanceStorage.getOfflineQueue();
           setOfflineCount(queue.length);
+
+          const checkInTime = await AttendanceStorage.getLastCheckInTime();
+          setLastCheckInTime(checkInTime);
 
           const purchases = await PurchasesStorage.getPurchases();
           const midnight = new Date();
@@ -564,22 +568,39 @@ export default function HomeScreen() {
             </AnimatedPressable>
 
             {/* Attendance Viewfinder widget */}
-            <AnimatedPressable onPress={() => router.push('/attendance')} style={{ flex: 1 }}>
-              <GlassView style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border, alignItems: 'center' }]}>
-                <View style={[styles.widgetHeader, { width: '100%' }]}>
-                  <Label text="CHECK-IN" color={isDark ? '#94A3B8' : '#64748B'} />
-                  <Feather name="aperture" size={13} color={colors.accent} />
-                </View>
-                
-                <CameraViewfinder offlineCount={offlineCount} colors={colors} isDark={isDark} />
+            <AnimatedPressable
+              onPress={() => router.push('/attendance')}
+              style={{ flex: 1 }}
+            >
+              {(() => {
+                const checkInTimeStr = lastCheckInTime
+                  ? new Date(lastCheckInTime).toLocaleTimeString('en-IN', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      timeZone: 'Asia/Kolkata',
+                    })
+                  : null;
 
-                <View style={styles.statusRow}>
-                  <Dot color={offlineCount > 0 ? themeColors.alert : themeColors.success} />
-                  <Text style={[styles.statusText, { color: offlineCount > 0 ? themeColors.alert : themeColors.success, fontSize: 12 }]} numberOfLines={1}>
-                    {offlineCount > 0 ? `${offlineCount} log pending` : 'Synced'}
-                  </Text>
-                </View>
-              </GlassView>
+                return (
+                  <GlassView style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border, alignItems: 'center' }]}>
+                    <View style={[styles.widgetHeader, { width: '100%' }]}>
+                      <Label text="CHECK-IN" color={isDark ? '#94A3B8' : '#64748B'} />
+                      <Feather name="aperture" size={13} color={colors.accent} />
+                    </View>
+                    
+                    <CameraViewfinder offlineCount={offlineCount} colors={colors} isDark={isDark} />
+
+                    <View style={styles.statusRow}>
+                      <Dot color={offlineCount > 0 ? themeColors.alert : themeColors.success} />
+                      <Text style={[styles.statusText, { color: offlineCount > 0 ? themeColors.alert : themeColors.success, fontSize: 12 }]} numberOfLines={1}>
+                        {offlineCount > 0
+                          ? (checkInTimeStr ? `Pending • ${checkInTimeStr}` : `${offlineCount} log pending`)
+                          : (checkInTimeStr ? `Synced • ${checkInTimeStr}` : 'Synced')}
+                      </Text>
+                    </View>
+                  </GlassView>
+                );
+              })()}
             </AnimatedPressable>
 
           </Animated.View>

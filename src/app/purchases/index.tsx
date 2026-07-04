@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   useColorScheme,
   View,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -52,6 +53,294 @@ export function PurchasesTabs({ activeTab }: { activeTab: 'daily' | 'weekly' | '
   );
 }
 
+// Helper to get days in a month
+function getDaysInMonth(year: number, month: number) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+// Helper to get first day of month weekday index (0 = Sun, 6 = Sat)
+function getFirstDayOfMonth(year: number, month: number) {
+  return new Date(year, month, 1).getDay();
+}
+
+// ── Calendar Picker Component ──────────────────────────────────────────────
+function CalendarPicker({ visible, onClose, selectedDate, onSelectDate, colors }: any) {
+  const [navDate, setNavDate] = useState(new Date(selectedDate));
+
+  const year = navDate.getFullYear();
+  const month = navDate.getMonth();
+
+  const daysInMonth = getDaysInMonth(year, month);
+  const firstDayIndex = getFirstDayOfMonth(year, month);
+  const prevMonthDays = getDaysInMonth(year, month - 1);
+
+  // Generate days grid
+  const gridCells = [];
+
+  // Empty slots from previous month
+  for (let i = firstDayIndex - 1; i >= 0; i--) {
+    gridCells.push({
+      day: prevMonthDays - i,
+      month: month - 1,
+      year: month === 0 ? year - 1 : year,
+      isCurrentMonth: false,
+    });
+  }
+
+  // Days of current month
+  for (let i = 1; i <= daysInMonth; i++) {
+    gridCells.push({
+      day: i,
+      month: month,
+      year: year,
+      isCurrentMonth: true,
+    });
+  }
+
+  // Fill up the rest of the cells to complete grid row (multiple of 7, total 42 max for a clean grid)
+  const remaining = 42 - gridCells.length;
+  for (let i = 1; i <= remaining; i++) {
+    gridCells.push({
+      day: i,
+      month: month + 1,
+      year: month === 11 ? year + 1 : year,
+      isCurrentMonth: false,
+    });
+  }
+
+  const weekdays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  const handlePrevMonth = () => {
+    setNavDate(new Date(year, month - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setNavDate(new Date(year, month + 1, 1));
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.calendarCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
+          {/* Calendar Header */}
+          <View style={styles.calHeader}>
+            <TouchableOpacity onPress={handlePrevMonth} style={styles.calNavBtn}>
+              <Feather name="chevron-left" size={18} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.calMonthText, { color: colors.text }]}>
+              {monthNames[month]} {year}
+            </Text>
+            <TouchableOpacity onPress={handleNextMonth} style={styles.calNavBtn}>
+              <Feather name="chevron-right" size={18} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Weekday headers */}
+          <View style={styles.calWeekdaysRow}>
+            {weekdays.map((w) => (
+              <Text key={w} style={[styles.calWeekdayText, { color: colors.textSecondary }]}>
+                {w}
+              </Text>
+            ))}
+          </View>
+
+          {/* Days Grid */}
+          <View style={styles.calGrid}>
+            {gridCells.map((cell, idx) => {
+              const cellDateStr = new Date(cell.year, cell.month, cell.day).toDateString();
+              const isSelected = selectedDate.toDateString() === cellDateStr;
+              return (
+                <TouchableOpacity
+                  key={idx}
+                  onPress={() => {
+                    const d = new Date(cell.year, cell.month, cell.day);
+                    const now = new Date();
+                    d.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+                    onSelectDate(d);
+                    onClose();
+                  }}
+                  style={[
+                    styles.calCell,
+                    isSelected && { backgroundColor: colors.primary },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.calCellText,
+                      { color: cell.isCurrentMonth ? colors.text : colors.textSecondary },
+                      isSelected && { color: '#FFF', fontWeight: '800' },
+                    ]}
+                  >
+                    {cell.day}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Close button */}
+          <TouchableOpacity
+            onPress={onClose}
+            style={[styles.calCloseBtn, { borderColor: colors.border }]}
+          >
+            <Text style={[styles.calCloseBtnText, { color: colors.text }]}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ── Edit Expense Modal Component ────────────────────────────────────────────
+function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors }: any) {
+  if (!log) return null;
+
+  const [editName, setEditName] = useState(log.name);
+  const [editCost, setEditCost] = useState(log.cost.toString());
+  const [editCategory, setEditCategory] = useState(log.category);
+  const [editDate, setEditDate] = useState(new Date(log.timestamp));
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Sync state if modal log changes
+  useEffect(() => {
+    if (log) {
+      setEditName(log.name);
+      setEditCost(log.cost.toString());
+      setEditCategory(log.category);
+      setEditDate(new Date(log.timestamp));
+    }
+  }, [log]);
+
+  const handleSave = () => {
+    if (!editName.trim()) {
+      Alert.alert('Validation Error', 'Please enter an item name.');
+      return;
+    }
+    const price = parseFloat(editCost);
+    if (isNaN(price) || price <= 0) {
+      Alert.alert('Validation Error', 'Please enter a valid cost amount.');
+      return;
+    }
+    onSave(log.id, {
+      name: editName.trim(),
+      cost: price,
+      category: editCategory,
+      timestamp: editDate.getTime(),
+    });
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.editCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
+          <Text style={[styles.editTitle, { color: colors.text }]}>Edit Expense</Text>
+
+          <TextInput
+            style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+            placeholder="Item name"
+            placeholderTextColor={colors.textSecondary}
+            value={editName}
+            onChangeText={setEditName}
+          />
+
+          <View style={styles.formRow}>
+            <TextInput
+              style={[
+                styles.textInput,
+                styles.costInput,
+                { color: colors.text, borderColor: colors.border, backgroundColor: colors.background },
+              ]}
+              placeholder="Cost"
+              placeholderTextColor={colors.textSecondary}
+              value={editCost}
+              onChangeText={setEditCost}
+              keyboardType="decimal-pad"
+            />
+
+            <TouchableOpacity
+              onPress={() => setShowDatePicker(true)}
+              style={[styles.datePickerBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
+            >
+              <Feather name="calendar" size={14} color={colors.primary} />
+              <Text style={{ color: colors.text, fontSize: 11, fontWeight: '600' }} numberOfLines={1}>
+                {editDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Category Selector */}
+          <View style={styles.categoryContainer}>
+            {(['Groceries', 'Dairy', 'Veggies', 'Misc'] as CategoryType[]).map((cat) => {
+              const selected = editCategory === cat;
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  onPress={() => setEditCategory(cat)}
+                  style={[
+                    styles.catBtn,
+                    {
+                      borderColor: selected ? colors.primary : colors.border,
+                      backgroundColor: selected ? colors.primary : 'transparent',
+                    },
+                  ]}
+                >
+                  <Text style={{ color: selected ? '#FFF' : colors.text, fontSize: 10, fontWeight: '700' }}>
+                    {cat.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Action Row */}
+          <View style={styles.editActionRow}>
+            <TouchableOpacity
+              onPress={() => {
+                onClose();
+                onDelete(log.id);
+              }}
+              style={[styles.actionBtn, styles.deleteActionBtn, { borderColor: colors.alert }]}
+            >
+              <Feather name="trash-2" size={16} color={colors.alert} />
+              <Text style={{ color: colors.alert, fontWeight: '700', fontSize: 13 }}>Delete</Text>
+            </TouchableOpacity>
+
+            <View style={{ flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>
+              <TouchableOpacity
+                onPress={onClose}
+                style={[styles.actionBtn, { borderColor: colors.border }]}
+              >
+                <Text style={{ color: colors.text, fontWeight: '700', fontSize: 13 }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleSave}
+                style={[styles.actionBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+              >
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Calendar Picker modal */}
+          <CalendarPicker
+            visible={showDatePicker}
+            onClose={() => setShowDatePicker(false)}
+            selectedDate={editDate}
+            onSelectDate={setEditDate}
+            colors={colors}
+          />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ── Main Daily Purchases Screen ──────────────────────────────────────────────
 export default function DailyPurchasesScreen() {
   const router = useRouter();
@@ -64,6 +353,12 @@ export default function DailyPurchasesScreen() {
   const [name, setName] = useState('');
   const [cost, setCost] = useState('');
   const [category, setCategory] = useState<CategoryType>('Groceries');
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Edit states
+  const [editingLog, setEditingLog] = useState<PurchasesStorage.PurchaseLog | null>(null);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
 
   // Load data
   useEffect(() => {
@@ -73,7 +368,6 @@ export default function DailyPurchasesScreen() {
   async function loadPurchases() {
     try {
       const data = await PurchasesStorage.getPurchases();
-      // Sort newest first
       setLogs(data.sort((a, b) => b.timestamp - a.timestamp));
     } catch (e) {
       Alert.alert('Error', 'Failed to load purchase logs.');
@@ -96,14 +390,31 @@ export default function DailyPurchasesScreen() {
 
     setLoading(true);
     try {
-      const newLog = await PurchasesStorage.savePurchase(name, price, category);
-      setLogs((prev) => [newLog, ...prev]);
+      const newLog = await PurchasesStorage.savePurchase(name, price, category, selectedDate.getTime());
+      setLogs((prev) => [newLog, ...prev].sort((a, b) => b.timestamp - a.timestamp));
       setName('');
       setCost('');
       setCategory('Groceries');
+      setSelectedDate(new Date());
       Keyboard.dismiss();
     } catch (e) {
       Alert.alert('Error', 'Failed to save purchase.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditSave = async (id: string, updates: Partial<Omit<PurchasesStorage.PurchaseLog, 'id'>>) => {
+    setLoading(true);
+    try {
+      await PurchasesStorage.updatePurchase(id, updates);
+      setLogs((prev) =>
+        prev
+          .map((log) => (log.id === id ? { ...log, ...updates } : log))
+          .sort((a, b) => b.timestamp - a.timestamp)
+      );
+    } catch (e) {
+      Alert.alert('Error', 'Failed to update purchase.');
     } finally {
       setLoading(false);
     }
@@ -151,11 +462,12 @@ export default function DailyPurchasesScreen() {
     ]);
   };
 
-  // Filter logs for today only
+  // Stats calculation
   const midnight = new Date();
   midnight.setHours(0, 0, 0, 0);
   const todayLogs = logs.filter((log) => log.timestamp >= midnight.getTime());
   const todayTotal = todayLogs.reduce((acc, curr) => acc + curr.cost, 0);
+  const allTimeTotal = logs.reduce((acc, curr) => acc + curr.cost, 0);
 
   return (
     <ThemedView style={styles.root}>
@@ -190,7 +502,7 @@ export default function DailyPurchasesScreen() {
 
         {/* Main List */}
         <FlatList
-          data={todayLogs}
+          data={logs}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -200,18 +512,18 @@ export default function DailyPurchasesScreen() {
               <View style={[styles.totalBar, { borderColor: colors.border, backgroundColor: colors.backgroundElement }]}>
                 <View>
                   <ThemedText type="code" style={{ fontSize: 10, fontWeight: '700' }} themeColor="textSecondary">
-                    TODAY'S ITEMS
-                  </ThemedText>
-                  <ThemedText type="subtitle" style={[styles.totalCount, { color: colors.text }]}>
-                    {todayLogs.length}
-                  </ThemedText>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <ThemedText type="code" style={{ fontSize: 10, fontWeight: '700' }} themeColor="textSecondary">
                     TODAY'S SPEND
                   </ThemedText>
                   <ThemedText type="subtitle" style={[styles.totalCost, { color: colors.primary }]}>
                     ₹{todayTotal.toFixed(2)}
+                  </ThemedText>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <ThemedText type="code" style={{ fontSize: 10, fontWeight: '700' }} themeColor="textSecondary">
+                    ALL-TIME SPEND
+                  </ThemedText>
+                  <ThemedText type="subtitle" style={[styles.totalCost, { color: colors.text }]}>
+                    ₹{allTimeTotal.toFixed(2)}
                   </ThemedText>
                 </View>
               </View>
@@ -219,7 +531,7 @@ export default function DailyPurchasesScreen() {
               {/* Input Form Panel */}
               <View style={[styles.formPanel, { borderColor: colors.border, backgroundColor: colors.backgroundElement }]}>
                 <ThemedText type="code" style={{ fontSize: 10, fontWeight: '700', marginBottom: Spacing.one }} themeColor="textSecondary">
-                  RECORD NEW EXPENSE
+                  RECORD EXPENSE
                 </ThemedText>
 
                 <TextInput
@@ -246,35 +558,46 @@ export default function DailyPurchasesScreen() {
                     autoCorrect={false}
                   />
 
-                  {/* Category Toggles */}
-                  <View style={styles.categoryContainer}>
-                    {(['Groceries', 'Dairy', 'Veggies', 'Misc'] as CategoryType[]).map((cat) => {
-                      const selected = category === cat;
-                      return (
-                        <TouchableOpacity
-                          key={cat}
-                          onPress={() => setCategory(cat)}
+                  {/* Custom Date Field */}
+                  <TouchableOpacity
+                    onPress={() => setShowDatePicker(true)}
+                    style={[styles.datePickerBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
+                  >
+                    <Feather name="calendar" size={14} color={colors.primary} />
+                    <Text style={{ color: colors.text, fontSize: 11, fontWeight: '600' }} numberOfLines={1}>
+                      {selectedDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Category Toggles */}
+                <View style={styles.categoryContainer}>
+                  {(['Groceries', 'Dairy', 'Veggies', 'Misc'] as CategoryType[]).map((cat) => {
+                    const selected = category === cat;
+                    return (
+                      <TouchableOpacity
+                        key={cat}
+                        onPress={() => setCategory(cat)}
+                        style={[
+                          styles.catBtn,
+                          {
+                            borderColor: selected ? colors.primary : colors.border,
+                            backgroundColor: selected ? colors.primary : 'transparent',
+                          },
+                        ]}
+                      >
+                        <ThemedText
+                          type="code"
                           style={[
-                            styles.catBtn,
-                            {
-                              borderColor: selected ? colors.primary : colors.border,
-                              backgroundColor: selected ? colors.primary : 'transparent',
-                            },
+                            styles.catBtnText,
+                            { color: selected ? '#FFF' : colors.text, fontWeight: '700' },
                           ]}
                         >
-                          <ThemedText
-                            type="code"
-                            style={[
-                              styles.catBtnText,
-                              { color: selected ? '#FFF' : colors.text, fontWeight: '700' },
-                            ]}
-                          >
-                            {cat.substring(0, 4).toUpperCase()}
-                          </ThemedText>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+                          {cat.toUpperCase()}
+                        </ThemedText>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
 
                 <AnimatedPressable
@@ -295,18 +618,45 @@ export default function DailyPurchasesScreen() {
               </View>
 
               <ThemedText type="smallBold" style={styles.sectionTitle} themeColor="textSecondary">
-                TODAY'S SPENDS
+                ALL RECORDED SPENDS (TAP TO EDIT)
               </ThemedText>
             </View>
           }
           renderItem={({ item }) => {
-            const formattedDate = new Date(item.timestamp).toLocaleTimeString('en-IN', {
+            const itemDate = new Date(item.timestamp);
+            const todayStr = new Date().toDateString();
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toDateString();
+
+            let dateStr = '';
+            if (itemDate.toDateString() === todayStr) {
+              dateStr = 'Today';
+            } else if (itemDate.toDateString() === yesterdayStr) {
+              dateStr = 'Yesterday';
+            } else {
+              dateStr = itemDate.toLocaleDateString('en-IN', {
+                day: '2-digit',
+                month: 'short',
+                year: itemDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
+                timeZone: 'Asia/Kolkata',
+              });
+            }
+            const timeStr = itemDate.toLocaleTimeString('en-IN', {
               hour: '2-digit',
               minute: '2-digit',
               timeZone: 'Asia/Kolkata',
             });
+            const formattedDate = `${dateStr} • ${timeStr}`;
+
             return (
-              <View style={[styles.itemCard, { borderColor: colors.border }]}>
+              <TouchableOpacity
+                onPress={() => {
+                  setEditingLog(item);
+                  setIsEditModalVisible(true);
+                }}
+                style={[styles.itemCard, { borderColor: colors.border }]}
+              >
                 <View style={{ flex: 1, gap: Spacing.half }}>
                   <View style={styles.itemNameRow}>
                     <ThemedText type="smallBold">{item.name}</ThemedText>
@@ -317,7 +667,7 @@ export default function DailyPurchasesScreen() {
                     </View>
                   </View>
                   <ThemedText type="code" style={{ fontSize: 10 }} themeColor="textSecondary">
-                    at {formattedDate}
+                    {formattedDate}
                   </ThemedText>
                 </View>
                 <View style={styles.rightItemBlock}>
@@ -331,20 +681,42 @@ export default function DailyPurchasesScreen() {
                     <Feather name="trash-2" size={16} color={colors.alert} />
                   </AnimatedPressable>
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           }}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Feather name="shopping-bag" size={32} color={colors.textSecondary} style={{ marginBottom: Spacing.two, opacity: 0.8 }} />
               <ThemedText type="code" themeColor="textSecondary" style={{ textAlign: 'center', fontSize: 12 }}>
-                No records logged today
+                No records logged
               </ThemedText>
               <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center', marginTop: Spacing.one }}>
-                Log items above to track today's shopping expenses.
+                Log items above to track shopping expenses.
               </ThemedText>
             </View>
           }
+        />
+
+        {/* Global Calendar Picker modal */}
+        <CalendarPicker
+          visible={showDatePicker}
+          onClose={() => setShowDatePicker(false)}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          colors={colors}
+        />
+
+        {/* Edit Expense Modal */}
+        <EditExpenseModal
+          visible={isEditModalVisible}
+          onClose={() => {
+            setIsEditModalVisible(false);
+            setEditingLog(null);
+          }}
+          log={editingLog}
+          onSave={handleEditSave}
+          onDelete={handleDelete}
+          colors={colors}
         />
       </SafeAreaView>
     </ThemedView>
@@ -421,12 +793,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  totalCount: {
-    fontSize: 22,
-    fontWeight: '800',
-  },
   totalCost: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '800',
   },
   formPanel: {
@@ -449,12 +817,21 @@ const styles = StyleSheet.create({
   costInput: {
     width: 90,
   },
-  categoryContainer: {
+  datePickerBtn: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+  },
+  categoryContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   catBtn: {
     flex: 1,
@@ -513,5 +890,109 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 40,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  calendarCard: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    alignItems: 'center',
+  },
+  calHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 16,
+  },
+  calNavBtn: {
+    padding: 8,
+  },
+  calMonthText: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  calWeekdaysRow: {
+    flexDirection: 'row',
+    width: '100%',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  calWeekdayText: {
+    width: 38,
+    textAlign: 'center',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  calGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    width: '100%',
+    justifyContent: 'space-between',
+    gap: 4,
+    marginBottom: 16,
+  },
+  calCell: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  calCellText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  calCloseBtn: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    width: '100%',
+  },
+  calCloseBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  editCard: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 20,
+    gap: 14,
+  },
+  editTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  editActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    gap: 10,
+  },
+  actionBtn: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  deleteActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
 });
