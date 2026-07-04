@@ -1,16 +1,10 @@
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-<<<<<<< HEAD
 import { useState, useEffect } from 'react';
 import {
   Alert,
-=======
-import { useState } from 'react';
-import {
-  Alert,
   LayoutAnimation,
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
   ScrollView,
   StyleSheet,
   Text,
@@ -18,16 +12,15 @@ import {
   TouchableOpacity,
   View,
   useColorScheme,
-<<<<<<< HEAD
   Switch,
   Platform,
-=======
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-<<<<<<< HEAD
+import * as Application from 'expo-application';
+import Constants from 'expo-constants';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { BottomTabInset, Colors, Radius, Spacing } from '@/constants/theme';
 import {
@@ -37,12 +30,6 @@ import {
   setOneMinuteReminderEnabled,
   scheduleHourlyWaterReminder,
 } from '@/utils/notifications';
-=======
-import * as Application from 'expo-application';
-import Constants from 'expo-constants';
-
-import { useAuth } from '@/contexts/AuthContext';
-import { BottomTabInset, Colors, Radius, Spacing } from '@/constants/theme';
 
 // ── Instruction Steps (inline for Discord setup) ──────────────────────────────
 const DISCORD_STEPS = [
@@ -72,7 +59,6 @@ const DISCORD_STEPS = [
     detail: 'Come back here, paste the URL in the field above, and tap "Save".',
   },
 ];
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 
 function Row({
   icon,
@@ -101,11 +87,12 @@ function Row({
 }
 
 export default function ProfileScreen() {
-<<<<<<< HEAD
-  const { user, signOut, updateDisplayName } = useAuth();
+  const { user, signOut, updateDisplayName, discordWebhookUrl, updateDiscordWebhook } = useAuth();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = Colors[scheme];
+  const isDark = scheme === 'dark';
   const router = useRouter();
+  const currentVersion = Application.nativeApplicationVersion || Constants.expoConfig?.version || '1.0.0';
 
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState('');
@@ -122,7 +109,7 @@ export default function ProfileScreen() {
   const handleToggleOneMinute = async (value: boolean) => {
     try {
       await setOneMinuteReminderEnabled(value);
-      await scheduleHourlyWaterReminder(true); // force reschedule to apply changes immediately
+      await scheduleHourlyWaterReminder(); // force reschedule to apply changes immediately
       setIsOneMinuteEnabled(value);
       Alert.alert(
         'Success',
@@ -134,16 +121,6 @@ export default function ProfileScreen() {
       Alert.alert('Error', e.message || 'Failed to update reminder settings.');
     }
   };
-=======
-  const { user, signOut, updateDisplayName, discordWebhookUrl, updateDiscordWebhook } = useAuth();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = Colors[scheme];
-  const isDark = scheme === 'dark';
-  const router = useRouter();
-  const currentVersion = Application.nativeApplicationVersion || Constants.expoConfig?.version || '1.0.0';
-
-  const [isEditing, setIsEditing] = useState(false);
-  const [newName, setNewName] = useState('');
 
   // Discord panel state
   const [discordExpanded, setDiscordExpanded] = useState(false);
@@ -178,7 +155,6 @@ export default function ProfileScreen() {
       setSavingWebhook(false);
     }
   }
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 
   const displayName = user?.displayName ?? user?.email?.split('@')[0] ?? 'User';
   const email = user?.email ?? '—';
@@ -215,8 +191,6 @@ export default function ProfileScreen() {
     }
   }
 
-<<<<<<< HEAD
-=======
   function toggleDiscordPanel() {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setDiscordExpanded(!discordExpanded);
@@ -231,8 +205,6 @@ export default function ProfileScreen() {
   }
 
   const isLinked = !!discordWebhookUrl;
-
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -324,7 +296,7 @@ export default function ProfileScreen() {
                   )}
                 </View>
               )}
-<<<<<<< HEAD
+              <Row icon="info" label="App Version" value={currentVersion} colors={colors} />
             </View>
           </Animated.View>
 
@@ -392,8 +364,6 @@ export default function ProfileScreen() {
                 </View>
                 <Feather name="chevron-right" size={16} color={colors.textSecondary} />
               </TouchableOpacity>
-=======
-              <Row icon="info" label="App Version" value={currentVersion} colors={colors} />
             </View>
           </Animated.View>
 
@@ -542,16 +512,11 @@ export default function ProfileScreen() {
                   )}
                 </View>
               )}
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
             </View>
           </Animated.View>
 
           {/* ── Sign Out ────────────────────────────────────────────────────── */}
-<<<<<<< HEAD
-          <Animated.View entering={FadeInDown.delay(320).duration(400)}>
-=======
           <Animated.View entering={FadeInDown.delay(300).duration(400)}>
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
             <TouchableOpacity
               id="signout-button"
               style={[styles.signOutBtn, { borderColor: colors.alert }]}
@@ -715,8 +680,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-<<<<<<< HEAD
-=======
+
   // ── Discord Panel ───────────────────────────────────────────────────────────
   statusDot: {
     width: 8,
@@ -836,7 +800,7 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
 
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
+
   // ── Sign out ────────────────────────────────────────────────────────────────
   signOutBtn: {
     flexDirection: 'row',

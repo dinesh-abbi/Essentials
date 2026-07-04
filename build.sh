@@ -8,8 +8,6 @@ RED='\033[0;31m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
-<<<<<<< HEAD
-=======
 # --- Parse Command Line Arguments ---
 CLEAN_BUILD=false
 for arg in "$@"; do
@@ -18,7 +16,6 @@ for arg in "$@"; do
   fi
 done
 
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 # --- Fancy Terminal Spinner ---
 run_with_spinner() {
   local msg="$1"
@@ -58,17 +55,6 @@ clear
 
 # --- ASCII Art Header ---
 echo -e "${CYAN}${BOLD}"
-<<<<<<< HEAD
-echo "=================================================="
-echo "  ______  ______  ______  ______  __      __  __  "
-echo " /\  ___\/\  __ \/\__  _\/\  __ \/\ \    /\ \/\ \ "
-echo " \ \ \___\ \  __ \/_/\ \/\ \  __ \ \ \___\ \ \_\ \ "
-echo "  \ \_____\ \_\ \_\ \ \_\ \ \_\ \_\ \_____\ \____/ "
-echo "   \/_____/\/_/\/_/  \/_/  \/_/\/_/\/_____/\/___/  "
-echo "                                                  "
-echo "        E N G I N E   B U I L D E R   v1.0        "
-echo "=================================================="
-=======
 cat <<'EOF'
 ====================================================================
 
@@ -81,18 +67,14 @@ cat <<'EOF'
 
 ====================================================================
 EOF
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 echo -e "${RESET}"
 
 echo -e "${CYAN}// CORE_BUILD_SEQUENCE: STARTING${RESET}\n"
 
-<<<<<<< HEAD
-=======
 # Force the build to use JDK 17 (LTS) to prevent Java 25 native-access prefab compilation errors
 export JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
 export PATH="$JAVA_HOME/bin:$PATH"
 
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 # --- STEP 1: Environment Checks ---
 echo -e "${BOLD}[ STEP 1/4 ] Verifying build environment...${RESET}"
 
@@ -136,10 +118,7 @@ else
   echo -e "${GREEN}✓ Android SDK path verified: $SDK_PATH${RESET}"
 fi
 
-<<<<<<< HEAD
-=======
 # --- STEP 2: Fetch dependencies ---
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 echo -e "\n${BOLD}[ STEP 2/4 ] Fetching dependencies...${RESET}"
 # Check if node_modules exists, if not install
 if [ ! -d "node_modules" ]; then
@@ -148,17 +127,6 @@ else
   echo -e "${GREEN}✓ Node modules already installed.${RESET}"
 fi
 
-<<<<<<< HEAD
-# --- STEP 2: Expo Prebuild ---
-echo -e "\n${BOLD}[ STEP 3/4 ] Generating Native Android Project wrapper...${RESET}"
-run_with_spinner "Generating native project (expo prebuild)" npx expo prebuild --platform android --clean --no-interactive
-
-# --- STEP 3: Gradle Compilation ---
-echo -e "\n${BOLD}[ STEP 4/4 ] Compiling Production-level APK...${RESET}"
-
-if [ ! -d "android" ]; then
-  echo -e "${RED}[ERROR] Android folder was not generated correctly during prebuild.${RESET}"
-=======
 # --- STEP 3: Expo Prebuild ---
 echo -e "\n${BOLD}[ STEP 3/4 ] Generating Native Android Project wrapper...${RESET}"
 
@@ -178,7 +146,6 @@ echo -e "\n${BOLD}[ STEP 4/4 ] Compiling Production-level APK...${RESET}"
 
 if [ ! -d "android" ]; then
   echo -e "${RED}[ERROR] Android folder was not generated correctly.${RESET}"
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
   exit 1
 fi
 
@@ -199,26 +166,16 @@ fi
 # Navigate back to root
 cd .. || exit
 
-<<<<<<< HEAD
-# --- STEP 4: Package Output ---
-=======
 # --- STEP 5: Package Output ---
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 APK_SRC="android/app/build/outputs/apk/release/app-release.apk"
 APK_DEST="CatalystEssentials.apk"
 
 if [ -f "$APK_SRC" ]; then
-<<<<<<< HEAD
-  cp "$APK_SRC" "$APK_DEST"
-  echo -e "\n=================================================="
-  echo -e "${GREEN}${BOLD}🎉 BUILD COMPLETE SUCCESSFULLY!${RESET}"
-=======
   # Clear old destination first to avoid confusion if copy fails
   rm -f "$APK_DEST"
   cp "$APK_SRC" "$APK_DEST"
   echo -e "\n=================================================="
   echo -e "${GREEN}${BOLD}🎉 BUILD COMPLETED SUCCESSFULLY!${RESET}"
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
   echo -e "=================================================="
   echo -e "${CYAN}Output File:${RESET} ${BOLD}$APK_DEST${RESET}"
   echo -e "${CYAN}File Size:  ${RESET} $(du -h "$APK_DEST" | cut -f1)"

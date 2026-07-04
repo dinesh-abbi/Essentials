@@ -1,14 +1,4 @@
 /**
-<<<<<<< HEAD
- * Firebase App + Auth initializer.
- * Uses EXPO_PUBLIC_ env vars — safe to use in client bundle.
- */
-import { getApp, getApps, initializeApp } from 'firebase/app';
-import { initializeAuth } from 'firebase/auth';
-import * as Auth from 'firebase/auth';
-const getReactNativePersistence = (Auth as any).getReactNativePersistence;
-import AsyncStorage from '@react-native-async-storage/async-storage';
-=======
  * Firebase App + Auth + Firestore initializer.
  * Uses EXPO_PUBLIC_ env vars — safe to use in client bundle.
  */
@@ -18,7 +8,6 @@ import * as Auth from 'firebase/auth';
 const getReactNativePersistence = (Auth as any).getReactNativePersistence;
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFirestore } from 'firebase/firestore';
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY!,
@@ -38,8 +27,6 @@ export const auth = initializeAuth(app, {
   persistence: getReactNativePersistence(AsyncStorage),
 });
 
-<<<<<<< HEAD
-=======
 // Firestore for user profile data (webhook URLs, etc.)
 export const db = getFirestore(app);
 
@@ -63,5 +50,4 @@ export function waitForAuth(): Promise<User> {
   });
 }
 
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 export { app };

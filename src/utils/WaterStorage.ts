@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-import AsyncStorage from '@react-native-async-storage/async-storage';
-=======
 import {
   addDoc,
   collection,
@@ -17,7 +14,6 @@ import { auth, db, waitForAuth } from '@/utils/firebase';
 import * as SyncManager from './SyncManager';
 
 const generateId = () => `water_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 
 export interface WaterLog {
   id: string;
@@ -25,54 +21,6 @@ export interface WaterLog {
   timestamp: number;
 }
 
-<<<<<<< HEAD
-const WATER_STORAGE_KEY = '@catalyst_water_log';
-export const DEFAULT_DAILY_GOAL = 3000; // ml
-
-const generateId = () => {
-  return `water_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-};
-
-/**
- * Retrieve all water logs
- */
-export async function getWaterLogs(): Promise<WaterLog[]> {
-  try {
-    const dataStr = await AsyncStorage.getItem(WATER_STORAGE_KEY);
-    return dataStr ? JSON.parse(dataStr) : [];
-  } catch (error) {
-    console.error('Failed to get water logs', error);
-    return [];
-  }
-}
-
-/**
- * Log a new water intake event
- */
-export async function logWaterIntake(amountMl: number): Promise<WaterLog> {
-  const newLog: WaterLog = {
-    id: generateId(),
-    amountMl,
-    timestamp: Date.now(),
-  };
-
-  try {
-    const currentLogs = await getWaterLogs();
-    currentLogs.push(newLog);
-    await AsyncStorage.setItem(WATER_STORAGE_KEY, JSON.stringify(currentLogs));
-    return newLog;
-  } catch (error) {
-    console.error('Failed to log water intake', error);
-    throw error;
-  }
-}
-
-/**
- * Get water logs logged today (local time)
- */
-export async function getTodayWaterLogs(): Promise<WaterLog[]> {
-  const allLogs = await getWaterLogs();
-=======
 export const DEFAULT_DAILY_GOAL = 3000; // ml
 
 /**
@@ -180,18 +128,10 @@ export async function logWaterIntake(amountMl: number): Promise<WaterLog> {
  * Get water logs logged today (local time) from Firestore.
  */
 export async function getTodayWaterLogs(): Promise<WaterLog[]> {
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const startOfTodayMs = startOfToday.getTime();
 
-<<<<<<< HEAD
-  return allLogs.filter((log) => log.timestamp >= startOfTodayMs);
-}
-
-/**
- * Get total ml drank today
-=======
   let dbLogs: WaterLog[] = [];
   try {
     const q = query(
@@ -216,7 +156,6 @@ export async function getTodayWaterLogs(): Promise<WaterLog[]> {
 
 /**
  * Get total ml drank today.
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
  */
 export async function getTodayTotalMl(): Promise<number> {
   const todayLogs = await getTodayWaterLogs();
@@ -224,15 +163,9 @@ export async function getTodayTotalMl(): Promise<number> {
 }
 
 /**
-<<<<<<< HEAD
- * Get hourly hydration logging status for today
- * Checks hours from 8:00 (8 AM) to 22:00 (10 PM)
- * Returns a mapping of hour to boolean (has intake in that hour)
-=======
  * Get hourly hydration logging status for today.
  * Checks hours from 8:00 (8 AM) to 22:00 (10 PM).
  * Returns a mapping of hour to boolean (has intake in that hour).
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
  */
 export async function getTodayHourlyStatus(): Promise<Record<number, boolean>> {
   const todayLogs = await getTodayWaterLogs();
@@ -255,30 +188,6 @@ export async function getTodayHourlyStatus(): Promise<Record<number, boolean>> {
 }
 
 /**
-<<<<<<< HEAD
- * Delete a specific water log by ID
- */
-export async function deleteWaterLog(id: string): Promise<void> {
-  try {
-    const currentLogs = await getWaterLogs();
-    const filteredLogs = currentLogs.filter((log) => log.id !== id);
-    await AsyncStorage.setItem(WATER_STORAGE_KEY, JSON.stringify(filteredLogs));
-  } catch (error) {
-    console.error('Failed to delete water log', error);
-    throw error;
-  }
-}
-
-/**
- * Clear all water logs
- */
-export async function clearWaterLogs(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(WATER_STORAGE_KEY);
-  } catch (error) {
-    console.error('Failed to clear water storage', error);
-    throw error;
-=======
  * Delete a specific water log by ID from Firestore.
  */
 export async function deleteWaterLog(id: string): Promise<void> {
@@ -352,28 +261,10 @@ export async function getMonthlyTotalMl(): Promise<number> {
   } catch (error) {
     console.error('Failed to get monthly water total from Firestore', error);
     return 0;
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
   }
 }
 
 /**
-<<<<<<< HEAD
- * Get total ml drank this month
- */
-export async function getMonthlyTotalMl(): Promise<number> {
-  const allLogs = await getWaterLogs();
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-
-  const monthlyLogs = allLogs.filter((log) => {
-    const logDate = new Date(log.timestamp);
-    return logDate.getMonth() === currentMonth && logDate.getFullYear() === currentYear;
-  });
-
-  return monthlyLogs.reduce((acc, curr) => acc + curr.amountMl, 0);
-}
-=======
  * Get the number of unique days with water logs this month.
  */
 export async function getMonthlyDaysTracked(): Promise<number> {
@@ -481,4 +372,4 @@ export async function getMonthlyCalendarData(
   return dayMap;
 }
 
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
+

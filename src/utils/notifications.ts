@@ -1,86 +1,4 @@
 import { Platform } from 'react-native';
-<<<<<<< HEAD
-import Constants, { ExecutionEnvironment } from 'expo-constants';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const WATER_CHANNEL_ID = 'water_hydration_channel_#528';
-const REMINDER_CATEGORY_ID = 'WATER_REMINDER_CATEGORY';
-const WATER_REMINDER_TEST_INTERVAL_KEY = '@catalyst_water_reminder_test_interval';
-
-export let Notifications: any;
-const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-
-if (Platform.OS === 'android' && isExpoGo) {
-  // Mock the notifications module on Android in Expo Go to prevent crashes due to SDK 53+ limitations
-  Notifications = {
-    setNotificationHandler: () => {},
-    getPermissionsAsync: async () => ({ status: 'undetermined' }),
-    requestPermissionsAsync: async () => ({ status: 'undetermined' }),
-    setNotificationCategoryAsync: async () => {},
-    setNotificationChannelAsync: async () => {},
-    cancelAllScheduledNotificationsAsync: async () => {},
-    scheduleNotificationAsync: async () => '',
-    getAllScheduledNotificationsAsync: async () => [],
-    addNotificationResponseReceivedListener: () => ({ remove: () => {} }),
-    DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
-    AndroidImportance: { MAX: 4 },
-    SchedulableTriggerInputTypes: { TIME_INTERVAL: 'timeInterval', CALENDAR: 'calendar' },
-  };
-  console.warn('expo-notifications is mocked on Android because push notifications are not supported in Expo Go.');
-} else {
-  try {
-    Notifications = require('expo-notifications');
-  } catch (e) {
-    console.error('Failed to import expo-notifications', e);
-  }
-}
-
-// Configure default notification handler behaviors
-if (Notifications && typeof Notifications.setNotificationHandler === 'function') {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
-}
-
-/**
- * Check if the 1-minute testing reminders are enabled
- */
-export async function isOneMinuteReminderEnabled(): Promise<boolean> {
-  try {
-    const val = await AsyncStorage.getItem(WATER_REMINDER_TEST_INTERVAL_KEY);
-    return val === 'true';
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Set the 1-minute testing reminders mode
- */
-export async function setOneMinuteReminderEnabled(enabled: boolean): Promise<void> {
-  try {
-    await AsyncStorage.setItem(WATER_REMINDER_TEST_INTERVAL_KEY, enabled ? 'true' : 'false');
-  } catch (e) {
-    console.error('Failed to save 1-minute reminder setting', e);
-  }
-}
-
-/**
- * Configure notifications: request permission, setup categories, and register sound channels
- */
-export async function configureNotifications() {
-  if (Platform.OS === 'android' && isExpoGo) {
-    return false;
-  }
-
-  // 1. Check & Request Permissions
-=======
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 
@@ -89,6 +7,8 @@ let IntentLauncher: any = null;
 
 // Use the same ExecutionEnvironment check that AuthContext uses — appOwnership is deprecated in SDK 56
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+const WATER_REMINDER_TEST_INTERVAL_KEY = '@catalyst_water_reminder_test_interval';
 
 if (!isExpoGo) {
   try {
@@ -115,7 +35,7 @@ if (!Notifications) {
     setNotificationCategoryAsync: async () => null,
     getAllScheduledNotificationsAsync: async () => [],
     AndroidImportance: { MAX: 5 },
-    SchedulableTriggerInputTypes: { DAILY: 'daily', TIME_INTERVAL: 'timeInterval' },
+    SchedulableTriggerInputTypes: { DAILY: 'daily', TIME_INTERVAL: 'timeInterval', CALENDAR: 'calendar' },
     DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
   };
 }
@@ -126,6 +46,7 @@ export { Notifications };
 // All notifications from Essentials use this single channel so they have a
 // distinct, recognizable sound separate from other apps on the device.
 const APP_CHANNEL_ID = 'essentials_default_channel';
+const WATER_CHANNEL_ID = 'water_hydration_channel_#528';
 const REMINDER_CATEGORY_ID = 'WATER_REMINDER_CATEGORY';
 
 // ── Expected number of hourly reminder notifications (8 AM to 10 PM = 15 hours) ──
@@ -143,6 +64,29 @@ Notifications.setNotificationHandler({
   }),
 });
 
+/**
+ * Check if the 1-minute testing reminders are enabled
+ */
+export async function isOneMinuteReminderEnabled(): Promise<boolean> {
+  try {
+    const val = await AsyncStorage.getItem(WATER_REMINDER_TEST_INTERVAL_KEY);
+    return val === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Set the 1-minute testing reminders mode
+ */
+export async function setOneMinuteReminderEnabled(enabled: boolean): Promise<void> {
+  try {
+    await AsyncStorage.setItem(WATER_REMINDER_TEST_INTERVAL_KEY, enabled ? 'true' : 'false');
+  } catch (e) {
+    console.error('Failed to save 1-minute reminder setting', e);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Permission & Configuration Utilities
 // ─────────────────────────────────────────────────────────────────────────────
@@ -153,6 +97,10 @@ Notifications.setNotificationHandler({
  * then request permission, then set interactive action categories.
  */
 export async function configureNotifications() {
+  if (Platform.OS === 'android' && isExpoGo) {
+    return false;
+  }
+
   // ── Step 1: Register Unified Android Sound Channel FIRST ──────────────────
   // On Android 13+, the OS suppresses the permission dialog unless a channel
   // already exists. Creating the channel here guarantees the dialog appears.
@@ -165,10 +113,17 @@ export async function configureNotifications() {
       lightColor: '#3B82F6',
       sound: 'water_remainder.mp3', // Matches app.json sounds array asset filename
     });
+    // Support the local channel ID as well
+    await Notifications.setNotificationChannelAsync(WATER_CHANNEL_ID, {
+      name: 'Water Hydration Reminders (#528)',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#3B82F6',
+      sound: 'water_remainder.mp3',
+    });
   }
 
   // ── Step 2: Check & Request Notification Permission ───────────────────────
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
   if (existingStatus !== 'granted') {
@@ -180,11 +135,7 @@ export async function configureNotifications() {
     return false;
   }
 
-<<<<<<< HEAD
-  // 2. Register Interactive Action Categories (Yes/No buttons)
-=======
   // ── Step 3: Register Interactive Action Categories (Yes/No buttons) ───────
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
   await Notifications.setNotificationCategoryAsync(REMINDER_CATEGORY_ID, [
     {
       identifier: 'YES_ACTION',
@@ -202,17 +153,6 @@ export async function configureNotifications() {
     },
   ]);
 
-<<<<<<< HEAD
-  // 3. Register Custom Android Sound Channel
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync(WATER_CHANNEL_ID, {
-      name: 'Water Hydration Reminders (#528)',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#3B82F6',
-      sound: 'water_remainder.mp3', // Matches app.json sounds array asset filename
-    });
-=======
   // ── Step 4: Exact Alarm Permission Health Check (Android 12+) ─────────────
   // SCHEDULE_EXACT_ALARM requires explicit user approval in Settings on Android 12+.
   // If not granted, open the "Alarms & Reminders" settings page so the user can
@@ -227,102 +167,11 @@ export async function configureNotifications() {
     } catch (e) {
       console.warn('[Notifications] Could not check exact alarm permission:', e);
     }
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
   }
 
   return true;
 }
 
-<<<<<<< HEAD
-/**
- * Schedule recurring water reminders
- */
-export async function scheduleHourlyWaterReminder(forceReschedule = false) {
-  if (Platform.OS === 'android' && isExpoGo) {
-    console.warn('Skipping scheduleHourlyWaterReminder: notifications are not supported in Expo Go on Android.');
-    return;
-  }
-
-  const isConfigured = await configureNotifications();
-  if (!isConfigured) return;
-
-  const useOneMinute = await isOneMinuteReminderEnabled();
-
-  // Inspect what is currently scheduled to see if we need to reschedule
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  const reminderNotifs = scheduled.filter(
-    (notif: any) => notif.content.categoryIdentifier === REMINDER_CATEGORY_ID
-  );
-
-  let needsReschedule = forceReschedule;
-
-  if (!needsReschedule) {
-    if (useOneMinute) {
-      // 1-minute test reminders: we expect exactly 1 reminder with a 60-second time interval
-      if (reminderNotifs.length !== 1) {
-        needsReschedule = true;
-      } else {
-        const trigger = reminderNotifs[0].trigger;
-        if (!trigger || trigger.seconds !== 60) {
-          needsReschedule = true;
-        }
-      }
-    } else {
-      // Hourly reminders: we expect exactly 15 calendar reminders
-      if (reminderNotifs.length !== 15) {
-        needsReschedule = true;
-      } else {
-        // If any has a time interval instead of calendar, reschedule
-        const hasTimeInterval = reminderNotifs.some(
-          (notif: any) => notif.trigger && notif.trigger.seconds !== undefined
-        );
-        if (hasTimeInterval) {
-          needsReschedule = true;
-        }
-      }
-    }
-  }
-
-  if (!needsReschedule) {
-    return; // Already correctly scheduled
-  }
-
-  // Cancel only the water reminders to avoid interfering with other notifications
-  for (const notif of reminderNotifs) {
-    try {
-      await Notifications.cancelScheduledNotificationAsync(notif.identifier);
-    } catch (e) {
-      console.error('Failed to cancel reminder notification', e);
-    }
-  }
-
-  // Brief pause to allow the native cancellation to complete
-  await new Promise((resolve) => setTimeout(resolve, 300));
-
-  if (useOneMinute) {
-    // Schedule water hydration reminder every 1 minute
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Time to Hydrate! 💧',
-        body: 'Have you drank some water recently? Select an action below.',
-        sound: Platform.OS === 'android' ? undefined : 'water_remainder.mp3',
-        categoryIdentifier: REMINDER_CATEGORY_ID,
-        channelId: WATER_CHANNEL_ID, // Placed inside content for Android channel mapping
-        data: {
-          highlight: 'water',
-        },
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: 60,
-        repeats: true,
-        channelId: WATER_CHANNEL_ID,
-      },
-    });
-  } else {
-    // Schedule water hydration reminders on the hour (sharp 8:00, 9:00, etc.) from 8 AM to 10 PM
-    for (let hour = 8; hour <= 22; hour++) {
-=======
 // ─────────────────────────────────────────────────────────────────────────────
 // Battery Optimization & Exact Alarm Permission Checks (Android only)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -458,8 +307,6 @@ export async function getNotificationHealthStatus(): Promise<{
 
 /**
  * Schedule recurring hourly water reminders (8 AM to 10 PM).
- * Uses DAILY trigger which maps to AlarmManager.setExactAndAllowWhileIdle
- * when SCHEDULE_EXACT_ALARM permission is granted.
  */
 export async function scheduleHourlyWaterReminder() {
   const isConfigured = await configureNotifications();
@@ -471,33 +318,18 @@ export async function scheduleHourlyWaterReminder() {
   // Schedule daily notifications for each active hour (8 AM to 10 PM)
   for (const hour of REMINDER_HOURS) {
     try {
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
       await Notifications.scheduleNotificationAsync({
         content: {
           title: 'Time to Hydrate! 💧',
           body: 'Have you drank some water recently? Select an action below.',
-<<<<<<< HEAD
-          sound: Platform.OS === 'android' ? undefined : 'water_remainder.mp3',
-          categoryIdentifier: REMINDER_CATEGORY_ID,
-          channelId: WATER_CHANNEL_ID, // Placed inside content for Android channel mapping
-=======
           sound: Platform.OS === 'android' ? undefined : 'water_remainder.mp3', // For Android, channel takes care of sound. For iOS, we specify here.
           categoryIdentifier: REMINDER_CATEGORY_ID,
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
+          channelId: WATER_CHANNEL_ID,
           data: {
             highlight: 'water',
           },
         },
         trigger: {
-<<<<<<< HEAD
-          type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-          hour,
-          minute: 0,
-          repeats: true,
-          channelId: WATER_CHANNEL_ID,
-        },
-      });
-=======
           type: Notifications.SchedulableTriggerInputTypes.DAILY,
           channelId: APP_CHANNEL_ID,
           hour,
@@ -506,7 +338,6 @@ export async function scheduleHourlyWaterReminder() {
       });
     } catch (error) {
       console.error(`Failed to schedule water reminder for ${hour}:00`, error);
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
     }
   }
 }
@@ -515,21 +346,6 @@ export async function scheduleHourlyWaterReminder() {
  * Cancel all scheduled reminders
  */
 export async function cancelAllReminders() {
-<<<<<<< HEAD
-  if (Platform.OS === 'android' && isExpoGo) {
-    return;
-  }
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  const reminderNotifs = scheduled.filter(
-    (notif: any) => notif.content.categoryIdentifier === REMINDER_CATEGORY_ID
-  );
-  for (const notif of reminderNotifs) {
-    try {
-      await Notifications.cancelScheduledNotificationAsync(notif.identifier);
-    } catch (e) {
-      console.error(e);
-    }
-=======
   await Notifications.cancelAllScheduledNotificationsAsync();
 }
 
@@ -612,12 +428,10 @@ export async function ensureNotificationsScheduled(): Promise<void> {
     console.error('[Notifications] Failed to verify/restore schedules:', error);
     // Attempt to re-schedule as a safety net
     await scheduleHourlyWaterReminder();
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
   }
 }
 
 /**
-<<<<<<< HEAD
  * Test notification for hourly reminder (trigger immediately / 1 second)
  */
 export async function triggerHourlyWaterReminderTest() {
@@ -651,7 +465,7 @@ export async function triggerHourlyWaterReminderTest() {
 /**
  * Test notification for hitting the daily water goal
  */
-export async function triggerWaterGoalNotification() {
+export async function triggerWaterGoalNotificationTest() {
   if (Platform.OS === 'android' && isExpoGo) {
     throw new Error('Notifications cannot be triggered in Expo Go on Android. Please build and use a Development Build or APK to test notifications.');
   }
@@ -676,7 +490,9 @@ export async function triggerWaterGoalNotification() {
       channelId: WATER_CHANNEL_ID,
     },
   });
-=======
+}
+
+/**
  * Debug helper: list all currently scheduled notifications
  */
 export async function getScheduledNotificationsList(): Promise<
@@ -693,5 +509,4 @@ export async function getScheduledNotificationsList(): Promise<
   } catch {
     return [];
   }
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 }

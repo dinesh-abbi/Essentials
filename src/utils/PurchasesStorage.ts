@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-import AsyncStorage from '@react-native-async-storage/async-storage';
-=======
 import {
   addDoc,
   collection,
@@ -17,7 +14,6 @@ import { auth, db, waitForAuth } from '@/utils/firebase';
 import * as SyncManager from './SyncManager';
 
 const generateId = () => `purchase_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 
 export interface PurchaseLog {
   id: string;
@@ -27,30 +23,6 @@ export interface PurchaseLog {
   timestamp: number;
 }
 
-<<<<<<< HEAD
-const PURCHASES_STORAGE_KEY = '@catalyst_purchases_log';
-
-const generateId = () => {
-  return `purchase_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-};
-
-/**
- * Retrieve all purchases logs sorted from newest to oldest
- */
-export async function getPurchases(): Promise<PurchaseLog[]> {
-  try {
-    const dataStr = await AsyncStorage.getItem(PURCHASES_STORAGE_KEY);
-    const logs: PurchaseLog[] = dataStr ? JSON.parse(dataStr) : [];
-    return logs.sort((a, b) => b.timestamp - a.timestamp);
-  } catch (error) {
-    console.error('Failed to get purchases from AsyncStorage', error);
-    return [];
-  }
-}
-
-/**
- * Save a new purchase log
-=======
 /**
  * Returns the current authenticated user's UID.
  * Waits for auth state to be restored on cold-start before accessing uid.
@@ -119,58 +91,10 @@ export async function getPurchases(): Promise<PurchaseLog[]> {
 
 /**
  * Save a new purchase log to Firestore.
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
  */
 export async function savePurchase(
   name: string,
   cost: number,
-<<<<<<< HEAD
-  category: 'Groceries' | 'Dairy' | 'Veggies' | 'Misc'
-): Promise<PurchaseLog> {
-  const newLog: PurchaseLog = {
-    id: generateId(),
-    name: name.trim(),
-    cost,
-    category,
-    timestamp: Date.now(),
-  };
-
-  try {
-    const currentLogs = await getPurchases();
-    currentLogs.push(newLog);
-    await AsyncStorage.setItem(PURCHASES_STORAGE_KEY, JSON.stringify(currentLogs));
-    return newLog;
-  } catch (error) {
-    console.error('Failed to save purchase log to AsyncStorage', error);
-    throw error;
-  }
-}
-
-/**
- * Delete a specific purchase log by ID
- */
-export async function deletePurchase(id: string): Promise<void> {
-  try {
-    const currentLogs = await getPurchases();
-    const filteredLogs = currentLogs.filter((log) => log.id !== id);
-    await AsyncStorage.setItem(PURCHASES_STORAGE_KEY, JSON.stringify(filteredLogs));
-  } catch (error) {
-    console.error('Failed to delete purchase log', error);
-    throw error;
-  }
-}
-
-/**
- * Clear all purchase logs
- */
-export async function clearPurchases(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(PURCHASES_STORAGE_KEY);
-  } catch (error) {
-    console.error('Failed to clear purchases storage', error);
-    throw error;
-  }
-=======
   category: 'Groceries' | 'Dairy' | 'Veggies' | 'Misc',
   timestamp: number = Date.now()
 ): Promise<PurchaseLog> {
@@ -296,5 +220,4 @@ export async function clearPurchases(): Promise<void> {
     type: 'purchase_clear',
     payload: {},
   });
->>>>>>> 75a8f1eb581347a111be59164a8d408806e91506
 }
