@@ -5,13 +5,17 @@
  * Automatically increments the version and versionCode, builds the Android release APK,
  * commits/pushes the version bump, and publishes it as a GitHub Release asset.
  *
+ * It will:
+ *   1. Check for changes since the last tag. If none are found, it skips release (unless --force is passed).
+ *   2. Clean up old GitHub releases/tags so only the latest one remains.
+ *
  * Prerequisites:
  *   - `gh` CLI authenticated: gh auth login
  *   - Gradle wrapper present at ./android/gradlew
  *   - JDK 17 active (configured via android/gradle.properties)
  *
  * Usage:
- *   npm run publish
+ *   npm run publish [-- --force]
  */
 
 'use strict';
@@ -27,6 +31,53 @@ function runCmd(cmd, options = {}) {
   } catch (err) {
     throw new Error(err.stderr || err.message || `Command failed: ${cmd}`);
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 0. Change Detection & Force Check
+// ─────────────────────────────────────────────────────────────────────────────
+const force = process.argv.includes('--force');
+let hasChanges = false;
+let lastTagName = '';
+
+try {
+  lastTagName = execSync('git describe --tags --abbrev=0', { encoding: 'utf8', stdio: 'pipe' }).trim();
+  const commitsSinceTag = execSync(`git log ${lastTagName}..HEAD --oneline`, { encoding: 'utf8', stdio: 'pipe' }).trim();
+  if (commitsSinceTag) {
+    hasChanges = true;
+  }
+} catch (err) {
+  // If no tag is found or git describe fails, assume there are changes (first build)
+  hasChanges = true;
+}
+
+// Check for any uncommitted changes in tracked files (excluding config files that we bump)
+try {
+  const statusRaw = execSync('git status --porcelain', { encoding: 'utf8', stdio: 'pipe' }).trim();
+  if (statusRaw) {
+    const lines = statusRaw.split('\n');
+    const dirtyFiles = lines.filter(line => {
+      const file = line.substring(3).trim();
+      return file !== 'app.json' && file !== 'package.json';
+    });
+    if (dirtyFiles.length > 0) {
+      hasChanges = true;
+    }
+  }
+} catch (err) {
+  // If git status fails, default to true
+  hasChanges = true;
+}
+
+if (!hasChanges && !force) {
+  console.log(`\nℹ️   No new commits or modifications detected since the last tag (${lastTagName || 'none'}).`);
+  console.log('    Skipping build and release to prevent version inflation.');
+  console.log('    Use: npm run publish -- --force to run build anyway.\n');
+  process.exit(0);
+}
+
+if (force) {
+  console.log('⚠️   Force flag active: Skipping change detection checks.');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -192,11 +243,50 @@ try {
   console.log('    URL:', output.trim());
 } catch (err) {
   const stderr = err.stderr?.toString() ?? '';
-
   if (stderr.includes('already exists')) {
     console.error(`\n❌  Release ${tag} already exists on GitHub.`);
   } else {
     console.error('\n❌  Failed to create GitHub Release:', stderr || err.message);
   }
   process.exit(1);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. Clean up older GitHub releases and tags
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n🧹  Cleaning up older GitHub releases and tags...');
+try {
+  const releasesRaw = execSync('gh release list --limit 100', { encoding: 'utf8', stdio: 'pipe' }).trim();
+  if (releasesRaw) {
+    const oldTags = releasesRaw
+      .split('\n')
+      .map(line => {
+        const parts = line.split(/\s+/);
+        return parts[0]?.trim();
+      })
+      .filter(t => t && /^v\d+\.\d+\.\d+$/.test(t) && t !== tag);
+
+    if (oldTags.length > 0) {
+      console.log(`Found ${oldTags.length} older releases to delete: ${oldTags.join(', ')}`);
+      for (const oldTag of oldTags) {
+        console.log(`Deleteting old release and remote tag: ${oldTag}`);
+        try {
+          execSync(`gh release delete "${oldTag}" --yes --cleanup-tag`, { stdio: 'ignore' });
+        } catch (e) {
+          console.warn(`Failed to delete release/tag ${oldTag} from remote:`, e.message);
+        }
+
+        try {
+          execSync(`git tag -d "${oldTag}"`, { stdio: 'ignore' });
+        } catch (e) {
+          // ignore if local tag delete fails
+        }
+      }
+      console.log('✅  Cleanup complete. Only the latest release remains.');
+    } else {
+      console.log('No older releases found to clean up.');
+    }
+  }
+} catch (err) {
+  console.warn('⚠️   Warning: Cleanup of old releases failed:', err.message);
 }

@@ -120,10 +120,9 @@ export default function OTAUpdateChecker() {
       setIsDownloading(false);
 
       // 3. Trigger Android native package installer intent
-      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+      await IntentLauncher.startActivityAsync('android.intent.action.INSTALL_PACKAGE', {
         data: contentUri,
         flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
-        type: 'application/vnd.android.package-archive',
       });
     } catch (err: any) {
       console.error('OTA Install Error:', err);

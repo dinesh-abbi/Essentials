@@ -16,6 +16,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
+import * as Application from 'expo-application';
+import Constants from 'expo-constants';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { BottomTabInset, Colors, Radius, Spacing } from '@/constants/theme';
 
@@ -80,6 +83,7 @@ export default function ProfileScreen() {
   const colors = Colors[scheme];
   const isDark = scheme === 'dark';
   const router = useRouter();
+  const currentVersion = Application.nativeApplicationVersion || Constants.expoConfig?.version || '1.0.0';
 
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState('');
@@ -259,6 +263,7 @@ export default function ProfileScreen() {
                   )}
                 </View>
               )}
+              <Row icon="info" label="App Version" value={currentVersion} colors={colors} />
             </View>
           </Animated.View>
 
