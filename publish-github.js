@@ -256,14 +256,11 @@ try {
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n🧹  Cleaning up older GitHub releases and tags...');
 try {
-  const releasesRaw = execSync('gh release list --limit 100', { encoding: 'utf8', stdio: 'pipe' }).trim();
+  const releasesRaw = execSync('gh release list --json tagName', { encoding: 'utf8', stdio: 'pipe' }).trim();
   if (releasesRaw) {
-    const oldTags = releasesRaw
-      .split('\n')
-      .map(line => {
-        const parts = line.split(/\s+/);
-        return parts[0]?.trim();
-      })
+    const releases = JSON.parse(releasesRaw);
+    const oldTags = releases
+      .map(r => r.tagName?.trim())
       .filter(t => t && /^v\d+\.\d+\.\d+$/.test(t) && t !== tag);
 
     if (oldTags.length > 0) {
