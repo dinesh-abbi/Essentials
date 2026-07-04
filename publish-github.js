@@ -212,13 +212,19 @@ try {
   runCmd(`git commit -m "chore: bump version to ${tag}"`);
   console.log('✅  Version bump committed.');
 
-  console.log('📤  Pushing commit to git upstream...');
+  console.log('📤  Pushing commit and tag to git upstream...');
   let branchName = 'main';
   try {
     branchName = execSync('git branch --show-current', { encoding: 'utf8' }).trim();
   } catch {}
   runCmd(`git push origin ${branchName || 'main'}`);
-  console.log('✅  Git push completed.');
+  try {
+    runCmd(`git tag ${tag}`);
+    runCmd(`git push origin ${tag}`);
+  } catch (tagErr) {
+    console.warn('⚠️  Warning: tagging failed or tag already exists:', tagErr.message);
+  }
+  console.log('✅  Git push and tagging completed.');
 } catch (err) {
   console.error('⚠️   Warning: Git commit/push failed.', err.message);
   console.log('Continuing with release creation using built assets...');
