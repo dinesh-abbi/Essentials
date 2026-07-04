@@ -29,6 +29,7 @@ import { ThemedView } from '@/components/themed-view';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import AppLoader from '@/components/AppLoader';
 import * as WaterStorage from '@/utils/WaterStorage';
+import { triggerWaterGoalNotification } from '@/utils/notifications';
 
 // ── Water Wave Animation Component ──────────────────────────────────────────
 function WaterWave({ percent, colors }: { percent: number; colors: any }) {
@@ -228,8 +229,20 @@ export default function DailyWaterScreen() {
 
   async function handleAddWater(ml: number) {
     try {
+      const prevTotal = totalDrank; // snapshot before adding
       await WaterStorage.logWaterIntake(ml);
       await refreshData();
+
+      // Fire the celebration notification the first time we cross 3000ml today.
+      // Re-read the fresh total from storage to avoid stale state closure.
+      if (prevTotal < WaterStorage.DEFAULT_DAILY_GOAL) {
+        const freshTotal = await WaterStorage.getTodayTotalMl();
+        if (freshTotal >= WaterStorage.DEFAULT_DAILY_GOAL) {
+          triggerWaterGoalNotification().catch((e) =>
+            console.warn('Goal notification failed:', e)
+          );
+        }
+      }
     } catch (e) {
       Alert.alert('Error', 'Could not save water log.');
     }

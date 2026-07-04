@@ -22,6 +22,8 @@ export default function WaterLayout() {
       {/* Weekly / Monthly — instant switch, no blank-screen flash */}
       <Stack.Screen name="weekly" options={{ animation: 'none' }} />
       <Stack.Screen name="monthly" options={{ animation: 'none' }} />
+      {/* Goal celebration — slide up as a triumphant reveal */}
+      <Stack.Screen name="goal" options={{ animation: 'fade' }} />
     </Stack>
   );
 }

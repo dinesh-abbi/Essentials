@@ -1,10 +1,12 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 let Notifications: any = null;
 let IntentLauncher: any = null;
-const isExpoGo = Constants.appOwnership === 'expo';
+
+// Use the same ExecutionEnvironment check that AuthContext uses — appOwnership is deprecated in SDK 56
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 if (!isExpoGo) {
   try {
@@ -25,8 +27,8 @@ if (!Notifications) {
     addNotificationResponseReceivedListener: () => ({ remove: () => {} }),
     cancelAllScheduledNotificationsAsync: async () => {},
     scheduleNotificationAsync: async () => '',
-    requestPermissionsAsync: async () => ({ status: 'granted' }),
-    getPermissionsAsync: async () => ({ status: 'granted' }),
+    requestPermissionsAsync: async () => ({ status: 'granted', canScheduleExactNotifications: true }),
+    getPermissionsAsync: async () => ({ status: 'granted', canScheduleExactNotifications: true }),
     setNotificationChannelAsync: async () => null,
     setNotificationCategoryAsync: async () => null,
     getAllScheduledNotificationsAsync: async () => [],
@@ -64,10 +66,26 @@ Notifications.setNotificationHandler({
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Configure notifications: request permission, setup categories, and register sound channels
+ * Configure notifications: register sound channel FIRST (Android 13+ requires
+ * at least one channel to exist before the permission dialog will appear),
+ * then request permission, then set interactive action categories.
  */
 export async function configureNotifications() {
-  // 1. Check & Request Permissions
+  // ── Step 1: Register Unified Android Sound Channel FIRST ──────────────────
+  // On Android 13+, the OS suppresses the permission dialog unless a channel
+  // already exists. Creating the channel here guarantees the dialog appears.
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync(APP_CHANNEL_ID, {
+      name: 'Essentials Alerts',
+      description: 'All notifications from Essentials (water reminders, goals, etc.)',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#3B82F6',
+      sound: 'water_remainder.mp3', // Matches app.json sounds array asset filename
+    });
+  }
+
+  // ── Step 2: Check & Request Notification Permission ───────────────────────
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
   if (existingStatus !== 'granted') {
@@ -79,7 +97,7 @@ export async function configureNotifications() {
     return false;
   }
 
-  // 2. Register Interactive Action Categories (Yes/No buttons)
+  // ── Step 3: Register Interactive Action Categories (Yes/No buttons) ───────
   await Notifications.setNotificationCategoryAsync(REMINDER_CATEGORY_ID, [
     {
       identifier: 'YES_ACTION',
@@ -97,16 +115,20 @@ export async function configureNotifications() {
     },
   ]);
 
-  // 3. Register Unified Android Sound Channel for ALL app notifications
+  // ── Step 4: Exact Alarm Permission Health Check (Android 12+) ─────────────
+  // SCHEDULE_EXACT_ALARM requires explicit user approval in Settings on Android 12+.
+  // If not granted, open the "Alarms & Reminders" settings page so the user can
+  // enable it — without this, daily-trigger notifications fire inexactly or not at all.
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync(APP_CHANNEL_ID, {
-      name: 'Essentials Alerts',
-      description: 'All notifications from Essentials (water reminders, goals, etc.)',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#3B82F6',
-      sound: 'water_remainder.mp3', // Matches app.json sounds array asset filename
-    });
+    try {
+      const perms = await Notifications.getPermissionsAsync();
+      if (perms.canScheduleExactNotifications === false) {
+        console.warn('[Notifications] Exact alarm permission not granted — opening settings');
+        await openExactAlarmSettings();
+      }
+    } catch (e) {
+      console.warn('[Notifications] Could not check exact alarm permission:', e);
+    }
   }
 
   return true;
@@ -174,7 +196,7 @@ export async function markBatteryOptimizationDismissed(): Promise<void> {
 }
 
 /**
- * Open the "Alarms & Reminders" permission settings page (Android 14+).
+ * Open the "Alarms & Reminders" permission settings page (Android 12+).
  * This is where users grant SCHEDULE_EXACT_ALARM if it's denied by default.
  */
 export async function openExactAlarmSettings(): Promise<void> {
@@ -291,83 +313,56 @@ export async function cancelAllReminders() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test Mode (COMMENTED OUT — preserved for future use)
+// Hydration Goal Notification
 // ─────────────────────────────────────────────────────────────────────────────
 
-// const TEST_MODE_KEY = '@water_reminder_test_mode';
+/**
+ * Module-level daily guard — tracks the date of the last goal notification
+ * so we fire at most once per calendar day, no matter how much water is logged.
+ * Resets automatically every new day (date string changes).
+ */
+let goalNotifiedDate: string | null = null;
 
-// export async function isTestModeEnabled(): Promise<boolean> {
-//   try {
-//     const value = await AsyncStorage.getItem(TEST_MODE_KEY);
-//     return value === 'true';
-//   } catch {
-//     return false;
-//   }
-// }
+/**
+ * Fire an immediate notification celebrating the 3000ml daily goal.
+ * Tapping the notification routes the user to the /water/goal screen.
+ * Protected by a daily guard so it fires at most once per calendar day.
+ */
+export async function triggerWaterGoalNotification(): Promise<void> {
+  const today = new Date().toDateString(); // e.g. "Fri Jul 04 2026"
+  if (goalNotifiedDate === today) {
+    console.log('[Notifications] Goal notification already fired today — skipping');
+    return;
+  }
+  goalNotifiedDate = today;
 
-// export async function setTestModeEnabled(enabled: boolean): Promise<void> {
-//   try {
-//     await AsyncStorage.setItem(TEST_MODE_KEY, String(enabled));
-//   } catch (error) {
-//     console.error('Failed to save test mode state', error);
-//   }
-// }
+  const isConfigured = await configureNotifications();
+  if (!isConfigured) return;
 
-// export async function scheduleOneMinuteTestReminder() {
-//   const isConfigured = await configureNotifications();
-//   if (!isConfigured) return;
-//
-//   // Clear existing schedules first to avoid duplicates
-//   await Notifications.cancelAllScheduledNotificationsAsync();
-//
-//   // Schedule water hydration reminder every 1 minute (60 seconds)
-//   await Notifications.scheduleNotificationAsync({
-//     content: {
-//       title: 'Time to Hydrate! (Test Mode) 💧',
-//       body: 'This is your 1-minute water hydration test reminder. Keep drinking water!',
-//       sound: Platform.OS === 'android' ? undefined : 'water_remainder.mp3',
-//       categoryIdentifier: REMINDER_CATEGORY_ID,
-//       data: {
-//         highlight: 'water',
-//       },
-//     },
-//     trigger: {
-//       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-//       channelId: APP_CHANNEL_ID,
-//       seconds: 60,
-//       repeats: true,
-//     },
-//   });
-// }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Goal Notification (COMMENTED OUT — preserved for future use)
-// ─────────────────────────────────────────────────────────────────────────────
-
-// /**
-//  * Notification for hitting the daily water goal
-//  */
-// export async function triggerWaterGoalNotification() {
-//   const isConfigured = await configureNotifications();
-//   if (!isConfigured) return;
-//
-//   await Notifications.scheduleNotificationAsync({
-//     content: {
-//       title: 'Daily Water Goal Reached! 🏆',
-//       body: 'Congratulations! You have reached your daily hydration goal. Great job!',
-//       sound: Platform.OS === 'android' ? undefined : 'water_remainder.mp3',
-//       data: {
-//         route: '/water',
-//       },
-//     },
-//     trigger: {
-//       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-//       channelId: APP_CHANNEL_ID,
-//       seconds: 1,
-//       repeats: false,
-//     },
-//   });
-// }
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '🏆 Hydration Goal Reached!',
+        body: "Amazing! You've hit 3000ml today. Your body thanks you! 💧",
+        sound: Platform.OS === 'android' ? undefined : 'water_remainder.mp3',
+        data: {
+          route: '/water/goal', // Tap opens the celebration screen
+        },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        channelId: APP_CHANNEL_ID,
+        seconds: 1,
+        repeats: false,
+      },
+    });
+    console.log('[Notifications] Goal notification scheduled ✓');
+  } catch (error) {
+    console.error('[Notifications] Failed to schedule goal notification:', error);
+    // Reset guard so it can be retried
+    goalNotifiedDate = null;
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Self-Healing / Ensure Schedules

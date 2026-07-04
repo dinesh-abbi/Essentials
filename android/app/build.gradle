@@ -4,27 +4,6 @@ apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
-import groovy.json.JsonSlurper
-
-def getAppVersion() {
-    def appJsonFile = file('../../app.json')
-    if (appJsonFile.exists()) {
-        def parsedJson = new JsonSlurper().parseText(appJsonFile.text)
-        return parsedJson.expo?.version ?: "1.0.0"
-    }
-    return "1.0.0"
-}
-
-def getAppVersionCode() {
-    def appJsonFile = file('../../app.json')
-    if (appJsonFile.exists()) {
-        def parsedJson = new JsonSlurper().parseText(appJsonFile.text)
-        def code = parsedJson.expo?.android?.versionCode
-        return code != null ? code.toInteger() : 1
-    }
-    return 1
-}
-
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -113,8 +92,8 @@ android {
         applicationId 'com.catalyst.essentials'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode getAppVersionCode()
-        versionName getAppVersion()
+        versionCode 11
+        versionName "1.0.10"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
