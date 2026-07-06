@@ -10,6 +10,7 @@ import {
   Dimensions,
   TextInput,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
@@ -406,13 +407,10 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (highlight === 'water') {
-      waterHighlight.value = withRepeat(
-        withSequence(
-          withTiming(1, { duration: 300 }),
-          withTiming(0, { duration: 300 })
-        ),
-        6,
-        false
+      waterHighlight.value = 0;
+      waterHighlight.value = withSequence(
+        withTiming(1, { duration: 600, easing: Easing.out(Easing.cubic) }),
+        withTiming(0, { duration: 1400, easing: Easing.inOut(Easing.ease) })
       );
       router.setParams({ highlight: undefined });
     }
@@ -422,16 +420,17 @@ export default function HomeScreen() {
     const borderColor = interpolateColor(
       waterHighlight.value,
       [0, 1],
-      [colors.border, colors.primary]
+      ['transparent', colors.primary]
     );
-    const scale = 1 + waterHighlight.value * 0.03;
+    const shadowOpacity = waterHighlight.value * 0.6;
+    const shadowRadius = waterHighlight.value * 16;
     return {
+      borderWidth: 2,
       borderColor,
-      transform: [{ scale }],
       shadowColor: colors.primary,
-      shadowOpacity: waterHighlight.value * 0.5,
-      shadowRadius: waterHighlight.value * 12,
-      elevation: waterHighlight.value * 6,
+      shadowOpacity,
+      shadowRadius,
+      elevation: waterHighlight.value * 8,
       borderRadius: Radius.xl,
     };
   });
@@ -441,6 +440,25 @@ export default function HomeScreen() {
   const [todaySpend, setTodaySpend] = useState(0);
   const [waterTotalMl, setWaterTotalMl] = useState(0);
   const [waterHourlyMap, setWaterHourlyMap] = useState<Record<number, boolean>>({});
+  const [waterSaving, setWaterSaving] = useState(false);
+  const [waterGoal, setWaterGoal] = useState(WaterStorage.DEFAULT_DAILY_GOAL);
+
+  const newBadgeY = useSharedValue(0);
+
+  useEffect(() => {
+    newBadgeY.value = withRepeat(
+      withSequence(
+        withTiming(-4, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
+        withTiming(4, { duration: 1200, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+  }, []);
+
+  const bobbingStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: newBadgeY.value }],
+  }));
 
   useFocusEffect(
     useCallback(() => {
@@ -460,6 +478,9 @@ export default function HomeScreen() {
 
           setWaterTotalMl(await WaterStorage.getTodayTotalMl());
           setWaterHourlyMap(await WaterStorage.getTodayHourlyStatus());
+
+          const userGoal = await WaterStorage.getUserWaterGoal();
+          setWaterGoal(userGoal);
         } catch (e) {
           console.error('load metrics failed', e);
         }
@@ -469,23 +490,22 @@ export default function HomeScreen() {
   );
 
   const addWater = async (amount: number) => {
+    setWaterSaving(true);
     try {
       await WaterStorage.logWaterIntake(amount);
       const total = await WaterStorage.getTodayTotalMl();
       const hourly = await WaterStorage.getTodayHourlyStatus();
       setWaterTotalMl(total);
       setWaterHourlyMap(hourly);
-      
-      // COMMENTED OUT — goal notification disabled for now
-      // if (total >= WaterStorage.DEFAULT_DAILY_GOAL) {
-      //   await NotificationsUtil.triggerWaterGoalNotification();
-      // }
     } catch (e) {
       console.error('Add water failed', e);
+    } finally {
+      setWaterSaving(false);
     }
   };
 
   const removeWater = async () => {
+    setWaterSaving(true);
     try {
       const todayLogs = await WaterStorage.getTodayWaterLogs();
       if (todayLogs.length > 0) {
@@ -498,11 +518,13 @@ export default function HomeScreen() {
       }
     } catch (e) {
       console.error('Remove water failed', e);
+    } finally {
+      setWaterSaving(false);
     }
   };
 
   const trackedHours = Object.values(waterHourlyMap).filter(Boolean).length;
-  const waterPct = Math.min(Math.round((waterTotalMl / WaterStorage.DEFAULT_DAILY_GOAL) * 100), 100);
+  const waterPct = Math.min(Math.round((waterTotalMl / waterGoal) * 100), 100);
 
   const now = new Date();
   const greeting =
@@ -613,7 +635,12 @@ export default function HomeScreen() {
                   <View style={{ flex: 1, gap: 10 }}>
                     <AnimatedPressable onPress={() => router.push('/water')} style={{ width: '100%' }}>
                       <View style={styles.widgetHeader}>
-                        <Label text="WATER & TIMELINE" color={isDark ? '#94A3B8' : '#64748B'} />
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Label text="WATER & TIMELINE" color={isDark ? '#94A3B8' : '#64748B'} />
+                          <Animated.View style={[styles.wateryBadge, bobbingStyle]}>
+                            <Text style={styles.wateryBadgeText}>NEW</Text>
+                          </Animated.View>
+                        </View>
                         <Feather name="droplet" size={14} color={colors.primary} />
                       </View>
                       
@@ -651,12 +678,20 @@ export default function HomeScreen() {
 
                     {/* Inline water controls */}
                     <View style={styles.widgetControlRowLeft}>
-                      <TouchableOpacity onPress={() => removeWater()} style={[styles.widgetControlBtn, { backgroundColor: colors.primary + '18' }]} activeOpacity={0.7}>
-                        <Feather name="minus" size={13} color={colors.primary} />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => addWater(250)} style={[styles.widgetControlBtn, { backgroundColor: colors.primary + '18' }]} activeOpacity={0.7}>
-                        <Feather name="plus" size={13} color={colors.primary} />
-                      </TouchableOpacity>
+                      {waterSaving ? (
+                        <View style={[styles.widgetControlBtn, { backgroundColor: colors.primary + '18', width: 66, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' }]}>
+                          <ActivityIndicator size="small" color={colors.primary} style={{ transform: [{ scale: 0.8 }] }} />
+                        </View>
+                      ) : (
+                        <>
+                          <TouchableOpacity onPress={() => removeWater()} style={[styles.widgetControlBtn, { backgroundColor: colors.primary + '18' }]} activeOpacity={0.7}>
+                            <Feather name="minus" size={13} color={colors.primary} />
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => addWater(250)} style={[styles.widgetControlBtn, { backgroundColor: colors.primary + '18' }]} activeOpacity={0.7}>
+                            <Feather name="plus" size={13} color={colors.primary} />
+                          </TouchableOpacity>
+                        </>
+                      )}
                       <Text style={[styles.statusText, { color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, marginLeft: 4 }]}>
                         {trackedHours} logs today
                       </Text>
@@ -956,5 +991,27 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     bottom: 0,
     left: '50%',
+  },
+  wateryBadge: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+    marginLeft: 6,
+    borderWidth: 1,
+    borderColor: '#60A5FA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  wateryBadgeText: {
+    color: '#FFF',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
 });

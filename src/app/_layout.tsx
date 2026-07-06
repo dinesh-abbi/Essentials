@@ -5,7 +5,7 @@ import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import * as WaterStorage from '@/utils/WaterStorage';
 import { ensureNotificationsScheduled, Notifications, triggerWaterGoalNotification } from '@/utils/notifications';
-import { auth } from '@/utils/firebase';
+import { auth, waitForAuth } from '@/utils/firebase';
 import OTAUpdateChecker from '@/components/OTAUpdateChecker';
 import AppLoader from '@/components/AppLoader';
 
@@ -44,13 +44,15 @@ function AppStack() {
 
       if (actionIdentifier === 'YES_ACTION') {
         try {
+          await waitForAuth();
           // Only attempt logging if user is actually authenticated
           if (auth.currentUser) {
+            const userGoal = await WaterStorage.getUserWaterGoal();
             const prevTotal = await WaterStorage.getTodayTotalMl();
             await WaterStorage.logWaterIntake(250);
-            if (prevTotal < 3000) {
+            if (prevTotal < userGoal) {
               const freshTotal = await WaterStorage.getTodayTotalMl();
-              if (freshTotal >= 3000) {
+              if (freshTotal >= userGoal) {
                 triggerWaterGoalNotification().catch((e) =>
                   console.warn('Goal notification (YES_ACTION) failed:', e)
                 );

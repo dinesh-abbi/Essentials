@@ -9,8 +9,9 @@ import {
   writeBatch,
   setDoc,
 } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { auth, db, waitForAuth } from '@/utils/firebase';
+import { auth, db, waitForAuth, withTimeout } from '@/utils/firebase';
 import * as SyncManager from './SyncManager';
 
 const generateId = () => `purchase_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -22,6 +23,8 @@ export interface PurchaseLog {
   category: 'Groceries' | 'Dairy' | 'Veggies' | 'Misc';
   timestamp: number;
 }
+
+const PURCHASES_CACHE_KEY = '@essentials_purchases_cache';
 
 /**
  * Returns the current authenticated user's UID.
@@ -39,6 +42,50 @@ async function getCurrentUserId(): Promise<string> {
 async function purchasesCollection() {
   const uid = await getCurrentUserId();
   return collection(db, 'users', uid, 'purchases');
+}
+
+/**
+ * Helper to write purchases list completely to local AsyncStorage cache.
+ */
+async function savePurchasesCache(logs: PurchaseLog[]): Promise<void> {
+  try {
+    const uid = await getCurrentUserId();
+    const key = `${PURCHASES_CACHE_KEY}_${uid}`;
+    await AsyncStorage.setItem(key, JSON.stringify(logs));
+  } catch (error) {
+    console.error('Failed to save purchases cache', error);
+  }
+}
+
+/**
+ * Helper to get all cached purchases from AsyncStorage.
+ */
+async function getPurchasesCache(): Promise<PurchaseLog[]> {
+  try {
+    const uid = await getCurrentUserId();
+    const key = `${PURCHASES_CACHE_KEY}_${uid}`;
+    const cached = await AsyncStorage.getItem(key);
+    return cached ? JSON.parse(cached) : [];
+  } catch (error) {
+    console.error('Failed to get purchases cache', error);
+    return [];
+  }
+}
+
+/**
+ * Helper to merge new purchases into local cache.
+ */
+async function updatePurchasesCache(newLogs: PurchaseLog[]): Promise<void> {
+  try {
+    const currentCache = await getPurchasesCache();
+    const mergedMap = new Map<string, PurchaseLog>();
+    currentCache.forEach((log) => mergedMap.set(log.id, log));
+    newLogs.forEach((log) => mergedMap.set(log.id, log));
+    const mergedList = Array.from(mergedMap.values()).sort((a, b) => b.timestamp - a.timestamp);
+    await savePurchasesCache(mergedList);
+  } catch (error) {
+    console.error('Failed to update purchases cache', error);
+  }
 }
 
 /**
@@ -75,7 +122,7 @@ export async function getPurchases(): Promise<PurchaseLog[]> {
   let dbLogs: PurchaseLog[] = [];
   try {
     const q = query(await purchasesCollection(), orderBy('timestamp', 'desc'));
-    const snapshot = await getDocs(q);
+    const snapshot = await withTimeout(getDocs(q), 1500);
     dbLogs = snapshot.docs.map((d) => ({
       id: d.id,
       name: d.data().name,
@@ -83,8 +130,10 @@ export async function getPurchases(): Promise<PurchaseLog[]> {
       category: d.data().category,
       timestamp: d.data().timestamp,
     }));
+    await savePurchasesCache(dbLogs);
   } catch (error) {
-    console.warn('Failed to get purchases from Firestore, merging with offline', error);
+    console.warn('Failed to get purchases from Firestore, using offline cache', error);
+    dbLogs = await getPurchasesCache();
   }
   return applyPurchasesOfflineMutations(dbLogs);
 }
@@ -99,6 +148,11 @@ export async function savePurchase(
   timestamp: number = Date.now()
 ): Promise<PurchaseLog> {
   const id = generateId();
+  const trimmedName = name.trim();
+  const newPurchase: PurchaseLog = { id, name: trimmedName, cost, category, timestamp };
+
+  // Optimistically sync to local cache immediately
+  await updatePurchasesCache([newPurchase]);
 
   const isOnline = await SyncManager.isOnline();
   if (isOnline) {
@@ -106,19 +160,13 @@ export async function savePurchase(
       const coll = await purchasesCollection();
       const docRef = doc(coll, id);
       await setDoc(docRef, {
-        name: name.trim(),
+        name: trimmedName,
         cost,
         category,
         timestamp,
       });
 
-      return {
-        id,
-        name: name.trim(),
-        cost,
-        category,
-        timestamp,
-      };
+      return newPurchase;
     } catch (error) {
       console.warn('Failed to save purchase directly to Firestore, queueing offline', error);
     }
@@ -128,16 +176,10 @@ export async function savePurchase(
   await SyncManager.queueAction({
     id: `action_${id}`,
     type: 'purchase_save',
-    payload: { id, name: name.trim(), cost, category, timestamp },
+    payload: newPurchase,
   });
 
-  return {
-    id,
-    name: name.trim(),
-    cost,
-    category,
-    timestamp,
-  };
+  return newPurchase;
 }
 
 /**
@@ -147,6 +189,17 @@ export async function updatePurchase(
   id: string,
   updates: Partial<Omit<PurchaseLog, 'id'>>
 ): Promise<void> {
+  // Update in local cache immediately
+  try {
+    const currentCache = await getPurchasesCache();
+    const updatedCache = currentCache.map((log) =>
+      log.id === id ? { ...log, ...updates } : log
+    );
+    await savePurchasesCache(updatedCache);
+  } catch (err) {
+    console.error('Failed to update purchase in cache', err);
+  }
+
   const isOnline = await SyncManager.isOnline();
   if (isOnline) {
     try {
@@ -171,6 +224,15 @@ export async function updatePurchase(
  * Delete a specific purchase log by ID from Firestore.
  */
 export async function deletePurchase(id: string): Promise<void> {
+  // Delete from local cache immediately
+  try {
+    const currentCache = await getPurchasesCache();
+    const updatedCache = currentCache.filter((log) => log.id !== id);
+    await savePurchasesCache(updatedCache);
+  } catch (err) {
+    console.error('Failed to delete purchase from cache', err);
+  }
+
   const isOnline = await SyncManager.isOnline();
   if (isOnline) {
     try {
@@ -194,6 +256,9 @@ export async function deletePurchase(id: string): Promise<void> {
  * Clear all purchase logs from Firestore (batch delete).
  */
 export async function clearPurchases(): Promise<void> {
+  // Clear local cache immediately
+  await savePurchasesCache([]);
+
   const isOnline = await SyncManager.isOnline();
   if (isOnline) {
     try {

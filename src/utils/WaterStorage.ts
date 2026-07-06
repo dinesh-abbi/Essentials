@@ -8,9 +8,12 @@ import {
   where,
   writeBatch,
   setDoc,
+  getDoc,
+  updateDoc,
 } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { auth, db, waitForAuth } from '@/utils/firebase';
+import { auth, db, waitForAuth, withTimeout } from '@/utils/firebase';
 import * as SyncManager from './SyncManager';
 
 const generateId = () => `water_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -22,6 +25,8 @@ export interface WaterLog {
 }
 
 export const DEFAULT_DAILY_GOAL = 3000; // ml
+
+const WATER_CACHE_KEY = '@essentials_water_logs_cache';
 
 /**
  * Returns the current authenticated user's UID.
@@ -39,6 +44,50 @@ async function getCurrentUserId(): Promise<string> {
 async function waterLogsCollection() {
   const uid = await getCurrentUserId();
   return collection(db, 'users', uid, 'waterLogs');
+}
+
+/**
+ * Helper to write water logs list completely to local AsyncStorage cache.
+ */
+async function saveWaterLogsCache(logs: WaterLog[]): Promise<void> {
+  try {
+    const uid = await getCurrentUserId();
+    const key = `${WATER_CACHE_KEY}_${uid}`;
+    await AsyncStorage.setItem(key, JSON.stringify(logs));
+  } catch (error) {
+    console.error('Failed to save water logs cache', error);
+  }
+}
+
+/**
+ * Helper to get all cached water logs from AsyncStorage.
+ */
+async function getWaterLogsCache(): Promise<WaterLog[]> {
+  try {
+    const uid = await getCurrentUserId();
+    const key = `${WATER_CACHE_KEY}_${uid}`;
+    const cached = await AsyncStorage.getItem(key);
+    return cached ? JSON.parse(cached) : [];
+  } catch (error) {
+    console.error('Failed to get water logs cache', error);
+    return [];
+  }
+}
+
+/**
+ * Helper to merge new water logs into the local cache.
+ */
+async function updateWaterLogsCache(newLogs: WaterLog[]): Promise<void> {
+  try {
+    const currentCache = await getWaterLogsCache();
+    const mergedMap = new Map<string, WaterLog>();
+    currentCache.forEach((log) => mergedMap.set(log.id, log));
+    newLogs.forEach((log) => mergedMap.set(log.id, log));
+    const mergedList = Array.from(mergedMap.values()).sort((a, b) => b.timestamp - a.timestamp);
+    await saveWaterLogsCache(mergedList);
+  } catch (error) {
+    console.error('Failed to update water logs cache', error);
+  }
 }
 
 /**
@@ -71,14 +120,16 @@ export async function applyWaterOfflineMutations(logs: WaterLog[]): Promise<Wate
 export async function getWaterLogs(): Promise<WaterLog[]> {
   let dbLogs: WaterLog[] = [];
   try {
-    const snapshot = await getDocs(await waterLogsCollection());
+    const snapshot = await withTimeout(getDocs(await waterLogsCollection()), 1500);
     dbLogs = snapshot.docs.map((d) => ({
       id: d.id,
       amountMl: d.data().amountMl,
       timestamp: d.data().timestamp,
     }));
+    await saveWaterLogsCache(dbLogs);
   } catch (error) {
-    console.warn('Failed to get water logs from Firestore, using offline logs', error);
+    console.warn('Failed to get water logs from Firestore, using offline cache', error);
+    dbLogs = await getWaterLogsCache();
   }
   return applyWaterOfflineMutations(dbLogs);
 }
@@ -89,6 +140,10 @@ export async function getWaterLogs(): Promise<WaterLog[]> {
 export async function logWaterIntake(amountMl: number): Promise<WaterLog> {
   const timestamp = Date.now();
   const id = generateId();
+  const newLog: WaterLog = { id, amountMl, timestamp };
+
+  // Optimistically sync to local cache immediately
+  await updateWaterLogsCache([newLog]);
 
   const isOnline = await SyncManager.isOnline();
   if (isOnline) {
@@ -100,11 +155,7 @@ export async function logWaterIntake(amountMl: number): Promise<WaterLog> {
         timestamp,
       });
 
-      return {
-        id,
-        amountMl,
-        timestamp,
-      };
+      return newLog;
     } catch (error) {
       console.warn('Failed to log water intake directly to Firestore, queueing offline', error);
     }
@@ -114,14 +165,10 @@ export async function logWaterIntake(amountMl: number): Promise<WaterLog> {
   await SyncManager.queueAction({
     id: `action_${id}`,
     type: 'water_log',
-    payload: { id, amountMl, timestamp },
+    payload: newLog,
   });
 
-  return {
-    id,
-    amountMl,
-    timestamp,
-  };
+  return newLog;
 }
 
 /**
@@ -138,14 +185,16 @@ export async function getTodayWaterLogs(): Promise<WaterLog[]> {
       await waterLogsCollection(),
       where('timestamp', '>=', startOfTodayMs)
     );
-    const snapshot = await getDocs(q);
+    const snapshot = await withTimeout(getDocs(q), 1500);
     dbLogs = snapshot.docs.map((d) => ({
       id: d.id,
       amountMl: d.data().amountMl,
       timestamp: d.data().timestamp,
     }));
+    await updateWaterLogsCache(dbLogs);
   } catch (error) {
-    console.warn('Failed to get today water logs from Firestore, merging with offline', error);
+    console.warn('Failed to get today water logs from Firestore, using offline cache', error);
+    dbLogs = await getWaterLogsCache();
   }
 
   // Merge with offline actions
@@ -191,6 +240,15 @@ export async function getTodayHourlyStatus(): Promise<Record<number, boolean>> {
  * Delete a specific water log by ID from Firestore.
  */
 export async function deleteWaterLog(id: string): Promise<void> {
+  // Update local cache immediately
+  try {
+    const currentCache = await getWaterLogsCache();
+    const updatedCache = currentCache.filter((log) => log.id !== id);
+    await saveWaterLogsCache(updatedCache);
+  } catch (err) {
+    console.error('Failed to delete log from cache', err);
+  }
+
   const isOnline = await SyncManager.isOnline();
   if (isOnline) {
     try {
@@ -214,6 +272,18 @@ export async function deleteWaterLog(id: string): Promise<void> {
  * Clear all water logs for today from Firestore (batch delete).
  */
 export async function clearWaterLogs(): Promise<void> {
+  // Clear today's logs from cache immediately
+  try {
+    const currentCache = await getWaterLogsCache();
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfTodayMs = startOfToday.getTime();
+    const updatedCache = currentCache.filter((log) => log.timestamp < startOfTodayMs);
+    await saveWaterLogsCache(updatedCache);
+  } catch (err) {
+    console.error('Failed to clear logs from cache', err);
+  }
+
   const isOnline = await SyncManager.isOnline();
   if (isOnline) {
     try {
@@ -250,18 +320,27 @@ export async function getMonthlyTotalMl(): Promise<number> {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const startOfMonthMs = startOfMonth.getTime();
 
+  let dbLogs: WaterLog[] = [];
   try {
     const q = query(
       await waterLogsCollection(),
       where('timestamp', '>=', startOfMonthMs)
     );
-    const snapshot = await getDocs(q);
-
-    return snapshot.docs.reduce((acc, d) => acc + (d.data().amountMl || 0), 0);
+    const snapshot = await withTimeout(getDocs(q), 1500);
+    dbLogs = snapshot.docs.map((d) => ({
+      id: d.id,
+      amountMl: d.data().amountMl,
+      timestamp: d.data().timestamp,
+    }));
+    await updateWaterLogsCache(dbLogs);
   } catch (error) {
-    console.error('Failed to get monthly water total from Firestore', error);
-    return 0;
+    console.warn('Failed to get monthly water total from Firestore, using offline cache', error);
+    dbLogs = await getWaterLogsCache();
   }
+
+  const merged = await applyWaterOfflineMutations(dbLogs);
+  const filtered = merged.filter((log) => log.timestamp >= startOfMonthMs);
+  return filtered.reduce((acc, curr) => acc + curr.amountMl, 0);
 }
 
 /**
@@ -272,24 +351,34 @@ export async function getMonthlyDaysTracked(): Promise<number> {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const startOfMonthMs = startOfMonth.getTime();
 
+  let dbLogs: WaterLog[] = [];
   try {
     const q = query(
       await waterLogsCollection(),
       where('timestamp', '>=', startOfMonthMs)
     );
-    const snapshot = await getDocs(q);
-
-    const uniqueDays = new Set<string>();
-    snapshot.docs.forEach((d) => {
-      const date = new Date(d.data().timestamp);
-      uniqueDays.add(`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`);
-    });
-
-    return uniqueDays.size;
+    const snapshot = await withTimeout(getDocs(q), 1500);
+    dbLogs = snapshot.docs.map((d) => ({
+      id: d.id,
+      amountMl: d.data().amountMl,
+      timestamp: d.data().timestamp,
+    }));
+    await updateWaterLogsCache(dbLogs);
   } catch (error) {
-    console.error('Failed to get monthly days tracked from Firestore', error);
-    return 0;
+    console.warn('Failed to get monthly days tracked from Firestore, using offline cache', error);
+    dbLogs = await getWaterLogsCache();
   }
+
+  const merged = await applyWaterOfflineMutations(dbLogs);
+  const filtered = merged.filter((log) => log.timestamp >= startOfMonthMs);
+
+  const uniqueDays = new Set<string>();
+  filtered.forEach((log) => {
+    const date = new Date(log.timestamp);
+    uniqueDays.add(`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`);
+  });
+
+  return uniqueDays.size;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -300,19 +389,24 @@ export async function getMonthlyDaysTracked(): Promise<number> {
  * Get water logs between two timestamps (inclusive).
  */
 export async function getWaterLogsBetween(startMs: number, endMs: number): Promise<WaterLog[]> {
+  let dbLogs: WaterLog[] = [];
   try {
     const col = await waterLogsCollection();
     const q = query(col, where('timestamp', '>=', startMs), where('timestamp', '<=', endMs));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map((d) => ({
+    const snapshot = await withTimeout(getDocs(q), 1500);
+    dbLogs = snapshot.docs.map((d) => ({
       id: d.id,
       amountMl: d.data().amountMl,
       timestamp: d.data().timestamp,
     }));
+    await updateWaterLogsCache(dbLogs);
   } catch (error) {
-    console.error('Failed to get water logs between dates', error);
-    return [];
+    console.warn('Failed to get water logs between dates, using offline cache', error);
+    dbLogs = await getWaterLogsCache();
   }
+
+  const merged = await applyWaterOfflineMutations(dbLogs);
+  return merged.filter((log) => log.timestamp >= startMs && log.timestamp <= endMs);
 }
 
 /**
@@ -372,3 +466,62 @@ export async function getMonthlyCalendarData(
   return dayMap;
 }
 
+const WATER_GOAL_KEY = '@essentials_water_goal';
+
+/**
+ * Gets the current user's hydration goal (in ml).
+ * Uses local AsyncStorage cache first, and queries Firestore if offline/cache empty.
+ */
+export async function getUserWaterGoal(): Promise<number> {
+  try {
+    const uid = await getCurrentUserId();
+    const cachedGoal = await AsyncStorage.getItem(`${WATER_GOAL_KEY}_${uid}`);
+    if (cachedGoal) {
+      return parseInt(cachedGoal, 10);
+    }
+  } catch (e) {
+    console.warn('Failed to read water goal cache', e);
+  }
+
+  const isOnline = await SyncManager.isOnline();
+  if (isOnline) {
+    try {
+      const uid = await getCurrentUserId();
+      const userRef = doc(db, 'users', uid);
+      const snap = await withTimeout(getDoc(userRef), 1500);
+      if (snap.exists() && snap.data()?.waterGoal) {
+        const goal = snap.data().waterGoal;
+        const uidCurrent = await getCurrentUserId();
+        await AsyncStorage.setItem(`${WATER_GOAL_KEY}_${uidCurrent}`, goal.toString());
+        return goal;
+      }
+    } catch (err) {
+      console.warn('Failed to query water goal from Firestore', err);
+    }
+  }
+
+  return DEFAULT_DAILY_GOAL;
+}
+
+/**
+ * Sets the current user's hydration goal (in ml).
+ * Saves to local cache immediately and updates Firestore asynchronously.
+ */
+export async function setUserWaterGoal(goal: number): Promise<void> {
+  const uid = await getCurrentUserId();
+  try {
+    await AsyncStorage.setItem(`${WATER_GOAL_KEY}_${uid}`, goal.toString());
+  } catch (e) {
+    console.error('Failed to cache water goal', e);
+  }
+
+  const isOnline = await SyncManager.isOnline();
+  if (isOnline) {
+    try {
+      const userRef = doc(db, 'users', uid);
+      await updateDoc(userRef, { waterGoal: goal });
+    } catch (err) {
+      console.warn('Failed to update water goal in Firestore', err);
+    }
+  }
+}

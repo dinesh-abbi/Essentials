@@ -31,8 +31,7 @@ export default function MonthlyWaterScreen() {
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date()); // Holds active year/month
   const [dayMap, setDayMap] = useState<Map<number, number>>(new Map());
-
-  const goal = WaterStorage.DEFAULT_DAILY_GOAL;
+  const [goal, setGoal] = useState(WaterStorage.DEFAULT_DAILY_GOAL);
 
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth(); // 0-indexed
@@ -46,6 +45,8 @@ export default function MonthlyWaterScreen() {
     try {
       const data = await WaterStorage.getMonthlyCalendarData(currentYear, currentMonth);
       setDayMap(data);
+      const userGoal = await WaterStorage.getUserWaterGoal();
+      setGoal(userGoal);
     } catch (e) {
       Alert.alert('Error', 'Failed to retrieve monthly hydration calendar.');
     } finally {

@@ -12,6 +12,7 @@ import {
   useColorScheme,
   View,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -196,7 +197,7 @@ function CalendarPicker({ visible, onClose, selectedDate, onSelectDate, colors }
 }
 
 // ── Edit Expense Modal Component ────────────────────────────────────────────
-function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors }: any) {
+function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isSaving }: any) {
   if (!log) return null;
 
   const [editName, setEditName] = useState(log.name);
@@ -320,9 +321,14 @@ function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors }: a
 
               <TouchableOpacity
                 onPress={handleSave}
-                style={[styles.actionBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                disabled={isSaving}
+                style={[styles.actionBtn, { backgroundColor: colors.primary, borderColor: colors.primary, opacity: isSaving ? 0.8 : 1 }]}
               >
-                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Save</Text>
+                {isSaving ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Save</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -355,6 +361,7 @@ export default function DailyPurchasesScreen() {
   const [category, setCategory] = useState<CategoryType>('Groceries');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Edit states
   const [editingLog, setEditingLog] = useState<PurchasesStorage.PurchaseLog | null>(null);
@@ -388,7 +395,7 @@ export default function DailyPurchasesScreen() {
       return;
     }
 
-    setLoading(true);
+    setIsSaving(true);
     try {
       const newLog = await PurchasesStorage.savePurchase(name, price, category, selectedDate.getTime());
       setLogs((prev) => [newLog, ...prev].sort((a, b) => b.timestamp - a.timestamp));
@@ -400,12 +407,12 @@ export default function DailyPurchasesScreen() {
     } catch (e) {
       Alert.alert('Error', 'Failed to save purchase.');
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
 
   const handleEditSave = async (id: string, updates: Partial<Omit<PurchasesStorage.PurchaseLog, 'id'>>) => {
-    setLoading(true);
+    setIsSaving(true);
     try {
       await PurchasesStorage.updatePurchase(id, updates);
       setLogs((prev) =>
@@ -416,7 +423,7 @@ export default function DailyPurchasesScreen() {
     } catch (e) {
       Alert.alert('Error', 'Failed to update purchase.');
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
 
@@ -427,14 +434,14 @@ export default function DailyPurchasesScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          setLoading(true);
+          setIsSaving(true);
           try {
             await PurchasesStorage.deletePurchase(id);
             setLogs((prev) => prev.filter((log) => log.id !== id));
           } catch (e) {
             Alert.alert('Error', 'Failed to delete purchase.');
           } finally {
-            setLoading(false);
+            setIsSaving(false);
           }
         },
       },
@@ -448,14 +455,14 @@ export default function DailyPurchasesScreen() {
         text: 'Wipe Memory',
         style: 'destructive',
         onPress: async () => {
-          setLoading(true);
+          setIsSaving(true);
           try {
             await PurchasesStorage.clearPurchases();
             setLogs([]);
           } catch (e) {
             Alert.alert('Error', 'Failed to clear data.');
           } finally {
-            setLoading(false);
+            setIsSaving(false);
           }
         },
       },
@@ -602,18 +609,23 @@ export default function DailyPurchasesScreen() {
 
                 <AnimatedPressable
                   onPress={handleAddPurchase}
-                  disabled={loading}
+                  disabled={isSaving}
                   style={[
                     styles.submitBtn,
                     {
                       borderColor: colors.primary,
                       backgroundColor: colors.primary,
+                      opacity: isSaving ? 0.8 : 1,
                     },
                   ]}
                 >
-                  <ThemedText type="smallBold" style={{ color: '#FFF' }}>
-                    Record Entry
-                  </ThemedText>
+                  {isSaving ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <ThemedText type="smallBold" style={{ color: '#FFF' }}>
+                      Record Entry
+                    </ThemedText>
+                  )}
                 </AnimatedPressable>
               </View>
 
@@ -717,6 +729,7 @@ export default function DailyPurchasesScreen() {
           onSave={handleEditSave}
           onDelete={handleDelete}
           colors={colors}
+          isSaving={isSaving}
         />
       </SafeAreaView>
     </ThemedView>

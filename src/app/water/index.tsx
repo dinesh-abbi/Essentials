@@ -10,6 +10,8 @@ import {
   TouchableOpacity,
   View,
   useColorScheme,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
@@ -206,6 +208,9 @@ export default function DailyWaterScreen() {
   const [goal, setGoal] = useState(WaterStorage.DEFAULT_DAILY_GOAL);
   const [todayLogs, setTodayLogs] = useState<WaterStorage.WaterLog[]>([]);
   const [hourlyStatus, setHourlyStatus] = useState<Record<number, boolean>>({});
+  const [isMutating, setIsMutating] = useState<number | boolean>(false);
+  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+  const [customGoalInput, setCustomGoalInput] = useState('');
 
   useEffect(() => {
     refreshData();
@@ -217,9 +222,11 @@ export default function DailyWaterScreen() {
       const logs = await WaterStorage.getTodayWaterLogs();
       const total = await WaterStorage.getTodayTotalMl();
       const hourly = await WaterStorage.getTodayHourlyStatus();
+      const userGoal = await WaterStorage.getUserWaterGoal();
       setTodayLogs(logs.sort((a, b) => b.timestamp - a.timestamp));
       setTotalDrank(total);
       setHourlyStatus(hourly);
+      setGoal(userGoal);
     } catch (e) {
       Alert.alert('Error', 'Failed to retrieve hydration logs.');
     } finally {
@@ -227,7 +234,23 @@ export default function DailyWaterScreen() {
     }
   }
 
+  async function handleSaveGoal(newGoal: number) {
+    if (isNaN(newGoal) || newGoal <= 0) {
+      Alert.alert('Invalid Goal', 'Please enter a valid water volume in ml.');
+      return;
+    }
+    try {
+      await WaterStorage.setUserWaterGoal(newGoal);
+      setGoal(newGoal);
+      setIsGoalModalOpen(false);
+      setCustomGoalInput('');
+    } catch (e) {
+      Alert.alert('Error', 'Failed to update hydration target.');
+    }
+  }
+
   async function handleAddWater(ml: number) {
+    setIsMutating(ml);
     try {
       const prevTotal = totalDrank; // snapshot before adding
       await WaterStorage.logWaterIntake(ml);
@@ -245,6 +268,8 @@ export default function DailyWaterScreen() {
       }
     } catch (e) {
       Alert.alert('Error', 'Could not save water log.');
+    } finally {
+      setIsMutating(false);
     }
   }
 
@@ -255,11 +280,14 @@ export default function DailyWaterScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
+          setIsMutating(true);
           try {
             await WaterStorage.deleteWaterLog(id);
             await refreshData();
           } catch (e) {
             Alert.alert('Error', 'Could not delete entry.');
+          } finally {
+            setIsMutating(false);
           }
         },
       },
@@ -307,23 +335,46 @@ export default function DailyWaterScreen() {
                 <Text style={[styles.mainVol, { color: colors.text }]}>
                   {totalDrank} <Text style={styles.volUnit}>ml</Text>
                 </Text>
-                <Text style={[styles.goalLabel, { color: colors.textSecondary }]}>
-                  Target: {goal} ml
-                </Text>
+                <TouchableOpacity
+                  onPress={() => setIsGoalModalOpen(true)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.goalLabel, { color: colors.textSecondary }]}>
+                    Target: {goal} ml
+                  </Text>
+                  <Feather name="edit-2" size={12} color={colors.primary} />
+                </TouchableOpacity>
               </View>
 
               {/* Quick Add Buttons */}
               <View style={styles.quickAddRow}>
-                {[250, 500, 1000].map((ml) => (
-                  <AnimatedPressable
-                    key={ml}
-                    onPress={() => handleAddWater(ml)}
-                    style={[styles.quickBtn, { borderColor: colors.border }]}
-                  >
-                    <Feather name="droplet" size={14} color={colors.primary} />
-                    <Text style={[styles.quickBtnText, { color: colors.text }]}>+{ml}ml</Text>
-                  </AnimatedPressable>
-                ))}
+                {[250, 500, 1000].map((ml) => {
+                  const currentlyMutating = isMutating === ml;
+                  return (
+                    <AnimatedPressable
+                      key={ml}
+                      onPress={() => handleAddWater(ml)}
+                      disabled={isMutating !== false}
+                      style={[
+                        styles.quickBtn,
+                        {
+                          borderColor: colors.border,
+                          opacity: isMutating !== false && !currentlyMutating ? 0.5 : 1,
+                        },
+                      ]}
+                    >
+                      {currentlyMutating ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : (
+                        <>
+                          <Feather name="droplet" size={14} color={colors.primary} />
+                          <Text style={[styles.quickBtnText, { color: colors.text }]}>+{ml}ml</Text>
+                        </>
+                      )}
+                    </AnimatedPressable>
+                  );
+                })}
               </View>
 
               {/* Hourly Timeline */}
@@ -388,6 +439,83 @@ export default function DailyWaterScreen() {
             ) : null
           }
         />
+        {/* Set Hydration Target Modal */}
+        <Modal
+          visible={isGoalModalOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setIsGoalModalOpen(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.editCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
+              <Text style={[styles.editTitle, { color: colors.text }]}>Set Daily Target</Text>
+              
+              <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 16 }}>
+                Adjust your daily target water intake to keep track of your hydration progress.
+              </Text>
+
+              {/* Goal Presets */}
+              <View style={styles.presetRow}>
+                {[2000, 3000, 4000, 5000].map((presetMl) => (
+                  <TouchableOpacity
+                    key={presetMl}
+                    onPress={() => {
+                      handleSaveGoal(presetMl);
+                    }}
+                    style={[styles.presetBtn, { borderColor: colors.border }]}
+                  >
+                    <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>
+                      {presetMl / 1000}L
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={{ color: colors.textSecondary, fontSize: 10, fontWeight: '700', marginTop: 12, marginBottom: 6 }}>
+                CUSTOM TARGET (ML)
+              </Text>
+              
+              <TextInput
+                style={[
+                  styles.textInput,
+                  {
+                    color: colors.text,
+                    borderColor: colors.border,
+                    backgroundColor: colors.background,
+                    marginBottom: 20,
+                  },
+                ]}
+                placeholder="e.g. 3500"
+                placeholderTextColor={colors.textSecondary}
+                value={customGoalInput}
+                onChangeText={setCustomGoalInput}
+                keyboardType="numeric"
+              />
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setIsGoalModalOpen(false);
+                    setCustomGoalInput('');
+                  }}
+                  style={[styles.actionBtn, { borderColor: colors.border }]}
+                >
+                  <Text style={{ color: colors.text, fontWeight: '700', fontSize: 13 }}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    const customMl = parseInt(customGoalInput, 10);
+                    handleSaveGoal(customMl);
+                  }}
+                  style={[styles.actionBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                >
+                  <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </ThemedView>
   );
@@ -612,5 +740,60 @@ const styles = StyleSheet.create({
   emptyLogsText: {
     fontSize: 13,
     fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  editCard: {
+    width: '100%',
+    maxWidth: 340,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 20,
+    gap: 8,
+  },
+  editTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  presetRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 8,
+  },
+  presetBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  actionBtn: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

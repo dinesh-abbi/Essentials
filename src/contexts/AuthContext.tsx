@@ -10,6 +10,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
@@ -70,6 +71,31 @@ if (!isExpoGo && GoogleSignin) {
   });
 }
 
+import * as SyncManager from '@/utils/SyncManager';
+
+const WEBHOOK_CACHE_PREFIX = '@essentials_discord_webhook_url_';
+
+async function getCachedWebhook(uid: string): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(`${WEBHOOK_CACHE_PREFIX}${uid}`);
+  } catch (e) {
+    console.error('Failed to read cached webhook URL', e);
+    return null;
+  }
+}
+
+async function setCachedWebhook(uid: string, url: string | null): Promise<void> {
+  try {
+    if (url === null) {
+      await AsyncStorage.removeItem(`${WEBHOOK_CACHE_PREFIX}${uid}`);
+    } else {
+      await AsyncStorage.setItem(`${WEBHOOK_CACHE_PREFIX}${uid}`, url);
+    }
+  } catch (e) {
+    console.error('Failed to write cached webhook URL', e);
+  }
+}
+
 // ─── Firestore helpers ────────────────────────────────────────────────────────
 
 /** Ensure a user document exists in the `users` collection. Creates one on first login. */
@@ -98,18 +124,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [discordWebhookUrl, setDiscordWebhookUrl] = useState<string | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
 
-  // ── Firebase auth state listener ──────────────────────────────────────────────
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
 
       if (u) {
+        // Load cache first so offline usage is immediate
+        const cached = await getCachedWebhook(u.uid);
+        setDiscordWebhookUrl(cached);
+
         try {
           const webhookUrl = await ensureUserDocument(u);
           setDiscordWebhookUrl(webhookUrl);
+          await setCachedWebhook(u.uid, webhookUrl);
         } catch (err) {
-          console.error('Failed to load user profile from Firestore:', err);
-          setDiscordWebhookUrl(null);
+          console.warn('Failed to load user profile from Firestore, using cached webhook URL:', err);
+          if (cached === null) {
+            setDiscordWebhookUrl(null);
+          }
         }
         setProfileLoaded(true);
       } else {
@@ -192,9 +224,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const updateDiscordWebhook = useCallback(async (url: string) => {
     if (!auth.currentUser) return;
-    const userRef = doc(db, 'users', auth.currentUser.uid);
-    await updateDoc(userRef, { discordWebhookUrl: url });
+    const uid = auth.currentUser.uid;
+    
+    // Save to local cache first so it's usable immediately
+    await setCachedWebhook(uid, url);
     setDiscordWebhookUrl(url);
+
+    // Try to update Firestore
+    try {
+      const userRef = doc(db, 'users', uid);
+      await updateDoc(userRef, { discordWebhookUrl: url });
+    } catch (err) {
+      console.warn('Failed to update webhook URL in Firestore', err);
+      const isOnline = await SyncManager.isOnline();
+      if (!isOnline) {
+        // Safe to return when offline since local cache is updated and will be read next time
+        return;
+      }
+      throw err;
+    }
   }, []);
 
   return (

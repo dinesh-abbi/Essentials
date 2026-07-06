@@ -181,6 +181,7 @@ export default function WaterGoalScreen() {
   const isDark = scheme === 'dark';
 
   const [totalDrank, setTotalDrank] = useState(0);
+  const [goal, setGoal] = useState(WaterStorage.DEFAULT_DAILY_GOAL);
   const [goalReachedTime, setGoalReachedTime] = useState<string>('');
 
   useEffect(() => {
@@ -189,6 +190,8 @@ export default function WaterGoalScreen() {
 
   async function loadGoalData() {
     try {
+      const userGoal = await WaterStorage.getUserWaterGoal();
+      setGoal(userGoal);
       const total = await WaterStorage.getTodayTotalMl();
       setTotalDrank(total);
 
@@ -198,7 +201,7 @@ export default function WaterGoalScreen() {
       let running = 0;
       for (const log of sorted) {
         running += log.amountMl;
-        if (running >= WaterStorage.DEFAULT_DAILY_GOAL) {
+        if (running >= userGoal) {
           setGoalReachedTime(
             new Date(log.timestamp).toLocaleTimeString([], {
               hour: '2-digit',
@@ -273,7 +276,7 @@ export default function WaterGoalScreen() {
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{WaterStorage.DEFAULT_DAILY_GOAL}</Text>
+                <Text style={styles.statValue}>{goal}</Text>
                 <Text style={styles.statLabel}>ML GOAL</Text>
               </View>
               {goalReachedTime ? (
@@ -293,13 +296,13 @@ export default function WaterGoalScreen() {
                 entering={FadeIn.delay(1500)}
                 style={[
                   styles.progressFill,
-                  { width: `${Math.min((totalDrank / WaterStorage.DEFAULT_DAILY_GOAL) * 100, 100)}%` },
+                  { width: `${Math.min((totalDrank / goal) * 100, 100)}%` },
                 ]}
               />
             </View>
             <Text style={styles.progressLabel}>
-              {totalDrank > WaterStorage.DEFAULT_DAILY_GOAL
-                ? `${totalDrank - WaterStorage.DEFAULT_DAILY_GOAL}ml over goal! 🚀`
+              {totalDrank > goal
+                ? `${totalDrank - goal}ml over goal! 🚀`
                 : '100% complete ✓'}
             </Text>
           </Animated.View>

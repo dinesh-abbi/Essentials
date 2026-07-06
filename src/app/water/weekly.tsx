@@ -89,7 +89,7 @@ export default function WeeklyWaterScreen() {
 
   const [loading, setLoading] = useState(true);
   const [weeklyData, setWeeklyData] = useState<WeeklyDayData[]>([]);
-  const goal = WaterStorage.DEFAULT_DAILY_GOAL;
+  const [goal, setGoal] = useState(WaterStorage.DEFAULT_DAILY_GOAL);
 
   useEffect(() => {
     loadData();
@@ -100,6 +100,8 @@ export default function WeeklyWaterScreen() {
     try {
       const data = await WaterStorage.getWeeklyData();
       setWeeklyData(data);
+      const userGoal = await WaterStorage.getUserWaterGoal();
+      setGoal(userGoal);
     } catch (e) {
       Alert.alert('Error', 'Failed to retrieve weekly progress data.');
     } finally {

@@ -81,6 +81,28 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+import groovy.json.JsonSlurper
+
+def getAppVersionName() {
+    try {
+        def jsonFile = file("../../app.json")
+        def parsed = new JsonSlurper().parseText(jsonFile.text)
+        return parsed.expo.version
+    } catch (Exception e) {
+        return "1.0.0"
+    }
+}
+
+def getAppVersionCode() {
+    try {
+        def jsonFile = file("../../app.json")
+        def parsed = new JsonSlurper().parseText(jsonFile.text)
+        return parsed.expo.android.versionCode.toInteger()
+    } catch (Exception e) {
+        return 1
+    }
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
 
@@ -92,8 +114,8 @@ android {
         applicationId 'com.catalyst.essentials'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 11
-        versionName "1.0.10"
+        versionCode getAppVersionCode()
+        versionName getAppVersionName()
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
