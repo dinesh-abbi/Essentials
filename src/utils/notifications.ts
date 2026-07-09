@@ -43,7 +43,7 @@ export { Notifications };
 // ── Unified App Notification Channel ──────────────────────────────────────────
 // All notifications from Essentials use this single channel so they have a
 // distinct, recognizable sound separate from other apps on the device.
-const APP_CHANNEL_ID = 'essentials_default_channel';
+const APP_CHANNEL_ID = 'hydration#001';
 const REMINDER_CATEGORY_ID = 'WATER_REMINDER_CATEGORY';
 
 // ── Expected number of hourly reminder notifications (8 AM to 10 PM = 15 hours) ──
@@ -379,9 +379,12 @@ export async function ensureNotificationsScheduled(): Promise<void> {
     // Verify we have all 15 hourly reminders
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     
-    if (scheduled.length < EXPECTED_REMINDER_COUNT) {
+    // Check if any scheduled notifications use an old channel ID on Android
+    const hasOldChannel = Platform.OS === 'android' && scheduled.some((n: any) => n.trigger?.channelId !== APP_CHANNEL_ID);
+    
+    if (scheduled.length < EXPECTED_REMINDER_COUNT || hasOldChannel) {
       console.log(
-        `[Notifications] Only ${scheduled.length}/${EXPECTED_REMINDER_COUNT} reminders scheduled — re-scheduling all`
+        `[Notifications] Scheduled count (${scheduled.length}/${EXPECTED_REMINDER_COUNT}) or channel mismatch (old channel: ${hasOldChannel}) — re-scheduling all`
       );
       await scheduleHourlyWaterReminder();
     } else {

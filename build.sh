@@ -75,6 +75,17 @@ echo -e "${CYAN}// CORE_BUILD_SEQUENCE: STARTING${RESET}\n"
 export JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
 export PATH="$JAVA_HOME/bin:$PATH"
 
+# --- Prompt for Publish ---
+PUBLISH_BUILD=false
+if [ -t 0 ]; then
+  echo -n -e "${CYAN}${BOLD}Would you like to publish this build to GitHub? (y/N): ${RESET}"
+  read -r PUBLISH_RESPONSE
+  PUBLISH_RESPONSE=$(echo "$PUBLISH_RESPONSE" | tr '[:upper:]' '[:lower:]')
+  if [ "$PUBLISH_RESPONSE" = "y" ] || [ "$PUBLISH_RESPONSE" = "yes" ]; then
+    PUBLISH_BUILD=true
+  fi
+fi
+
 # --- STEP 1: Environment Checks ---
 echo -e "${BOLD}[ STEP 1/4 ] Verifying build environment...${RESET}"
 
@@ -125,6 +136,43 @@ if [ ! -d "node_modules" ]; then
   run_with_spinner "Installing node dependencies (npm install)" npm install
 else
   echo -e "${GREEN}✓ Node modules already installed.${RESET}"
+fi
+
+# If publishing is requested, run publish workflow instead of standard build
+if [ "$PUBLISH_BUILD" = "true" ]; then
+  # Ensure android directory exists since publish script requires gradlew
+  if [ ! -d "android" ]; then
+    echo -e "\n${YELLOW}android/ folder not found. Generating native project wrapper...${RESET}"
+    run_with_spinner "Generating native project (expo prebuild)" npx expo prebuild --platform android
+  fi
+
+  echo -e "\n${BOLD}[ STEP 3/4 ] Running GitHub Publish Sequence...${RESET}"
+  PUBLISH_ARGS=""
+  if [ "$CLEAN_BUILD" = "true" ]; then
+    PUBLISH_ARGS="--force"
+  fi
+  node publish-github.js $PUBLISH_ARGS
+  PUBLISH_EXIT=$?
+  
+  if [ $PUBLISH_EXIT -eq 0 ]; then
+    # Copy APK to root
+    APK_SRC="android/app/build/outputs/apk/release/app-release.apk"
+    APK_DEST="CatalystEssentials.apk"
+    if [ -f "$APK_SRC" ]; then
+      rm -f "$APK_DEST"
+      cp "$APK_SRC" "$APK_DEST"
+      echo -e "\n=================================================="
+      echo -e "${GREEN}${BOLD}🎉 PUBLISH & BUILD COMPLETED SUCCESSFULLY!${RESET}"
+      echo -e "=================================================="
+      echo -e "${CYAN}Output File:${RESET} ${BOLD}$APK_DEST${RESET}"
+      echo -e "${CYAN}File Size:  ${RESET} $(du -h "$APK_DEST" | cut -f1)"
+      echo -e "=================================================="
+    fi
+    exit 0
+  else
+    echo -e "${RED}[ERROR] Publishing failed.${RESET}"
+    exit 1
+  fi
 fi
 
 # --- STEP 3: Expo Prebuild ---
