@@ -14,11 +14,11 @@ export const Colors = {
     background: '#F5F5F0',         // Warm off-white — feels premium, not clinical
     backgroundElement: '#FFFFFF',
     backgroundSelected: '#EFEFEA',
-    primary: '#D97706',            // Warm amber — distinct, not neon
+    primary: '#4F46E5',            // Premium Indigo
     success: '#16A34A',
     border: '#E4E4DF',
     alert: '#DC2626',
-    accent: '#D97706',
+    accent: '#4F46E5',
   },
   dark: {
     text: '#F0F0EB',
@@ -26,11 +26,11 @@ export const Colors = {
     background: '#111111',         // True near-black
     backgroundElement: '#1C1C1C',
     backgroundSelected: '#272727',
-    primary: '#F59E0B',            // Brighter amber in dark mode
+    primary: '#6366F1',            // Sleek Indigo in dark mode
     success: '#22C55E',
     border: '#2A2A2A',
     alert: '#EF4444',
-    accent: '#F59E0B',
+    accent: '#6366F1',
   },
 } as const;
 

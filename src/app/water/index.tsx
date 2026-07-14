@@ -14,6 +14,7 @@ import {
   TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Skeleton from '@/components/SkeletonLoader';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -320,125 +321,186 @@ export default function DailyWaterScreen() {
         {/* Tab Selector */}
         <WaterTabs activeTab="daily" />
 
-        <FlatList
-          data={todayLogs}
-          keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-          ListHeaderComponent={
+        {loading ? (
+          <View style={styles.scrollContent}>
             <View style={styles.heroSection}>
-              {/* Wave Animation */}
-              <WaterWave percent={hydrationPercent} colors={colors} />
-
-              {/* Progress Stats */}
-              <View style={styles.statsBlock}>
-                <Text style={[styles.mainVol, { color: colors.text }]}>
-                  {totalDrank} <Text style={styles.volUnit}>ml</Text>
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setIsGoalModalOpen(true)}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.goalLabel, { color: colors.textSecondary }]}>
-                    Target: {goal} ml
-                  </Text>
-                  <Feather name="edit-2" size={12} color={colors.primary} />
-                </TouchableOpacity>
+              {/* Circular Wave Skeleton */}
+              <View style={[styles.waveContainer, { borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }]}>
+                <Skeleton width={120} height={120} borderRadius={60} />
               </View>
 
-              {/* Quick Add Buttons */}
+              {/* Progress Stats Skeleton */}
+              <View style={[styles.statsBlock, { gap: 8 }]}>
+                <Skeleton width={110} height={36} />
+                <Skeleton width={140} height={14} />
+              </View>
+
+              {/* Quick Add Buttons Skeleton */}
               <View style={styles.quickAddRow}>
-                {[250, 500, 1000].map((ml) => {
-                  const currentlyMutating = isMutating === ml;
-                  return (
-                    <AnimatedPressable
-                      key={ml}
-                      onPress={() => handleAddWater(ml)}
-                      disabled={isMutating !== false}
-                      style={[
-                        styles.quickBtn,
-                        {
-                          borderColor: colors.border,
-                          opacity: isMutating !== false && !currentlyMutating ? 0.5 : 1,
-                        },
-                      ]}
-                    >
-                      {currentlyMutating ? (
-                        <ActivityIndicator size="small" color={colors.primary} />
-                      ) : (
-                        <>
-                          <Feather name="droplet" size={14} color={colors.primary} />
-                          <Text style={[styles.quickBtnText, { color: colors.text }]}>+{ml}ml</Text>
-                        </>
-                      )}
-                    </AnimatedPressable>
-                  );
-                })}
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <View key={i} style={[styles.quickBtn, { borderColor: colors.border, paddingVertical: 14 }]}>
+                    <Skeleton width={50} height={14} style={{ marginBottom: 4 }} />
+                    <Skeleton width={30} height={10} />
+                  </View>
+                ))}
               </View>
 
-              {/* Hourly Timeline */}
+              {/* Hourly Timeline Skeleton */}
               <View style={[styles.timelineCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-                <Text style={[styles.timelineTitle, { color: colors.textSecondary }]}>HOURLY TRACKING (8 AM - 10 PM)</Text>
+                <Skeleton width={180} height={12} style={{ marginBottom: 15 }} />
                 <View style={styles.timelineDotsRow}>
-                  {Object.entries(hourlyStatus)
-                    .map(([hour, drank]) => ({ hour: parseInt(hour), drank }))
-                    .sort((a, b) => a.hour - b.hour)
-                    .map(({ hour, drank }) => (
-                      <View key={hour} style={styles.dotColumn}>
-                        <View
-                          style={[
-                            styles.timelineDot,
-                            {
-                              backgroundColor: drank
-                                ? '#3B82F6'
-                                : colors.backgroundSelected,
-                              borderColor: drank ? '#60A5FA' : colors.border,
-                            },
-                          ]}
-                        />
-                        <Text style={[styles.dotLabel, { color: colors.textSecondary }]}>
-                          {hour > 12 ? `${hour - 12}p` : hour === 12 ? '12p' : `${hour}a`}
-                        </Text>
-                      </View>
-                    ))}
+                  {Array.from({ length: 17 }).map((_, i) => (
+                    <View key={i} style={styles.dotColumn}>
+                      <Skeleton width={6} height={16} borderRadius={3} />
+                      <Skeleton width={12} height={8} style={{ marginTop: 4 }} />
+                    </View>
+                  ))}
                 </View>
               </View>
 
-              {/* History Header */}
-              <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>TODAY'S LOG HISTORY</Text>
+              {/* History Header Skeleton */}
+              <Skeleton width={120} height={12} style={{ alignSelf: 'flex-start', marginTop: 32, marginBottom: 12 }} />
             </View>
-          }
-          renderItem={({ item }) => (
-            <Animated.View
-              entering={FadeInDown.duration(350)}
-              style={[styles.logCard, { borderColor: colors.border }]}
-            >
-              <View style={styles.logLeft}>
-                <View style={[styles.logIcon, { backgroundColor: '#3B82F618' }]}>
-                  <Feather name="droplet" size={14} color="#3B82F6" />
+
+            {/* List Items Skeleton */}
+            <View style={{ gap: 12, width: '100%' }}>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <View key={i} style={[styles.logCard, { borderColor: colors.border, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <Skeleton width={32} height={32} borderRadius={16} />
+                    <View style={{ gap: 4 }}>
+                      <Skeleton width={60} height={14} />
+                      <Skeleton width={40} height={10} />
+                    </View>
+                  </View>
+                  <Skeleton width={14} height={14} borderRadius={7} />
                 </View>
-                <View>
-                  <Text style={[styles.logAmount, { color: colors.text }]}>{item.amountMl} ml</Text>
-                  <Text style={[styles.logTime, { color: colors.textSecondary }]}>
-                    {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              ))}
+            </View>
+          </View>
+        ) : (
+          <FlatList
+            data={todayLogs}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+            ListHeaderComponent={
+              <View style={styles.heroSection}>
+                {/* Wave Animation */}
+                <WaterWave percent={hydrationPercent} colors={colors} />
+
+                {/* Progress Stats */}
+                <View style={styles.statsBlock}>
+                  <Text style={[styles.mainVol, { color: colors.text }]}>
+                    {totalDrank} <Text style={styles.volUnit}>ml</Text>
                   </Text>
+                  <TouchableOpacity
+                    onPress={() => setIsGoalModalOpen(true)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.goalLabel, { color: colors.textSecondary }]}>
+                      Target: {goal} ml
+                    </Text>
+                    <Feather name="edit-2" size={12} color={colors.primary} />
+                  </TouchableOpacity>
                 </View>
+
+                {/* Quick Add Buttons */}
+                <View style={styles.quickAddRow}>
+                  {[250, 500, 1000].map((ml) => {
+                    const currentlyMutating = isMutating === ml;
+                    return (
+                      <AnimatedPressable
+                        key={ml}
+                        onPress={() => handleAddWater(ml)}
+                        disabled={isMutating !== false}
+                        style={[
+                          styles.quickBtn,
+                          {
+                            borderColor: colors.border,
+                            opacity: isMutating !== false && !currentlyMutating ? 0.5 : 1,
+                          },
+                        ]}
+                      >
+                        {currentlyMutating ? (
+                          <ActivityIndicator size="small" color={colors.primary} />
+                        ) : (
+                          <>
+                            <Feather name="droplet" size={14} color={colors.primary} />
+                            <Text style={[styles.quickBtnText, { color: colors.text }]}>+{ml}ml</Text>
+                          </>
+                        )}
+                      </AnimatedPressable>
+                    );
+                  })}
+                </View>
+
+                {/* Hourly Timeline */}
+                <View style={[styles.timelineCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
+                  <Text style={[styles.timelineTitle, { color: colors.textSecondary }]}>HOURLY TRACKING (6 AM - 10 PM)</Text>
+                  <View style={styles.timelineDotsRow}>
+                    {Object.entries(hourlyStatus)
+                      .map(([hour, drank]) => ({ hour: parseInt(hour), drank }))
+                      .sort((a, b) => a.hour - b.hour)
+                      .map(({ hour, drank }) => (
+                        <View key={hour} style={styles.dotColumn}>
+                          <View
+                            style={[
+                              styles.timelineDot,
+                              {
+                                backgroundColor: drank
+                                  ? '#3B82F6'
+                                  : colors.backgroundSelected,
+                                borderColor: drank ? '#60A5FA' : colors.border,
+                              },
+                            ]}
+                          />
+                          <Text style={[styles.dotLabel, { color: colors.textSecondary }]}>
+                            {hour % 3 === 0 || hour === 22 || hour === 6
+                              ? (hour > 12 ? `${hour - 12}p` : hour === 12 ? '12p' : `${hour}a`)
+                              : ''}
+                          </Text>
+                        </View>
+                      ))}
+                  </View>
+                </View>
+
+                {/* History Header */}
+                <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>TODAY'S LOG HISTORY</Text>
               </View>
-              <TouchableOpacity onPress={() => handleDeleteLog(item.id)} style={styles.deleteBtn}>
-                <Feather name="trash-2" size={14} color={colors.alert} />
-              </TouchableOpacity>
-            </Animated.View>
-          )}
-          ListEmptyComponent={
-            !loading ? (
-              <View style={styles.emptyLogs}>
-                <Feather name="coffee" size={32} color={colors.textSecondary} style={{ marginBottom: 8 }} />
-                <Text style={[styles.emptyLogsText, { color: colors.textSecondary }]}>No water logged yet today.</Text>
-              </View>
-            ) : null
-          }
-        />
+            }
+            renderItem={({ item }) => (
+              <Animated.View
+                entering={FadeInDown.duration(350)}
+                style={[styles.logCard, { borderColor: colors.border }]}
+              >
+                <View style={styles.logLeft}>
+                  <View style={[styles.logIcon, { backgroundColor: '#3B82F618' }]}>
+                    <Feather name="droplet" size={14} color="#3B82F6" />
+                  </View>
+                  <View>
+                    <Text style={[styles.logAmount, { color: colors.text }]}>{item.amountMl} ml</Text>
+                    <Text style={[styles.logTime, { color: colors.textSecondary }]}>
+                      {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => handleDeleteLog(item.id)} style={styles.deleteBtn}>
+                  <Feather name="trash-2" size={14} color={colors.alert} />
+                </TouchableOpacity>
+              </Animated.View>
+            )}
+            ListEmptyComponent={
+              !loading ? (
+                <View style={styles.emptyLogs}>
+                  <Feather name="coffee" size={32} color={colors.textSecondary} style={{ marginBottom: 8 }} />
+                  <Text style={[styles.emptyLogsText, { color: colors.textSecondary }]}>No water logged yet today.</Text>
+                </View>
+              ) : null
+            }
+          />
+        )}
         {/* Set Hydration Target Modal */}
         <Modal
           visible={isGoalModalOpen}

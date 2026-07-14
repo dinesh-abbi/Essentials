@@ -214,7 +214,7 @@ export default function MonthlyWaterScreen() {
                 </View>
 
                 <View style={[styles.statItem, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-                  <Feather name="trending-up" size={16} color="#F59E0B" />
+                  <Feather name="trending-up" size={16} color={colors.primary} />
                   <Text style={[styles.statVal, { color: colors.text }]}>{(dailyAverage / 1000).toFixed(1)}L</Text>
                   <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Daily Avg</Text>
                 </View>

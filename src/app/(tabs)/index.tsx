@@ -29,6 +29,7 @@ import Animated, {
 import { GlassView } from 'expo-glass-effect';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
+import Skeleton from '@/components/SkeletonLoader';
 import {
   BottomTabInset,
   Colors,
@@ -442,6 +443,7 @@ export default function HomeScreen() {
   const [waterHourlyMap, setWaterHourlyMap] = useState<Record<number, boolean>>({});
   const [waterSaving, setWaterSaving] = useState(false);
   const [waterGoal, setWaterGoal] = useState(WaterStorage.DEFAULT_DAILY_GOAL);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
 
   const newBadgeY = useSharedValue(0);
 
@@ -463,6 +465,7 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       async function load() {
+        setDashboardLoading(true);
         try {
           const queue = await AttendanceStorage.getOfflineQueue();
           setOfflineCount(queue.length);
@@ -483,6 +486,8 @@ export default function HomeScreen() {
           setWaterGoal(userGoal);
         } catch (e) {
           console.error('load metrics failed', e);
+        } finally {
+          setDashboardLoading(false);
         }
       }
       load();
@@ -561,151 +566,209 @@ export default function HomeScreen() {
             </View>
           </Animated.View>
 
-          {/* ── Row 1: Spend & Check-in Squares (Apple Grid) ──────────────── */}
-          <Animated.View entering={FadeInUp.delay(100).duration(600).springify()} style={styles.widgetGridRow}>
-            
-            {/* Spend widget */}
-            <AnimatedPressable onPress={() => router.push('/purchases')} style={{ flex: 1 }}>
-              <GlassView style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <View style={styles.widgetHeader}>
-                  <Label text="SPEND" color={isDark ? '#94A3B8' : '#64748B'} />
-                  <Feather name="credit-card" size={14} color={colors.accent} />
-                </View>
-                
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
-                  <AnimatedNumber
-                    value={todaySpend}
-                    prefix="₹"
-                    style={[styles.widgetNumber, { color: isDark ? '#F8FAFC' : '#0F172A' }]}
-                  />
-                </View>
+          {dashboardLoading ? (
+            <View style={{ gap: 16 }}>
+              {/* Row 1 Skeletons */}
+              <View style={styles.widgetGridRow}>
+                {/* Spend widget skeleton */}
+                <GlassView style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <View style={{ width: '100%', gap: 10 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Skeleton width={50} height={12} />
+                      <Feather name="credit-card" size={14} color={colors.accent} />
+                    </View>
+                    <Skeleton width={100} height={32} style={{ marginTop: 4 }} />
+                    <Skeleton width={90} height={12} style={{ marginTop: 8 }} />
+                    <Skeleton width="100%" height={8} borderRadius={4} style={{ marginTop: 8 }} />
+                  </View>
+                </GlassView>
 
-                <View style={{ width: '100%', gap: 4 }}>
-                  <Text style={[styles.statusText, { color: isDark ? '#94A3B8' : '#64748B', fontSize: 11 }]}>
-                    today's expenses
-                  </Text>
-                  <SpendPowerCore spend={todaySpend} isDark={isDark} />
-                </View>
-              </GlassView>
-            </AnimatedPressable>
-
-            {/* Attendance Viewfinder widget */}
-            <AnimatedPressable
-              onPress={() => router.push('/attendance')}
-              style={{ flex: 1 }}
-            >
-              {(() => {
-                const checkInTimeStr = lastCheckInTime
-                  ? new Date(lastCheckInTime).toLocaleTimeString('en-IN', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      timeZone: 'Asia/Kolkata',
-                    })
-                  : null;
-
-                return (
-                  <GlassView style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border, alignItems: 'center' }]}>
-                    <View style={[styles.widgetHeader, { width: '100%' }]}>
-                      <Label text="CHECK-IN" color={isDark ? '#94A3B8' : '#64748B'} />
+                {/* Check-in widget skeleton */}
+                <GlassView style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border, alignItems: 'center' }]}>
+                  <View style={{ width: '100%', gap: 10 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Skeleton width={60} height={12} />
                       <Feather name="aperture" size={13} color={colors.accent} />
                     </View>
-                    
-                    <CameraViewfinder offlineCount={offlineCount} colors={colors} isDark={isDark} />
+                    <Skeleton width={56} height={56} borderRadius={28} style={{ alignSelf: 'center', marginTop: 4 }} />
+                    <Skeleton width={80} height={12} style={{ alignSelf: 'center', marginTop: 6 }} />
+                  </View>
+                </GlassView>
+              </View>
 
-                    <View style={styles.statusRow}>
-                      <Dot color={offlineCount > 0 ? themeColors.alert : themeColors.success} />
-                      <Text style={[styles.statusText, { color: offlineCount > 0 ? themeColors.alert : themeColors.success, fontSize: 12 }]} numberOfLines={1}>
-                        {offlineCount > 0
-                          ? (checkInTimeStr ? `Pending • ${checkInTimeStr}` : `${offlineCount} log pending`)
-                          : (checkInTimeStr ? `Synced • ${checkInTimeStr}` : 'Synced')}
-                      </Text>
-                    </View>
-                  </GlassView>
-                );
-              })()}
-            </AnimatedPressable>
-
-          </Animated.View>
-
-          {/* ── Row 2: Unified Combined Water & Timeline Widget ─────────── */}
-          <Animated.View entering={FadeInUp.delay(200).duration(600).springify()}>
-            <Animated.View style={highlightStyle}>
+              {/* Row 2 Skeleton */}
               <GlassView style={[styles.widgetFullWidth, { backgroundColor: colors.surface, borderColor: 'transparent', borderWidth: 0 }]}>
-                <View style={styles.horizontalSplit}>
-                  <View style={{ flex: 1, gap: 10 }}>
-                    <AnimatedPressable onPress={() => router.push('/water')} style={{ width: '100%' }}>
-                      <View style={styles.widgetHeader}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <Label text="WATER & TIMELINE" color={isDark ? '#94A3B8' : '#64748B'} />
-                          <Animated.View style={[styles.wateryBadge, bobbingStyle]}>
-                            <Text style={styles.wateryBadgeText}>NEW</Text>
-                          </Animated.View>
-                        </View>
-                        <Feather name="droplet" size={14} color={colors.primary} />
-                      </View>
-                      
-                      <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
-                        <AnimatedNumber
-                          value={waterTotalMl}
-                          prefix=""
-                          style={[styles.widgetNumber, { color: colors.primary }]}
-                        />
-                        <Text style={[styles.widgetNumberUnit, { color: colors.primary }]}>ml</Text>
-                        <Text style={[styles.statusText, { color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, marginLeft: 8 }]}>
-                          ({waterPct}% of goal)
-                        </Text>
-                      </View>
-                    </AnimatedPressable>
-
-                    {/* Compact grid timeline */}
-                    <View style={styles.hourGridCompactLeft}>
-                      {Array.from({ length: 16 }, (_, i) => {
-                        const hour = i + 6; // 6 AM to 9 PM
-                        const done = waterHourlyMap[hour] === true;
-                        const isCurrentHour = hour === currentHour;
-                        
-                        let dotColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
-                        if (done) dotColor = colors.primary;
-                        if (isCurrentHour && !done) dotColor = colors.accent;
-
-                        return (
-                          <View key={hour} style={styles.hourCellCompact}>
-                            <PulseDot color={dotColor} isActive={isCurrentHour} size={8} />
-                          </View>
-                        );
-                      })}
+                <View style={{ flexDirection: 'row', width: '100%' }}>
+                  <View style={{ flex: 1, gap: 12, paddingVertical: 4 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Skeleton width={130} height={12} />
+                      <Feather name="droplet" size={14} color={colors.primary} />
                     </View>
-
-                    {/* Inline water controls */}
-                    <View style={styles.widgetControlRowLeft}>
-                      {waterSaving ? (
-                        <View style={[styles.widgetControlBtn, { backgroundColor: colors.primary + '18', width: 66, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' }]}>
-                          <ActivityIndicator size="small" color={colors.primary} style={{ transform: [{ scale: 0.8 }] }} />
-                        </View>
-                      ) : (
-                        <>
-                          <TouchableOpacity onPress={() => removeWater()} style={[styles.widgetControlBtn, { backgroundColor: colors.primary + '18' }]} activeOpacity={0.7}>
-                            <Feather name="minus" size={13} color={colors.primary} />
-                          </TouchableOpacity>
-                          <TouchableOpacity onPress={() => addWater(250)} style={[styles.widgetControlBtn, { backgroundColor: colors.primary + '18' }]} activeOpacity={0.7}>
-                            <Feather name="plus" size={13} color={colors.primary} />
-                          </TouchableOpacity>
-                        </>
-                      )}
-                      <Text style={[styles.statusText, { color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, marginLeft: 4 }]}>
-                        {trackedHours} logs today
-                      </Text>
+                    <Skeleton width={120} height={32} style={{ marginTop: 4 }} />
+                    {/* Timeline capsules row skeleton */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '90%', paddingVertical: 6 }}>
+                      {Array.from({ length: 17 }).map((_, i) => (
+                        <Skeleton key={i} width={5} height={14} borderRadius={2.5} />
+                      ))}
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                      <Skeleton width={32} height={28} borderRadius={14} />
+                      <Skeleton width={32} height={28} borderRadius={14} />
+                      <Skeleton width={80} height={12} style={{ marginLeft: 6 }} />
                     </View>
                   </View>
-
-                  {/* Animated Bottle Fluid Chamber */}
-                  <AnimatedPressable onPress={() => router.push('/water')}>
-                    <WaterChamber percent={waterPct} colors={colors} isDark={isDark} />
-                  </AnimatedPressable>
+                  <View style={{ width: 60, height: 110, justifyContent: 'center', alignItems: 'center' }}>
+                    <Skeleton width={50} height={100} borderRadius={25} />
+                  </View>
                 </View>
               </GlassView>
-            </Animated.View>
-          </Animated.View>
+            </View>
+          ) : (
+            <>
+              {/* ── Row 1: Spend & Check-in Squares (Apple Grid) ──────────────── */}
+              <Animated.View entering={FadeInUp.delay(100).duration(600).springify()} style={styles.widgetGridRow}>
+                
+                {/* Spend widget */}
+                <AnimatedPressable onPress={() => router.push('/purchases')} style={{ flex: 1 }}>
+                  <GlassView style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <View style={styles.widgetHeader}>
+                      <Label text="SPEND" color={isDark ? '#94A3B8' : '#64748B'} />
+                      <Feather name="credit-card" size={14} color={colors.accent} />
+                    </View>
+                    
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
+                      <AnimatedNumber
+                        value={todaySpend}
+                        prefix="₹"
+                        style={[styles.widgetNumber, { color: isDark ? '#F8FAFC' : '#0F172A' }]}
+                      />
+                    </View>
+
+                    <View style={{ width: '100%', gap: 4 }}>
+                      <Text style={[styles.statusText, { color: isDark ? '#94A3B8' : '#64748B', fontSize: 11 }]}>
+                        today's expenses
+                      </Text>
+                      <SpendPowerCore spend={todaySpend} isDark={isDark} />
+                    </View>
+                  </GlassView>
+                </AnimatedPressable>
+
+                {/* Attendance Viewfinder widget */}
+                <AnimatedPressable
+                  onPress={() => router.push('/attendance')}
+                  style={{ flex: 1 }}
+                >
+                  {(() => {
+                    const checkInTimeStr = lastCheckInTime
+                      ? new Date(lastCheckInTime).toLocaleTimeString('en-IN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          timeZone: 'Asia/Kolkata',
+                        })
+                      : null;
+
+                    return (
+                      <GlassView style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border, alignItems: 'center' }]}>
+                        <View style={[styles.widgetHeader, { width: '100%' }]}>
+                          <Label text="CHECK-IN" color={isDark ? '#94A3B8' : '#64748B'} />
+                          <Feather name="aperture" size={13} color={colors.accent} />
+                        </View>
+                        
+                        <CameraViewfinder offlineCount={offlineCount} colors={colors} isDark={isDark} />
+
+                        <View style={styles.statusRow}>
+                          <Dot color={offlineCount > 0 ? themeColors.alert : themeColors.success} />
+                          <Text style={[styles.statusText, { color: offlineCount > 0 ? themeColors.alert : themeColors.success, fontSize: 12 }]} numberOfLines={1}>
+                            {offlineCount > 0
+                              ? (checkInTimeStr ? `Pending • ${checkInTimeStr}` : `${offlineCount} log pending`)
+                              : (checkInTimeStr ? `Synced • ${checkInTimeStr}` : 'Synced')}
+                          </Text>
+                        </View>
+                      </GlassView>
+                    );
+                  })()}
+                </AnimatedPressable>
+
+              </Animated.View>
+
+              {/* ── Row 2: Unified Combined Water & Timeline Widget ─────────── */}
+              <Animated.View entering={FadeInUp.delay(200).duration(600).springify()}>
+                <Animated.View style={highlightStyle}>
+                  <GlassView style={[styles.widgetFullWidth, { backgroundColor: colors.surface, borderColor: 'transparent', borderWidth: 0 }]}>
+                    <View style={styles.horizontalSplit}>
+                      <View style={{ flex: 1, gap: 10 }}>
+                        <AnimatedPressable onPress={() => router.push('/water')} style={{ width: '100%' }}>
+                          <View style={styles.widgetHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                              <Label text="WATER & TIMELINE" color={isDark ? '#94A3B8' : '#64748B'} />
+                            </View>
+                            <Feather name="droplet" size={14} color={colors.primary} />
+                          </View>
+                          
+                          <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
+                            <AnimatedNumber
+                              value={waterTotalMl}
+                              prefix=""
+                              style={[styles.widgetNumber, { color: colors.primary }]}
+                            />
+                            <Text style={[styles.widgetNumberUnit, { color: colors.primary }]}>ml</Text>
+                            <Text style={[styles.statusText, { color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, marginLeft: 8 }]}>
+                              ({waterPct}% of goal)
+                            </Text>
+                          </View>
+                        </AnimatedPressable>
+
+                        {/* Compact grid timeline */}
+                        <View style={styles.hourGridCompactLeft}>
+                          {Array.from({ length: 17 }, (_, i) => {
+                            const hour = i + 6; // 6 AM to 10 PM
+                            const done = waterHourlyMap[hour] === true;
+                            const isCurrentHour = hour === currentHour;
+                            
+                            let dotColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+                            if (done) dotColor = colors.primary;
+                            if (isCurrentHour && !done) dotColor = colors.accent;
+
+                            return (
+                              <View key={hour} style={styles.hourCellCompact}>
+                                <PulseDot color={dotColor} isActive={isCurrentHour} size={8} />
+                              </View>
+                            );
+                          })}
+                        </View>
+
+                        {/* Inline water controls */}
+                        <View style={styles.widgetControlRowLeft}>
+                          {waterSaving ? (
+                            <View style={[styles.widgetControlBtn, { backgroundColor: colors.primary + '18', width: 66, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' }]}>
+                              <ActivityIndicator size="small" color={colors.primary} style={{ transform: [{ scale: 0.8 }] }} />
+                            </View>
+                          ) : (
+                            <>
+                              <TouchableOpacity onPress={() => removeWater()} style={[styles.widgetControlBtn, { backgroundColor: colors.primary + '18' }]} activeOpacity={0.7}>
+                                <Feather name="minus" size={13} color={colors.primary} />
+                              </TouchableOpacity>
+                              <TouchableOpacity onPress={() => addWater(250)} style={[styles.widgetControlBtn, { backgroundColor: colors.primary + '18' }]} activeOpacity={0.7}>
+                                <Feather name="plus" size={13} color={colors.primary} />
+                              </TouchableOpacity>
+                            </>
+                          )}
+                          <Text style={[styles.statusText, { color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, marginLeft: 4 }]}>
+                            {trackedHours} logs today
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Animated Bottle Fluid Chamber */}
+                      <AnimatedPressable onPress={() => router.push('/water')}>
+                        <WaterChamber percent={waterPct} colors={colors} isDark={isDark} />
+                      </AnimatedPressable>
+                    </View>
+                  </GlassView>
+                </Animated.View>
+              </Animated.View>
+            </>
+          )}
 
         </ScrollView>
       </SafeAreaView>

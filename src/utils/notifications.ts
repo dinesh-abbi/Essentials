@@ -43,7 +43,7 @@ export { Notifications };
 // ── Unified App Notification Channel ──────────────────────────────────────────
 // All notifications from Essentials use this single channel so they have a
 // distinct, recognizable sound separate from other apps on the device.
-const APP_CHANNEL_ID = 'hydration#001';
+const APP_CHANNEL_ID = 'hydration#003';
 const REMINDER_CATEGORY_ID = 'WATER_REMINDER_CATEGORY';
 
 // ── Expected number of hourly reminder notifications (8 AM to 10 PM = 15 hours) ──
@@ -317,25 +317,12 @@ export async function cancelAllReminders() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Module-level daily guard — tracks the date of the last goal notification
- * so we fire at most once per calendar day, no matter how much water is logged.
- * Resets automatically every new day (date string changes).
- */
-let goalNotifiedDate: string | null = null;
-
 /**
- * Fire an immediate notification celebrating the 3000ml daily goal.
+ * Fire an immediate notification celebrating the daily goal.
  * Tapping the notification routes the user to the /water/goal screen.
- * Protected by a daily guard so it fires at most once per calendar day.
+ * Fires every time it is called (no daily guard).
  */
 export async function triggerWaterGoalNotification(): Promise<void> {
-  const today = new Date().toDateString(); // e.g. "Fri Jul 04 2026"
-  if (goalNotifiedDate === today) {
-    console.log('[Notifications] Goal notification already fired today — skipping');
-    return;
-  }
-  goalNotifiedDate = today;
-
   const isConfigured = await configureNotifications();
   if (!isConfigured) return;
 
@@ -343,7 +330,7 @@ export async function triggerWaterGoalNotification(): Promise<void> {
     await Notifications.scheduleNotificationAsync({
       content: {
         title: '🏆 Hydration Goal Reached!',
-        body: "Amazing! You've hit 3000ml today. Your body thanks you! 💧",
+        body: "Amazing! You've hit your daily hydration goal. Your body thanks you! 💧",
         sound: Platform.OS === 'android' ? undefined : 'water_remainder.mp3',
         data: {
           route: '/water/goal', // Tap opens the celebration screen
@@ -359,8 +346,6 @@ export async function triggerWaterGoalNotification(): Promise<void> {
     console.log('[Notifications] Goal notification scheduled ✓');
   } catch (error) {
     console.error('[Notifications] Failed to schedule goal notification:', error);
-    // Reset guard so it can be retried
-    goalNotifiedDate = null;
   }
 }
 

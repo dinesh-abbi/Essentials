@@ -48,15 +48,12 @@ function AppStack() {
           // Only attempt logging if user is actually authenticated
           if (auth.currentUser) {
             const userGoal = await WaterStorage.getUserWaterGoal();
-            const prevTotal = await WaterStorage.getTodayTotalMl();
             await WaterStorage.logWaterIntake(250);
-            if (prevTotal < userGoal) {
-              const freshTotal = await WaterStorage.getTodayTotalMl();
-              if (freshTotal >= userGoal) {
-                triggerWaterGoalNotification().catch((e) =>
-                  console.warn('Goal notification (YES_ACTION) failed:', e)
-                );
-              }
+            const freshTotal = await WaterStorage.getTodayTotalMl();
+            if (freshTotal >= userGoal) {
+              triggerWaterGoalNotification().catch((e) =>
+                console.warn('Goal notification (YES_ACTION) failed:', e)
+              );
             }
           } else {
             console.warn('[Notifications] YES_ACTION tapped but no user session exists');
@@ -72,7 +69,9 @@ function AppStack() {
         if (route) {
           router.replace(route as any);
         } else {
-          router.replace('/(tabs)?highlight=water');
+          // Pass a unique timestamp so the home screen always detects a change
+          // even if it was already on the tab (param value changes → effect re-runs)
+          router.replace(`/(tabs)?highlight=water&waterTs=${Date.now()}` as any);
         }
       }
     });
@@ -84,7 +83,7 @@ function AppStack() {
   // Rendering AppLoader *before* <Stack> prevents the tabs from flashing
   // briefly before the redirect fires.
   if (loading || (user && !profileLoaded)) {
-    return <AppLoader label="Signing in…" />;
+    return <AppLoader label="" />;
   }
 
   return (
@@ -109,6 +108,14 @@ function AppStack() {
       />
       <Stack.Screen
         name="purchases"
+        options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="upi/scanner"
+        options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="upi/amount"
         options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }}
       />
     </Stack>

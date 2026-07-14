@@ -156,15 +156,13 @@ export default function DiscordScreen() {
                   borderColor: isLinked ? '#10B981' : colors.border,
                   backgroundColor: isLinked
                     ? '#10B98115'
-                    : isDark
-                    ? '#F59E0B12'
-                    : '#D9770612',
+                    : colors.backgroundElement,
                 },
               ]}
             >
-              <View style={[styles.statusIndicatorCircle, { backgroundColor: isLinked ? '#10B981' : '#F59E0B' }]} />
+              <View style={[styles.statusIndicatorCircle, { backgroundColor: isLinked ? '#10B981' : colors.textSecondary }]} />
               <View style={{ flex: 1 }}>
-                <Text style={[styles.statusText, { color: isLinked ? '#10B981' : colors.primary }]}>
+                <Text style={[styles.statusText, { color: isLinked ? '#10B981' : colors.textSecondary }]}>
                   {isLinked ? 'Connected & Configured' : 'No Webhook Linked'}
                 </Text>
                 {isLinked && (

@@ -220,15 +220,15 @@ export async function getTodayHourlyStatus(): Promise<Record<number, boolean>> {
   const todayLogs = await getTodayWaterLogs();
   const hourlyStatus: Record<number, boolean> = {};
 
-  // Initialize hours 8 to 22
-  for (let h = 8; h <= 22; h++) {
+  // Initialize hours 6 to 22
+  for (let h = 6; h <= 22; h++) {
     hourlyStatus[h] = false;
   }
 
   todayLogs.forEach((log) => {
     const date = new Date(log.timestamp);
     const hour = date.getHours();
-    if (hour >= 8 && hour <= 22) {
+    if (hour >= 6 && hour <= 22) {
       hourlyStatus[hour] = true;
     }
   });

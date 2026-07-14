@@ -13,16 +13,19 @@ import {
   View,
   Modal,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import Skeleton from '@/components/SkeletonLoader';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 import * as PurchasesStorage from '@/utils/PurchasesStorage';
+import * as WidgetSync from '@/utils/WidgetSync';
 
-export type CategoryType = 'Groceries' | 'Dairy' | 'Veggies' | 'Misc';
+export type CategoryType = 'Groceries' | 'Dairy' | 'Veggies' | 'Snacks' | 'Transport' | 'Bills' | 'Health' | 'Food' | 'Shopping' | 'Misc';
 
 // ── Purchases Navigation Tabs ────────────────────────────────────────────────
 export function PurchasesTabs({ activeTab }: { activeTab: 'daily' | 'weekly' | 'monthly' }) {
@@ -196,6 +199,145 @@ function CalendarPicker({ visible, onClose, selectedDate, onSelectDate, colors }
   );
 }
 
+// ── Custom Time Picker Component ─────────────────────────────────────────────
+function TimePicker({ visible, onClose, selectedDate, onSelectTime, colors }: any) {
+  const date = new Date(selectedDate);
+  let initialHours = date.getHours();
+  const ampm = initialHours >= 12 ? 'PM' : 'AM';
+  initialHours = initialHours % 12;
+  if (initialHours === 0) initialHours = 12;
+  const initialMinutes = date.getMinutes();
+
+  const [hours, setHours] = useState(initialHours);
+  const [minutes, setMinutes] = useState(initialMinutes);
+  const [period, setPeriod] = useState(ampm);
+
+  useEffect(() => {
+    if (visible) {
+      let h = selectedDate.getHours();
+      const p = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      if (h === 0) h = 12;
+      setHours(h);
+      setMinutes(selectedDate.getMinutes());
+      setPeriod(p);
+    }
+  }, [visible, selectedDate]);
+
+  const incrementHours = () => {
+    setHours((prev) => (prev === 12 ? 1 : prev + 1));
+  };
+
+  const decrementHours = () => {
+    setHours((prev) => (prev === 1 ? 12 : prev - 1));
+  };
+
+  const incrementMinutes = () => {
+    setMinutes((prev) => (prev >= 59 ? 0 : prev + 1));
+  };
+
+  const decrementMinutes = () => {
+    setMinutes((prev) => (prev <= 0 ? 59 : prev - 1));
+  };
+
+  const handleSave = () => {
+    const newDate = new Date(selectedDate);
+    let h = hours;
+    if (period === 'PM' && h < 12) h += 12;
+    if (period === 'AM' && h === 12) h = 0;
+    newDate.setHours(h, minutes, 0, 0);
+    onSelectTime(newDate);
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.calendarCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border, padding: 20 }]}>
+          <Text style={[styles.calMonthText, { color: colors.text, marginBottom: 20, alignSelf: 'center' }]}>
+            Adjust Time
+          </Text>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15, marginBottom: 25 }}>
+            {/* Hours Adjuster */}
+            <View style={{ alignItems: 'center' }}>
+              <TouchableOpacity onPress={incrementHours} style={styles.timeNavBtn}>
+                <Feather name="chevron-up" size={24} color={colors.primary} />
+              </TouchableOpacity>
+              <Text style={{ fontSize: 32, fontWeight: '700', color: colors.text, marginVertical: 8 }}>
+                {hours.toString().padStart(2, '0')}
+              </Text>
+              <TouchableOpacity onPress={decrementHours} style={styles.timeNavBtn}>
+                <Feather name="chevron-down" size={24} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 32, fontWeight: '700', color: colors.textSecondary, alignSelf: 'center', marginTop: -6 }}>
+              :
+            </Text>
+
+            {/* Minutes Adjuster */}
+            <View style={{ alignItems: 'center' }}>
+              <TouchableOpacity onPress={incrementMinutes} style={styles.timeNavBtn}>
+                <Feather name="chevron-up" size={24} color={colors.primary} />
+              </TouchableOpacity>
+              <Text style={{ fontSize: 32, fontWeight: '700', color: colors.text, marginVertical: 8 }}>
+                {minutes.toString().padStart(2, '0')}
+              </Text>
+              <TouchableOpacity onPress={decrementMinutes} style={styles.timeNavBtn}>
+                <Feather name="chevron-down" size={24} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* AM/PM Selector */}
+            <View style={{ gap: 8, marginLeft: 10 }}>
+              <TouchableOpacity
+                onPress={() => setPeriod('AM')}
+                style={[
+                  styles.ampmBtn,
+                  { borderColor: colors.border },
+                  period === 'AM' && { backgroundColor: colors.primary, borderColor: colors.primary }
+                ]}
+              >
+                <Text style={{ color: period === 'AM' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
+                  AM
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setPeriod('PM')}
+                style={[
+                  styles.ampmBtn,
+                  { borderColor: colors.border },
+                  period === 'PM' && { backgroundColor: colors.primary, borderColor: colors.primary }
+                ]}
+              >
+                <Text style={{ color: period === 'PM' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
+                  PM
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={[styles.calCloseBtn, { flex: 1, borderColor: colors.border, marginTop: 0 }]}
+            >
+              <Text style={{ color: colors.text, fontWeight: '700' }}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleSave}
+              style={[styles.calCloseBtn, { flex: 1, backgroundColor: colors.primary, borderColor: colors.primary, marginTop: 0 }]}
+            >
+              <Text style={{ color: '#FFF', fontWeight: '700' }}>Set Time</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ── Edit Expense Modal Component ────────────────────────────────────────────
 function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isSaving }: any) {
   if (!log) return null;
@@ -205,6 +347,7 @@ function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isS
   const [editCategory, setEditCategory] = useState(log.category);
   const [editDate, setEditDate] = useState(new Date(log.timestamp));
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   // Sync state if modal log changes
   useEffect(() => {
@@ -272,11 +415,26 @@ function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isS
                 {editDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
               </Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setShowTimePicker(true)}
+              style={[styles.datePickerBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
+            >
+              <Feather name="clock" size={14} color={colors.primary} />
+              <Text style={{ color: colors.text, fontSize: 11, fontWeight: '600' }} numberOfLines={1}>
+                {editDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {/* Category Selector */}
-          <View style={styles.categoryContainer}>
-            {(['Groceries', 'Dairy', 'Veggies', 'Misc'] as CategoryType[]).map((cat) => {
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryContainer}
+            style={{ maxHeight: 50, marginBottom: 15 }}
+          >
+            {(['Groceries', 'Dairy', 'Veggies', 'Snacks', 'Transport', 'Bills', 'Health', 'Food', 'Shopping', 'Misc'] as CategoryType[]).map((cat) => {
               const selected = editCategory === cat;
               return (
                 <TouchableOpacity
@@ -287,6 +445,8 @@ function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isS
                     {
                       borderColor: selected ? colors.primary : colors.border,
                       backgroundColor: selected ? colors.primary : 'transparent',
+                      paddingHorizontal: 12,
+                      marginRight: 6,
                     },
                   ]}
                 >
@@ -296,7 +456,7 @@ function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isS
                 </TouchableOpacity>
               );
             })}
-          </View>
+          </ScrollView>
 
           {/* Action Row */}
           <View style={styles.editActionRow}>
@@ -341,6 +501,15 @@ function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isS
             onSelectDate={setEditDate}
             colors={colors}
           />
+
+          {/* Time Picker modal */}
+          <TimePicker
+            visible={showTimePicker}
+            onClose={() => setShowTimePicker(false)}
+            selectedDate={editDate}
+            onSelectTime={setEditDate}
+            colors={colors}
+          />
         </View>
       </View>
     </Modal>
@@ -361,6 +530,7 @@ export default function DailyPurchasesScreen() {
   const [category, setCategory] = useState<CategoryType>('Groceries');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Edit states
@@ -404,6 +574,7 @@ export default function DailyPurchasesScreen() {
       setCategory('Groceries');
       setSelectedDate(new Date());
       Keyboard.dismiss();
+      WidgetSync.sync();
     } catch (e) {
       Alert.alert('Error', 'Failed to save purchase.');
     } finally {
@@ -420,6 +591,7 @@ export default function DailyPurchasesScreen() {
           .map((log) => (log.id === id ? { ...log, ...updates } : log))
           .sort((a, b) => b.timestamp - a.timestamp)
       );
+      WidgetSync.sync();
     } catch (e) {
       Alert.alert('Error', 'Failed to update purchase.');
     } finally {
@@ -438,6 +610,7 @@ export default function DailyPurchasesScreen() {
           try {
             await PurchasesStorage.deletePurchase(id);
             setLogs((prev) => prev.filter((log) => log.id !== id));
+            WidgetSync.sync();
           } catch (e) {
             Alert.alert('Error', 'Failed to delete purchase.');
           } finally {
@@ -459,6 +632,7 @@ export default function DailyPurchasesScreen() {
           try {
             await PurchasesStorage.clearPurchases();
             setLogs([]);
+            WidgetSync.sync();
           } catch (e) {
             Alert.alert('Error', 'Failed to clear data.');
           } finally {
@@ -508,206 +682,278 @@ export default function DailyPurchasesScreen() {
         <PurchasesTabs activeTab="daily" />
 
         {/* Main List */}
-        <FlatList
-          data={logs}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            <View style={{ gap: Spacing.four, marginBottom: Spacing.two }}>
-              {/* Daily Total Summary Card */}
-              <View style={[styles.totalBar, { borderColor: colors.border, backgroundColor: colors.backgroundElement }]}>
-                <View>
-                  <ThemedText type="code" style={{ fontSize: 10, fontWeight: '700' }} themeColor="textSecondary">
-                    TODAY'S SPEND
-                  </ThemedText>
-                  <ThemedText type="subtitle" style={[styles.totalCost, { color: colors.primary }]}>
-                    ₹{todayTotal.toFixed(2)}
-                  </ThemedText>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <ThemedText type="code" style={{ fontSize: 10, fontWeight: '700' }} themeColor="textSecondary">
-                    ALL-TIME SPEND
-                  </ThemedText>
-                  <ThemedText type="subtitle" style={[styles.totalCost, { color: colors.text }]}>
-                    ₹{allTimeTotal.toFixed(2)}
-                  </ThemedText>
-                </View>
+        {loading ? (
+          <View style={styles.scrollContent}>
+            {/* Daily Total Summary Card Skeleton */}
+            <View style={[styles.totalBar, { borderColor: colors.border, backgroundColor: colors.backgroundElement }]}>
+              <View style={{ gap: 4 }}>
+                <Skeleton width={80} height={10} />
+                <Skeleton width={100} height={24} style={{ marginTop: 4 }} />
               </View>
+              <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                <Skeleton width={90} height={10} />
+                <Skeleton width={100} height={24} style={{ marginTop: 4 }} />
+              </View>
+            </View>
 
-              {/* Input Form Panel */}
-              <View style={[styles.formPanel, { borderColor: colors.border, backgroundColor: colors.backgroundElement }]}>
-                <ThemedText type="code" style={{ fontSize: 10, fontWeight: '700', marginBottom: Spacing.one }} themeColor="textSecondary">
-                  RECORD EXPENSE
-                </ThemedText>
+            {/* Input Form Panel Skeleton */}
+            <View style={[styles.formPanel, { borderColor: colors.border, backgroundColor: colors.backgroundElement, gap: 12 }]}>
+              <Skeleton width={100} height={10} />
+              <Skeleton width="100%" height={40} borderRadius={8} />
+              <View style={[styles.formRow, { gap: 10 }]}>
+                <Skeleton width="40%" height={40} borderRadius={8} />
+                <Skeleton width="28%" height={40} borderRadius={8} />
+                <Skeleton width="28%" height={40} borderRadius={8} />
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8, marginVertical: 4 }}>
+                <Skeleton width={70} height={30} borderRadius={15} />
+                <Skeleton width={60} height={30} borderRadius={15} />
+                <Skeleton width={65} height={30} borderRadius={15} />
+                <Skeleton width={60} height={30} borderRadius={15} />
+                <Skeleton width={60} height={30} borderRadius={15} />
+              </View>
+              <Skeleton width="100%" height={44} borderRadius={8} />
+            </View>
 
-                <TextInput
-                  style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                  placeholder="Item name (e.g. Eggs, Milk...)"
-                  placeholderTextColor={colors.textSecondary}
-                  value={name}
-                  onChangeText={setName}
-                  autoCorrect={false}
-                />
+            {/* Spends Title Skeleton */}
+            <Skeleton width={180} height={12} style={{ alignSelf: 'flex-start', marginTop: 24, marginBottom: 8 }} />
 
-                <View style={styles.formRow}>
+            {/* Spends List Item Skeletons */}
+            <View style={{ gap: 12, width: '100%' }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <View key={i} style={[styles.itemCard, { borderColor: colors.border, padding: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+                  <View style={{ gap: 6, flex: 1 }}>
+                    <Skeleton width={120} height={14} />
+                    <Skeleton width={160} height={10} />
+                  </View>
+                  <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                    <Skeleton width={60} height={16} />
+                    <Skeleton width={50} height={10} borderRadius={4} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : (
+          <FlatList
+            data={logs}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <View style={{ gap: Spacing.four, marginBottom: Spacing.two }}>
+                {/* Daily Total Summary Card */}
+                <View style={[styles.totalBar, { borderColor: colors.border, backgroundColor: colors.backgroundElement }]}>
+                  <View>
+                    <ThemedText type="code" style={{ fontSize: 10, fontWeight: '700' }} themeColor="textSecondary">
+                      TODAY'S SPEND
+                    </ThemedText>
+                    <ThemedText type="subtitle" style={[styles.totalCost, { color: colors.primary }]}>
+                      ₹{todayTotal.toFixed(2)}
+                    </ThemedText>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <ThemedText type="code" style={{ fontSize: 10, fontWeight: '700' }} themeColor="textSecondary">
+                      ALL-TIME SPEND
+                    </ThemedText>
+                    <ThemedText type="subtitle" style={[styles.totalCost, { color: colors.text }]}>
+                      ₹{allTimeTotal.toFixed(2)}
+                    </ThemedText>
+                  </View>
+                </View>
+
+                {/* Input Form Panel */}
+                <View style={[styles.formPanel, { borderColor: colors.border, backgroundColor: colors.backgroundElement }]}>
+                  <ThemedText type="code" style={{ fontSize: 10, fontWeight: '700', marginBottom: Spacing.one }} themeColor="textSecondary">
+                    RECORD EXPENSE
+                  </ThemedText>
+
                   <TextInput
-                    style={[
-                      styles.textInput,
-                      styles.costInput,
-                      { color: colors.text, borderColor: colors.border, backgroundColor: colors.background },
-                    ]}
-                    placeholder="Cost (₹)"
+                    style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+                    placeholder="Item name (e.g. Eggs, Milk...)"
                     placeholderTextColor={colors.textSecondary}
-                    value={cost}
-                    onChangeText={setCost}
-                    keyboardType="decimal-pad"
+                    value={name}
+                    onChangeText={setName}
                     autoCorrect={false}
                   />
 
-                  {/* Custom Date Field */}
-                  <TouchableOpacity
-                    onPress={() => setShowDatePicker(true)}
-                    style={[styles.datePickerBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
-                  >
-                    <Feather name="calendar" size={14} color={colors.primary} />
-                    <Text style={{ color: colors.text, fontSize: 11, fontWeight: '600' }} numberOfLines={1}>
-                      {selectedDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                  <View style={styles.formRow}>
+                    <TextInput
+                      style={[
+                        styles.textInput,
+                        styles.costInput,
+                        { color: colors.text, borderColor: colors.border, backgroundColor: colors.background },
+                      ]}
+                      placeholder="Cost (₹)"
+                      placeholderTextColor={colors.textSecondary}
+                      value={cost}
+                      onChangeText={setCost}
+                      keyboardType="decimal-pad"
+                      autoCorrect={false}
+                    />
 
-                {/* Category Toggles */}
-                <View style={styles.categoryContainer}>
-                  {(['Groceries', 'Dairy', 'Veggies', 'Misc'] as CategoryType[]).map((cat) => {
-                    const selected = category === cat;
-                    return (
-                      <TouchableOpacity
-                        key={cat}
-                        onPress={() => setCategory(cat)}
-                        style={[
-                          styles.catBtn,
-                          {
-                            borderColor: selected ? colors.primary : colors.border,
-                            backgroundColor: selected ? colors.primary : 'transparent',
-                          },
-                        ]}
-                      >
-                        <ThemedText
-                          type="code"
+                    {/* Custom Date Field */}
+                    <TouchableOpacity
+                      onPress={() => setShowDatePicker(true)}
+                      style={[styles.datePickerBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
+                    >
+                      <Feather name="calendar" size={14} color={colors.primary} />
+                      <Text style={{ color: colors.text, fontSize: 11, fontWeight: '600' }} numberOfLines={1}>
+                        {selectedDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Custom Time Field */}
+                    <TouchableOpacity
+                      onPress={() => setShowTimePicker(true)}
+                      style={[styles.datePickerBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
+                    >
+                      <Feather name="clock" size={14} color={colors.primary} />
+                      <Text style={{ color: colors.text, fontSize: 11, fontWeight: '600' }} numberOfLines={1}>
+                        {selectedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Category Toggles */}
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.categoryContainer}
+                    style={{ maxHeight: 50, marginBottom: 15 }}
+                  >
+                    {(['Groceries', 'Dairy', 'Veggies', 'Snacks', 'Transport', 'Bills', 'Health', 'Food', 'Shopping', 'Misc'] as CategoryType[]).map((cat) => {
+                      const selected = category === cat;
+                      return (
+                        <TouchableOpacity
+                          key={cat}
+                          onPress={() => setCategory(cat)}
                           style={[
-                            styles.catBtnText,
-                            { color: selected ? '#FFF' : colors.text, fontWeight: '700' },
+                            styles.catBtn,
+                            {
+                              borderColor: selected ? colors.primary : colors.border,
+                              backgroundColor: selected ? colors.primary : 'transparent',
+                              paddingHorizontal: 12,
+                              marginRight: 6,
+                            },
                           ]}
                         >
-                          {cat.toUpperCase()}
-                        </ThemedText>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                          <ThemedText
+                            type="code"
+                            style={[
+                              styles.catBtnText,
+                              { color: selected ? '#FFF' : colors.text, fontWeight: '700' },
+                            ]}
+                          >
+                            {cat.toUpperCase()}
+                          </ThemedText>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
 
-                <AnimatedPressable
-                  onPress={handleAddPurchase}
-                  disabled={isSaving}
-                  style={[
-                    styles.submitBtn,
-                    {
-                      borderColor: colors.primary,
-                      backgroundColor: colors.primary,
-                      opacity: isSaving ? 0.8 : 1,
-                    },
-                  ]}
-                >
-                  {isSaving ? (
-                    <ActivityIndicator size="small" color="#FFF" />
-                  ) : (
-                    <ThemedText type="smallBold" style={{ color: '#FFF' }}>
-                      Record Entry
-                    </ThemedText>
-                  )}
-                </AnimatedPressable>
-              </View>
-
-              <ThemedText type="smallBold" style={styles.sectionTitle} themeColor="textSecondary">
-                ALL RECORDED SPENDS (TAP TO EDIT)
-              </ThemedText>
-            </View>
-          }
-          renderItem={({ item }) => {
-            const itemDate = new Date(item.timestamp);
-            const todayStr = new Date().toDateString();
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
-            const yesterdayStr = yesterday.toDateString();
-
-            let dateStr = '';
-            if (itemDate.toDateString() === todayStr) {
-              dateStr = 'Today';
-            } else if (itemDate.toDateString() === yesterdayStr) {
-              dateStr = 'Yesterday';
-            } else {
-              dateStr = itemDate.toLocaleDateString('en-IN', {
-                day: '2-digit',
-                month: 'short',
-                year: itemDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
-                timeZone: 'Asia/Kolkata',
-              });
-            }
-            const timeStr = itemDate.toLocaleTimeString('en-IN', {
-              hour: '2-digit',
-              minute: '2-digit',
-              timeZone: 'Asia/Kolkata',
-            });
-            const formattedDate = `${dateStr} • ${timeStr}`;
-
-            return (
-              <TouchableOpacity
-                onPress={() => {
-                  setEditingLog(item);
-                  setIsEditModalVisible(true);
-                }}
-                style={[styles.itemCard, { borderColor: colors.border }]}
-              >
-                <View style={{ flex: 1, gap: Spacing.half }}>
-                  <View style={styles.itemNameRow}>
-                    <ThemedText type="smallBold">{item.name}</ThemedText>
-                    <View style={[styles.miniBadge, { borderColor: colors.border }]}>
-                      <ThemedText type="code" style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>
-                        {item.category.toUpperCase()}
-                      </ThemedText>
-                    </View>
-                  </View>
-                  <ThemedText type="code" style={{ fontSize: 10 }} themeColor="textSecondary">
-                    {formattedDate}
-                  </ThemedText>
-                </View>
-                <View style={styles.rightItemBlock}>
-                  <ThemedText type="subtitle" style={[styles.itemPrice, { color: colors.text }]}>
-                    ₹{item.cost.toFixed(2)}
-                  </ThemedText>
                   <AnimatedPressable
-                    onPress={() => handleDelete(item.id)}
-                    style={styles.trashBtn}
+                    onPress={handleAddPurchase}
+                    disabled={isSaving}
+                    style={[
+                      styles.submitBtn,
+                      {
+                        borderColor: colors.primary,
+                        backgroundColor: colors.primary,
+                        opacity: isSaving ? 0.8 : 1,
+                      },
+                    ]}
                   >
-                    <Feather name="trash-2" size={16} color={colors.alert} />
+                    {isSaving ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <ThemedText type="smallBold" style={{ color: '#FFF' }}>
+                        Record Entry
+                      </ThemedText>
+                    )}
                   </AnimatedPressable>
                 </View>
-              </TouchableOpacity>
-            );
-          }}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Feather name="shopping-bag" size={32} color={colors.textSecondary} style={{ marginBottom: Spacing.two, opacity: 0.8 }} />
-              <ThemedText type="code" themeColor="textSecondary" style={{ textAlign: 'center', fontSize: 12 }}>
-                No records logged
-              </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center', marginTop: Spacing.one }}>
-                Log items above to track shopping expenses.
-              </ThemedText>
-            </View>
-          }
-        />
+
+                <ThemedText type="smallBold" style={styles.sectionTitle} themeColor="textSecondary">
+                  ALL RECORDED SPENDS (TAP TO EDIT)
+                </ThemedText>
+              </View>
+            }
+            renderItem={({ item }) => {
+              const itemDate = new Date(item.timestamp);
+              const todayStr = new Date().toDateString();
+              const yesterday = new Date();
+              yesterday.setDate(yesterday.getDate() - 1);
+              const yesterdayStr = yesterday.toDateString();
+
+              let dateStr = '';
+              if (itemDate.toDateString() === todayStr) {
+                dateStr = 'Today';
+              } else if (itemDate.toDateString() === yesterdayStr) {
+                dateStr = 'Yesterday';
+              } else {
+                dateStr = itemDate.toLocaleDateString('en-IN', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: itemDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
+                  timeZone: 'Asia/Kolkata',
+                });
+              }
+              const timeStr = itemDate.toLocaleTimeString('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: 'Asia/Kolkata',
+              });
+              const formattedDate = `${dateStr} • ${timeStr}`;
+
+              return (
+                <TouchableOpacity
+                  onPress={() => {
+                    setEditingLog(item);
+                    setIsEditModalVisible(true);
+                  }}
+                  style={[styles.itemCard, { borderColor: colors.border }]}
+                >
+                  <View style={{ flex: 1, gap: Spacing.half }}>
+                    <View style={styles.itemNameRow}>
+                      <ThemedText type="smallBold">{item.name}</ThemedText>
+                      <View style={[styles.miniBadge, { borderColor: colors.border }]}>
+                        <ThemedText type="code" style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>
+                          {item.category.toUpperCase()}
+                        </ThemedText>
+                      </View>
+                    </View>
+                    <ThemedText type="code" style={{ fontSize: 10 }} themeColor="textSecondary">
+                      {formattedDate}
+                    </ThemedText>
+                  </View>
+                  <View style={styles.rightItemBlock}>
+                    <ThemedText type="subtitle" style={[styles.itemPrice, { color: colors.text }]}>
+                      ₹{item.cost.toFixed(2)}
+                    </ThemedText>
+                    <AnimatedPressable
+                      onPress={() => handleDelete(item.id)}
+                      style={styles.trashBtn}
+                    >
+                      <Feather name="trash-2" size={16} color={colors.alert} />
+                    </AnimatedPressable>
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Feather name="shopping-bag" size={32} color={colors.textSecondary} style={{ marginBottom: Spacing.two, opacity: 0.8 }} />
+                <ThemedText type="code" themeColor="textSecondary" style={{ textAlign: 'center', fontSize: 12 }}>
+                  No records logged
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center', marginTop: Spacing.one }}>
+                  Log items above to track shopping expenses.
+                </ThemedText>
+              </View>
+            }
+          />
+        )}
 
         {/* Global Calendar Picker modal */}
         <CalendarPicker
@@ -715,6 +961,15 @@ export default function DailyPurchasesScreen() {
           onClose={() => setShowDatePicker(false)}
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
+          colors={colors}
+        />
+
+        {/* Global Time Picker modal */}
+        <TimePicker
+          visible={showTimePicker}
+          onClose={() => setShowTimePicker(false)}
+          selectedDate={selectedDate}
+          onSelectTime={setSelectedDate}
           colors={colors}
         />
 
@@ -1007,5 +1262,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  timeNavBtn: {
+    padding: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ampmBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 60,
   },
 });

@@ -19,6 +19,7 @@ import Animated, {
   FadeInDown,
 } from 'react-native-reanimated';
 
+import Skeleton from '@/components/SkeletonLoader';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -113,10 +114,16 @@ export default function MonthlyPurchasesScreen() {
 
       // Compute category breakdown
       const cats = [
-        { name: 'Groceries', color: '#60A5FA' }, // Blue
-        { name: 'Dairy', color: '#FBBF24' },     // Amber
-        { name: 'Veggies', color: '#34D399' },   // Emerald
-        { name: 'Misc', color: '#F472B6' },      // Pink
+        { name: 'Groceries', color: '#4F46E5' },
+        { name: 'Dairy', color: '#6366F1' },
+        { name: 'Veggies', color: '#818CF8' },
+        { name: 'Snacks', color: '#A5B4FC' },
+        { name: 'Transport', color: '#C7D2FE' },
+        { name: 'Bills', color: '#312E81' },
+        { name: 'Health', color: '#3730A3' },
+        { name: 'Food', color: '#4338CA' },
+        { name: 'Shopping', color: '#E0E7FF' },
+        { name: 'Misc', color: '#6B7280' },
       ];
 
       const breakdown: CategoryBreakdown[] = cats.map((c) => {
@@ -164,91 +171,135 @@ export default function MonthlyPurchasesScreen() {
         {/* Tab Selector */}
         <PurchasesTabs activeTab="monthly" />
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent as ViewStyle}
-        >
-          {/* Summary Card */}
-          <Animated.View
-            entering={FadeInDown.duration(500).springify()}
-            style={[
-              styles.summaryCard,
-              { borderColor: colors.border, backgroundColor: colors.backgroundElement },
-            ]}
-          >
-            <View style={styles.summaryHeader}>
-              <ThemedText type="code" themeColor="textSecondary" style={styles.summaryTitle as TextStyle}>
-                {currentMonthName.toUpperCase()} SUMMARY
-              </ThemedText>
-              <Feather name="pie-chart" size={14} color={colors.primary} />
+        {loading ? (
+          <View style={styles.scrollContent as ViewStyle}>
+            {/* Summary Card Skeleton */}
+            <View style={[styles.summaryCard, { borderColor: colors.border, backgroundColor: colors.backgroundElement, gap: 12 }]}>
+              <View style={[styles.summaryHeader, { justifyContent: 'space-between' }]}>
+                <Skeleton width={140} height={10} />
+                <Skeleton width={14} height={14} borderRadius={7} />
+              </View>
+              <View style={[styles.totalRow, { gap: 6, marginTop: 4 }]}>
+                <Skeleton width={150} height={32} />
+                <Skeleton width={100} height={10} />
+              </View>
             </View>
 
-            <View style={styles.totalRow}>
-              <Text style={[styles.totalSpentText, { color: colors.primary }]}>
-                ₹{totalSpent.toFixed(2)}
-              </Text>
-              <ThemedText type="code" themeColor="textSecondary" style={{ fontSize: 11, fontWeight: '700' } as TextStyle}>
-                SPENT IN TOTAL
-              </ThemedText>
+            {/* Category Breakdown Card Skeleton */}
+            <View style={[styles.breakdownCard, { borderColor: colors.border, backgroundColor: colors.backgroundElement, gap: 15 }]}>
+              <Skeleton width={160} height={10} style={{ marginBottom: 4 }} />
+              <View style={{ gap: 12 }}>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <View key={i} style={{ gap: 6 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Skeleton width={80} height={10} />
+                      <Skeleton width={60} height={10} />
+                    </View>
+                    <Skeleton width="100%" height={8} borderRadius={4} />
+                  </View>
+                ))}
+              </View>
             </View>
-          </Animated.View>
 
-          {/* Category Breakdown Card */}
-          <View
-            style={[
-              styles.breakdownCard,
-              { borderColor: colors.border, backgroundColor: colors.backgroundElement },
-            ]}
-          >
-            <ThemedText type="code" themeColor="textSecondary" style={styles.cardSectionTitle as TextStyle}>
-              CATEGORY ALLOCATION
-            </ThemedText>
-
-            <View style={styles.categoriesList}>
-              {categories.map((cat, idx) => (
-                <CategoryBar
-                  key={idx}
-                  category={cat.category}
-                  amount={cat.amount}
-                  percentage={cat.percentage}
-                  color={cat.color}
-                  textColor={colors.textSecondary}
-                />
-              ))}
+            {/* Stats Info Grid Skeleton */}
+            <View style={styles.statsGrid}>
+              <View style={[styles.statBox, { borderColor: colors.border, backgroundColor: colors.backgroundElement, gap: 8 }]}>
+                <Skeleton width={90} height={10} />
+                <Skeleton width={60} height={20} />
+              </View>
+              <View style={[styles.statBox, { borderColor: colors.border, backgroundColor: colors.backgroundElement, gap: 8 }]}>
+                <Skeleton width={100} height={10} />
+                <Skeleton width={90} height={20} />
+              </View>
             </View>
           </View>
-
-          {/* Stats Info Grid */}
-          <View style={styles.statsGrid}>
-            <View
+        ) : (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent as ViewStyle}
+          >
+            {/* Summary Card */}
+            <Animated.View
+              entering={FadeInDown.duration(500).springify()}
               style={[
-                styles.statBox,
+                styles.summaryCard,
                 { borderColor: colors.border, backgroundColor: colors.backgroundElement },
               ]}
             >
-              <ThemedText type="code" themeColor="textSecondary" style={styles.statLabel as TextStyle}>
-                TRANSACTIONS
-              </ThemedText>
-              <Text style={[styles.statValue, { color: colors.text }]}>
-                {totalTransactions}
-              </Text>
-            </View>
+              <View style={styles.summaryHeader}>
+                <ThemedText type="code" themeColor="textSecondary" style={styles.summaryTitle as TextStyle}>
+                  {currentMonthName.toUpperCase()} SUMMARY
+                </ThemedText>
+                <Feather name="pie-chart" size={14} color={colors.primary} />
+              </View>
 
+              <View style={styles.totalRow}>
+                <Text style={[styles.totalSpentText, { color: colors.primary }]}>
+                  ₹{totalSpent.toFixed(2)}
+                </Text>
+                <ThemedText type="code" themeColor="textSecondary" style={{ fontSize: 11, fontWeight: '700' } as TextStyle}>
+                  SPENT IN TOTAL
+                </ThemedText>
+              </View>
+            </Animated.View>
+
+            {/* Category Breakdown Card */}
             <View
               style={[
-                styles.statBox,
+                styles.breakdownCard,
                 { borderColor: colors.border, backgroundColor: colors.backgroundElement },
               ]}
             >
-              <ThemedText type="code" themeColor="textSecondary" style={styles.statLabel as TextStyle}>
-                AVG PER SPEND
+              <ThemedText type="code" themeColor="textSecondary" style={styles.cardSectionTitle as TextStyle}>
+                CATEGORY ALLOCATION
               </ThemedText>
-              <Text style={[styles.statValue, { color: colors.text }]}>
-                ₹{avgTransaction.toFixed(2)}
-              </Text>
+
+              <View style={styles.categoriesList}>
+                {categories.map((cat, idx) => (
+                  <CategoryBar
+                    key={idx}
+                    category={cat.category}
+                    amount={cat.amount}
+                    percentage={cat.percentage}
+                    color={cat.color}
+                    textColor={colors.textSecondary}
+                  />
+                ))}
+              </View>
             </View>
-          </View>
-        </ScrollView>
+
+            {/* Stats Info Grid */}
+            <View style={styles.statsGrid}>
+              <View
+                style={[
+                  styles.statBox,
+                  { borderColor: colors.border, backgroundColor: colors.backgroundElement },
+                ]}
+              >
+                <ThemedText type="code" themeColor="textSecondary" style={styles.statLabel as TextStyle}>
+                  TRANSACTIONS
+                </ThemedText>
+                <Text style={[styles.statValue, { color: colors.text }]}>
+                  {totalTransactions}
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.statBox,
+                  { borderColor: colors.border, backgroundColor: colors.backgroundElement },
+                ]}
+              >
+                <ThemedText type="code" themeColor="textSecondary" style={styles.statLabel as TextStyle}>
+                  AVG PER SPEND
+                </ThemedText>
+                <Text style={[styles.statValue, { color: colors.text }]}>
+                  ₹{avgTransaction.toFixed(2)}
+                </Text>
+              </View>
+            </View>
+          </ScrollView>
+        )}
       </SafeAreaView>
     </ThemedView>
   );

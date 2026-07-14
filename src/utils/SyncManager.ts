@@ -13,7 +13,8 @@ export interface SyncAction {
     | 'purchase_save'
     | 'purchase_delete'
     | 'purchase_clear'
-    | 'purchase_update';
+    | 'purchase_update'
+    | 'upi_save';
   payload: any;
   timestamp: number;
 }
@@ -179,6 +180,12 @@ export async function syncOfflineData(): Promise<{ successCount: number; failCou
               batch.delete(d.ref);
             });
             await batch.commit();
+            break;
+          }
+          case 'upi_save': {
+            const { id, upiId, amount, status, timestamp } = action.payload;
+            const docRef = doc(db, 'users', uid, 'upi_transactions', id);
+            await setDoc(docRef, { upiId, amount, status, timestamp });
             break;
           }
         }

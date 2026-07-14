@@ -235,18 +235,33 @@ try {
 // ─────────────────────────────────────────────────────────────────────────────
 console.log(`\n🚀  Creating GitHub Release ${tag} and uploading APK...\n`);
 
+let notesArg = '--generate-notes';
+const releaseNotesPath = path.join(__dirname, 'release-notes.md');
+if (fs.existsSync(releaseNotesPath)) {
+  console.log(`📝  Found custom release-notes.md. Using it for release notes...`);
+  notesArg = `--notes-file "${releaseNotesPath}"`;
+}
+
 const releaseCommand = [
   'gh release create',
   `"${tag}"`,
   `"${apkPath}"`,
   `--title "Essentials ${tag}"`,
-  '--generate-notes',
+  notesArg,
 ].join(' ');
 
 try {
   const output = execSync(releaseCommand, { encoding: 'utf8' });
   console.log('\n🎉  Release published successfully!');
   console.log('    URL:', output.trim());
+  
+  // Clean up release-notes.md after successful release
+  if (fs.existsSync(releaseNotesPath)) {
+    try {
+      fs.unlinkSync(releaseNotesPath);
+      console.log('🧹  Cleaned up local release-notes.md');
+    } catch (e) {}
+  }
 } catch (err) {
   const stderr = err.stderr?.toString() ?? '';
   if (stderr.includes('already exists')) {

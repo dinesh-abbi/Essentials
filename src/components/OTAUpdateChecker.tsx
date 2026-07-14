@@ -4,6 +4,7 @@ import {
   Alert,
   Modal,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -30,6 +31,7 @@ export default function OTAUpdateChecker() {
   const [apkUrl, setApkUrl] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [releaseNotes, setReleaseNotes] = useState('');
 
   const currentVersion = Application.nativeApplicationVersion || Constants.expoConfig?.version || '1.0.0';
 
@@ -57,10 +59,12 @@ export default function OTAUpdateChecker() {
       const latest = data.tag_name?.replace(/^v/i, '');
       // APK is always the first (and only) asset attached to the release
       const downloadLink: string | undefined = data.assets?.[0]?.browser_download_url;
+      const notes = data.body || '';
 
       if (latest && downloadLink && isNewerVersion(latest, currentVersion)) {
         setLatestVersion(latest);
         setApkUrl(downloadLink);
+        setReleaseNotes(notes);
         setModalVisible(true);
       }
     } catch (e) {
@@ -169,6 +173,19 @@ export default function OTAUpdateChecker() {
               <Text style={[styles.infoValue, { color: theme.primary, fontWeight: '800' }]}>v{latestVersion}</Text>
             </View>
           </View>
+
+          {/* Release Notes */}
+          {releaseNotes ? (
+            <ScrollView 
+              style={[styles.notesContainer, { backgroundColor: theme.backgroundSelected, borderColor: theme.border }]} 
+              contentContainerStyle={styles.notesContent}
+              nestedScrollEnabled={true}
+              showsVerticalScrollIndicator={true}
+            >
+              <Text style={[styles.notesTitle, { color: theme.text }]}>What's New:</Text>
+              <Text style={[styles.notesText, { color: theme.textSecondary }]}>{releaseNotes}</Text>
+            </ScrollView>
+          ) : null}
 
           {isDownloading ? (
             <View style={styles.downloadContainer}>
@@ -332,5 +349,24 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 13,
     fontWeight: '800',
+  },
+  notesContainer: {
+    maxHeight: 120,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    padding: 10,
+    marginTop: 4,
+  },
+  notesContent: {
+    paddingBottom: 4,
+  },
+  notesTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  notesText: {
+    fontSize: 11,
+    lineHeight: 16,
   },
 });

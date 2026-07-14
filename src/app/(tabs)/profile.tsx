@@ -286,14 +286,14 @@ export default function ProfileScreen() {
                   <Text
                     style={[
                       styles.rowValue,
-                      { color: isLinked ? '#10B981' : isDark ? '#F59E0B' : '#D97706' },
+                      { color: isLinked ? '#10B981' : colors.textSecondary },
                     ]}
                     numberOfLines={1}
                   >
                     {isLinked ? 'Connected ✓' : 'Not linked'}
                   </Text>
                 </View>
-                <View style={[styles.statusDot, { backgroundColor: isLinked ? '#10B981' : '#F59E0B' }]} />
+                <View style={[styles.statusDot, { backgroundColor: isLinked ? '#10B981' : colors.textSecondary }]} />
                 <Feather
                   name={discordExpanded ? 'chevron-up' : 'chevron-down'}
                   size={16}

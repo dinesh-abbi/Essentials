@@ -19,6 +19,7 @@ import Animated, {
   FadeInDown,
 } from 'react-native-reanimated';
 
+import Skeleton from '@/components/SkeletonLoader';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -164,84 +165,119 @@ export default function WeeklyPurchasesScreen() {
         {/* Tab Selector */}
         <PurchasesTabs activeTab="weekly" />
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent as ViewStyle}
-        >
-          {/* Chart Card */}
-          <Animated.View
-            entering={FadeInDown.duration(500).springify()}
-            style={[
-              styles.chartCard,
-              { borderColor: colors.border, backgroundColor: colors.backgroundElement },
-            ]}
-          >
-            <ThemedText type="code" themeColor="textSecondary" style={styles.chartTitle as TextStyle}>
-              WEEKLY SPENDING PATTERN
-            </ThemedText>
-
-            <View style={styles.chartRow}>
-              {weeklyData.map((day, idx) => {
-                const dayName = day.date.toLocaleDateString('en-IN', { weekday: 'short' });
-                return (
-                  <AnimatedBar
-                    key={idx}
-                    dayName={dayName.toUpperCase()}
-                    totalCost={day.totalCost}
-                    maxCost={maxVal}
-                    colors={colors}
-                  />
-                );
-              })}
+        {loading ? (
+          <View style={styles.scrollContent as ViewStyle}>
+            {/* Chart Card Skeleton */}
+            <View style={[styles.chartCard, { borderColor: colors.border, backgroundColor: colors.backgroundElement, gap: 16 }]}>
+              <Skeleton width={160} height={10} />
+              <View style={[styles.chartRow, { justifyContent: 'space-between', alignItems: 'flex-end', height: 120 }]}>
+                {Array.from({ length: 7 }).map((_, i) => (
+                  <View key={i} style={{ alignItems: 'center', gap: 8 }}>
+                    <Skeleton width={24} height={15 + i * 15} borderRadius={4} />
+                    <Skeleton width={20} height={8} />
+                  </View>
+                ))}
+              </View>
             </View>
-          </Animated.View>
 
-          {/* Stats Info Grid */}
-          <View style={styles.statsGrid}>
-            <View
+            {/* Stats Info Grid Skeleton */}
+            <View style={styles.statsGrid}>
+              <View style={[styles.statBox, { borderColor: colors.border, backgroundColor: colors.backgroundElement, gap: 8 }]}>
+                <Skeleton width={70} height={10} />
+                <Skeleton width={100} height={20} />
+              </View>
+              <View style={[styles.statBox, { borderColor: colors.border, backgroundColor: colors.backgroundElement, gap: 8 }]}>
+                <Skeleton width={80} height={10} />
+                <Skeleton width={100} height={20} />
+              </View>
+            </View>
+
+            {/* Highest Day Banner Skeleton */}
+            <View style={[styles.insightCard, { borderColor: colors.border, backgroundColor: colors.backgroundElement, gap: 12, flexDirection: 'row', alignItems: 'center' }]}>
+              <Skeleton width={16} height={16} borderRadius={8} />
+              <Skeleton width="80%" height={12} />
+            </View>
+          </View>
+        ) : (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent as ViewStyle}
+          >
+            {/* Chart Card */}
+            <Animated.View
+              entering={FadeInDown.duration(500).springify()}
               style={[
-                styles.statBox,
+                styles.chartCard,
                 { borderColor: colors.border, backgroundColor: colors.backgroundElement },
               ]}
             >
-              <ThemedText type="code" themeColor="textSecondary" style={styles.statLabel as TextStyle}>
-                TOTAL SPENT
+              <ThemedText type="code" themeColor="textSecondary" style={styles.chartTitle as TextStyle}>
+                WEEKLY SPENDING PATTERN
               </ThemedText>
-              <Text style={[styles.statValue, { color: colors.primary }]}>
-                ₹{totalSpent.toFixed(2)}
-              </Text>
+
+              <View style={styles.chartRow}>
+                {weeklyData.map((day, idx) => {
+                  const dayName = day.date.toLocaleDateString('en-IN', { weekday: 'short' });
+                  return (
+                    <AnimatedBar
+                      key={idx}
+                      dayName={dayName.toUpperCase()}
+                      totalCost={day.totalCost}
+                      maxCost={maxVal}
+                      colors={colors}
+                    />
+                  );
+                })}
+              </View>
+            </Animated.View>
+
+            {/* Stats Info Grid */}
+            <View style={styles.statsGrid}>
+              <View
+                style={[
+                  styles.statBox,
+                  { borderColor: colors.border, backgroundColor: colors.backgroundElement },
+                ]}
+              >
+                <ThemedText type="code" themeColor="textSecondary" style={styles.statLabel as TextStyle}>
+                  TOTAL SPENT
+                </ThemedText>
+                <Text style={[styles.statValue, { color: colors.primary }]}>
+                  ₹{totalSpent.toFixed(2)}
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.statBox,
+                  { borderColor: colors.border, backgroundColor: colors.backgroundElement },
+                ]}
+              >
+                <ThemedText type="code" themeColor="textSecondary" style={styles.statLabel as TextStyle}>
+                  DAILY AVERAGE
+                </ThemedText>
+                <Text style={[styles.statValue, { color: colors.text }]}>
+                  ₹{averageSpent.toFixed(2)}
+                </Text>
+              </View>
             </View>
 
+            {/* Highest Day Banner */}
             <View
               style={[
-                styles.statBox,
+                styles.insightCard,
                 { borderColor: colors.border, backgroundColor: colors.backgroundElement },
               ]}
             >
-              <ThemedText type="code" themeColor="textSecondary" style={styles.statLabel as TextStyle}>
-                DAILY AVERAGE
-              </ThemedText>
-              <Text style={[styles.statValue, { color: colors.text }]}>
-                ₹{averageSpent.toFixed(2)}
+              <Feather name="trending-up" size={16} color={colors.primary} />
+              <Text style={[styles.insightText, { color: colors.text }]}>
+                Highest spending day this week was{' '}
+                <Text style={{ fontWeight: '700', color: colors.primary }}>{highestDay.day}</Text>{' '}
+                (₹{highestDay.val.toFixed(2)}).
               </Text>
             </View>
-          </View>
-
-          {/* Highest Day Banner */}
-          <View
-            style={[
-              styles.insightCard,
-              { borderColor: colors.border, backgroundColor: colors.backgroundElement },
-            ]}
-          >
-            <Feather name="trending-up" size={16} color={colors.primary} />
-            <Text style={[styles.insightText, { color: colors.text }]}>
-              Highest spending day this week was{' '}
-              <Text style={{ fontWeight: '700', color: colors.primary }}>{highestDay.day}</Text>{' '}
-              (₹{highestDay.val.toFixed(2)}).
-            </Text>
-          </View>
-        </ScrollView>
+          </ScrollView>
+        )}
       </SafeAreaView>
     </ThemedView>
   );

@@ -9,6 +9,7 @@ BOLD='\033[1m'
 RESET='\033[0m'
 
 # --- Parse Command Line Arguments ---
+START_TIME=$(date +%s)
 CLEAN_BUILD=false
 for arg in "$@"; do
   if [ "$arg" = "--clean" ] || [ "$arg" = "-c" ]; then
@@ -157,15 +158,21 @@ if [ "$PUBLISH_BUILD" = "true" ]; then
   if [ $PUBLISH_EXIT -eq 0 ]; then
     # Copy APK to root
     APK_SRC="android/app/build/outputs/apk/release/app-release.apk"
-    APK_DEST="CatalystEssentials.apk"
+    TIMESTAMP=$(TZ='Asia/Kolkata' date +"%d-%m-%Y_%I-%M_%p")
+    APK_DEST="CatalystEssentials_${TIMESTAMP}.apk"
     if [ -f "$APK_SRC" ]; then
-      rm -f "$APK_DEST"
+      rm -f CatalystEssentials_*.apk
       cp "$APK_SRC" "$APK_DEST"
+      END_TIME=$(date +%s)
+      DURATION=$((END_TIME - START_TIME))
+      MINUTES=$((DURATION / 60))
+      SECONDS=$((DURATION % 60))
       echo -e "\n=================================================="
       echo -e "${GREEN}${BOLD}🎉 PUBLISH & BUILD COMPLETED SUCCESSFULLY!${RESET}"
       echo -e "=================================================="
-      echo -e "${CYAN}Output File:${RESET} ${BOLD}$APK_DEST${RESET}"
+      echo -e "${CYAN}Output Path:${RESET} ${BOLD}$PWD/$APK_DEST${RESET}"
       echo -e "${CYAN}File Size:  ${RESET} $(du -h "$APK_DEST" | cut -f1)"
+      echo -e "${CYAN}Build Time: ${RESET} ${MINUTES}m ${SECONDS}s"
       echo -e "=================================================="
     fi
     exit 0
@@ -216,17 +223,23 @@ cd .. || exit
 
 # --- STEP 5: Package Output ---
 APK_SRC="android/app/build/outputs/apk/release/app-release.apk"
-APK_DEST="CatalystEssentials.apk"
+TIMESTAMP=$(TZ='Asia/Kolkata' date +"%d-%m-%Y_%I-%M_%p")
+APK_DEST="CatalystEssentials_${TIMESTAMP}.apk"
 
 if [ -f "$APK_SRC" ]; then
   # Clear old destination first to avoid confusion if copy fails
-  rm -f "$APK_DEST"
+  rm -f CatalystEssentials_*.apk
   cp "$APK_SRC" "$APK_DEST"
+  END_TIME=$(date +%s)
+  DURATION=$((END_TIME - START_TIME))
+  MINUTES=$((DURATION / 60))
+  SECONDS=$((DURATION % 60))
   echo -e "\n=================================================="
   echo -e "${GREEN}${BOLD}🎉 BUILD COMPLETED SUCCESSFULLY!${RESET}"
   echo -e "=================================================="
-  echo -e "${CYAN}Output File:${RESET} ${BOLD}$APK_DEST${RESET}"
+  echo -e "${CYAN}Output Path:${RESET} ${BOLD}$PWD/$APK_DEST${RESET}"
   echo -e "${CYAN}File Size:  ${RESET} $(du -h "$APK_DEST" | cut -f1)"
+  echo -e "${CYAN}Build Time: ${RESET} ${MINUTES}m ${SECONDS}s"
   echo -e "=================================================="
   echo -e "${GREEN}You can now download and install the APK on any Android device!${RESET}"
 else
