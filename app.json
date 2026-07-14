@@ -2,7 +2,7 @@
   "expo": {
     "name": "Essentials",
     "slug": "Essentials",
-    "version": "1.0.15",
+    "version": "1.0.16",
     "owner": "dineshabbi",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -27,7 +27,7 @@
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.REQUEST_INSTALL_PACKAGES"
       ],
-      "versionCode": 16
+      "versionCode": 17
     },
     "web": {
       "output": "static",
