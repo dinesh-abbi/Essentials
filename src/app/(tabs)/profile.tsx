@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Alert,
   LayoutAnimation,
@@ -12,8 +12,9 @@ import {
   TouchableOpacity,
   View,
   useColorScheme,
+  Switch,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import * as Application from 'expo-application';
@@ -21,6 +22,7 @@ import Constants from 'expo-constants';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { BottomTabInset, Colors, Radius, Spacing } from '@/constants/theme';
+import * as BarcodeAlarmStorage from '@/utils/BarcodeAlarmStorage';
 
 // ── Instruction Steps (inline for Discord setup) ──────────────────────────────
 const DISCORD_STEPS = [
@@ -77,12 +79,20 @@ function Row({
   );
 }
 
+const formatAlarmTime = (h: number, m: number) => {
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 || 12;
+  const minStr = m < 10 ? '0' + m : m;
+  return `${hour12}:${minStr} ${ampm}`;
+};
+
 export default function ProfileScreen() {
   const { user, signOut, updateDisplayName, discordWebhookUrl, updateDiscordWebhook } = useAuth();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = Colors[scheme];
   const isDark = scheme === 'dark';
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const currentVersion = Application.nativeApplicationVersion || Constants.expoConfig?.version || '1.0.0';
 
   const [isEditing, setIsEditing] = useState(false);
@@ -94,6 +104,44 @@ export default function ProfileScreen() {
   const [newWebhookUrl, setNewWebhookUrl] = useState('');
   const [savingWebhook, setSavingWebhook] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+
+  const [alarmConfig, setAlarmConfig] = useState<BarcodeAlarmStorage.BarcodeAlarmConfig | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      async function load() {
+        const config = await BarcodeAlarmStorage.getAlarmConfig();
+        setAlarmConfig(config);
+      }
+      load();
+    }, [])
+  );
+
+  async function handleToggleAlarm(value: boolean) {
+    if (!alarmConfig) return;
+    
+    if (value && !alarmConfig.barcodePayload) {
+      Alert.alert(
+        'Barcode Required',
+        'You need to register a barcode to dismiss the alarm before you can enable it.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Set Up Now', onPress: () => router.push('/alarm/setup' as any) }
+        ]
+      );
+      return;
+    }
+
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const updated = { ...alarmConfig, enabled: value };
+    setAlarmConfig(updated);
+    try {
+      await BarcodeAlarmStorage.saveAlarmConfig(updated);
+    } catch (e) {
+      Alert.alert('Error', 'Failed to update alarm status.');
+      setAlarmConfig(alarmConfig);
+    }
+  }
 
   function maskWebhookUrl(url: string): string {
     if (url.length <= 45) return url;
@@ -176,7 +224,7 @@ export default function ProfileScreen() {
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView
-          contentContainerStyle={[styles.content, { paddingBottom: BottomTabInset + Spacing.five }]}
+          contentContainerStyle={[styles.content, { paddingBottom: BottomTabInset + insets.bottom + Spacing.three }]}
           showsVerticalScrollIndicator={false}
         >
 
@@ -410,6 +458,84 @@ export default function ProfileScreen() {
                       ))}
                     </View>
                   )}
+                </View>
+              )}
+            </View>
+          </Animated.View>
+
+          {/* ── Barcode Alarm Card ──────────────────────────────────────────── */}
+          <Animated.View entering={FadeInDown.delay(260).duration(400)}>
+            <View style={[styles.section, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
+              <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>BARCODE ALARM</Text>
+              
+              {/* Header: Toggle Switch */}
+              <View style={[styles.alarmToggleHeader, { borderColor: colors.border }]}>
+                <View style={[styles.rowIcon, { backgroundColor: colors.primary + '18' }]}>
+                  <Feather name="bell" size={15} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.alarmCardTitle, { color: colors.text }]}>Enable Alarm</Text>
+                  <Text style={[styles.alarmCardSubtitle, { color: colors.textSecondary }]}>
+                    {alarmConfig?.enabled ? 'Active' : 'Disabled'}
+                  </Text>
+                </View>
+                <Switch
+                  value={alarmConfig?.enabled ?? false}
+                  onValueChange={handleToggleAlarm}
+                  trackColor={{ false: colors.backgroundSelected, true: colors.primary + '40' }}
+                  thumbColor={alarmConfig?.enabled ? colors.primary : colors.textSecondary}
+                />
+              </View>
+
+              {/* Collapsible Alarm Info */}
+              {alarmConfig && (
+                <View style={[styles.alarmConfigBody, { borderTopWidth: alarmConfig.enabled ? StyleSheet.hairlineWidth : 0, borderColor: colors.border }]}>
+                  {alarmConfig.enabled ? (
+                    <View style={styles.alarmTimeInfoRow}>
+                      <View>
+                        <Text style={[styles.alarmCardTime, { color: colors.text }]}>
+                          {formatAlarmTime(alarmConfig.hour, alarmConfig.minute)}
+                        </Text>
+                        <View style={styles.alarmMetaBadgeRow}>
+                          <View style={[styles.alarmMetaBadge, { backgroundColor: colors.backgroundSelected }]}>
+                            <Feather name="music" size={10} color={colors.textSecondary} style={{ marginRight: 4 }} />
+                            <Text style={[styles.alarmMetaBadgeText, { color: colors.textSecondary }]}>
+                              {alarmConfig.soundName || 'Default'}
+                            </Text>
+                          </View>
+                          {alarmConfig.barcodePayload ? (
+                            <View style={[styles.alarmMetaBadge, { backgroundColor: '#10B98118' }]}>
+                              <Feather name="check" size={10} color="#10B981" style={{ marginRight: 4 }} />
+                              <Text style={[styles.alarmMetaBadgeText, { color: '#10B981' }]}>
+                                Barcode Registered
+                              </Text>
+                            </View>
+                          ) : (
+                            <View style={[styles.alarmMetaBadge, { backgroundColor: colors.alert + '18' }]}>
+                              <Feather name="alert-triangle" size={10} color={colors.alert} style={{ marginRight: 4 }} />
+                              <Text style={[styles.alarmMetaBadgeText, { color: colors.alert }]}>
+                                No Barcode
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+                  ) : (
+                    <Text style={[styles.alarmDisabledPlaceholder, { color: colors.textSecondary }]}>
+                      Turn on the switch to activate the motion-sensitive alarm.
+                    </Text>
+                  )}
+
+                  {/* Setup Edit Action Button */}
+                  <TouchableOpacity
+                    onPress={() => router.push('/alarm/setup' as any)}
+                    style={[styles.alarmSetupBtn, { backgroundColor: colors.backgroundSelected }]}
+                    activeOpacity={0.7}
+                  >
+                    <Feather name="sliders" size={13} color={colors.text} />
+                    <Text style={[styles.alarmSetupBtnText, { color: colors.text }]}>Configure Settings</Text>
+                  </TouchableOpacity>
                 </View>
               )}
             </View>
@@ -711,6 +837,71 @@ const styles = StyleSheet.create({
   },
   signOutText: {
     fontSize: 15,
+    fontWeight: '700',
+  },
+  alarmToggleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  alarmCardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  alarmCardSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  alarmConfigBody: {
+    paddingBottom: 14,
+    gap: 12,
+  },
+  alarmTimeInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+  },
+  alarmCardTime: {
+    fontSize: 34,
+    fontWeight: '800',
+    letterSpacing: -1,
+  },
+  alarmMetaBadgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  alarmMetaBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  alarmMetaBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  alarmDisabledPlaceholder: {
+    fontSize: 13,
+    fontWeight: '400',
+    lineHeight: 18,
+    paddingTop: 8,
+  },
+  alarmSetupBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  alarmSetupBtnText: {
+    fontSize: 13,
     fontWeight: '700',
   },
 });

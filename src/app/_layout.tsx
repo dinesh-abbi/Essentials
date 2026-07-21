@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider, Stack, useRouter, useSegments } from 'expo-router';
-import { useColorScheme } from 'react-native';
+import { AppState, NativeModules, useColorScheme } from 'react-native';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import * as WaterStorage from '@/utils/WaterStorage';
@@ -19,8 +19,11 @@ function AppStack() {
   useEffect(() => {
     if (loading) return;
 
-    // Check if the user is currently on the login screen
+    // Check segments
     const inAuthGroup = segments[0] === 'login';
+    const inAlarmGroup = (segments[0] as string) === 'alarm';
+
+    if (inAlarmGroup) return; // Never block or redirect alarm screen
 
     if (!user && !inAuthGroup) {
       // Redirect to the login screen if signed out
@@ -30,6 +33,45 @@ function AppStack() {
       router.replace('/(tabs)');
     }
   }, [user, loading, segments]);
+
+  // ── Alarm Launch check & Notification Auto-Clear on startup and resume ──────
+  useEffect(() => {
+    const checkAlarmLaunch = async () => {
+      try {
+        const { AlarmScheduler } = NativeModules;
+        if (AlarmScheduler && typeof AlarmScheduler.checkAlarmLaunch === 'function') {
+          const isAlarmLaunch = await AlarmScheduler.checkAlarmLaunch();
+          if (isAlarmLaunch) {
+            router.push('/alarm/screen' as any);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to check alarm launch state:', err);
+      }
+    };
+
+    const clearNotifications = () => {
+      if (Notifications && typeof Notifications.dismissAllNotificationsAsync === 'function') {
+        Notifications.dismissAllNotificationsAsync().catch((err: any) =>
+          console.warn('Failed to dismiss notifications:', err)
+        );
+      }
+    };
+
+    // Check & clear on mount
+    checkAlarmLaunch();
+    clearNotifications();
+
+    // Check & clear when App returns to foreground (e.g. via SingleTop activity launch)
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        checkAlarmLaunch();
+        clearNotifications();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [router]);
 
   // ── Notification Setup & Listener on Startup ────────────────────────────────
   useEffect(() => {
@@ -103,6 +145,10 @@ function AppStack() {
         options={{ headerShown: false, animation: 'fade' }}
       />
       <Stack.Screen
+        name="water/report"
+        options={{ headerShown: false, animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
         name="attendance"
         options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }}
       />
@@ -111,12 +157,26 @@ function AppStack() {
         options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }}
       />
       <Stack.Screen
+        name="purchases/report"
+        options={{ headerShown: false, animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
         name="upi/scanner"
         options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }}
       />
       <Stack.Screen
         name="upi/amount"
         options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }}
+      />
+
+      {/* Barcode Alarm screens */}
+      <Stack.Screen
+        name="alarm/setup"
+        options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="alarm/screen"
+        options={{ headerShown: false, animation: 'none', gestureEnabled: false }}
       />
     </Stack>
   );

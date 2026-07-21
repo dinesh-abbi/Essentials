@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   FadeInDown,
   FadeInUp,
@@ -42,6 +42,7 @@ import * as PurchasesStorage from '@/utils/PurchasesStorage';
 import * as WaterStorage from '@/utils/WaterStorage';
 import * as NotificationsUtil from '@/utils/notifications'; // kept for future use
 import { useAuth } from '@/contexts/AuthContext';
+import * as BarcodeAlarmStorage from '@/utils/BarcodeAlarmStorage';
 
 const { width } = Dimensions.get('window');
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
@@ -384,6 +385,42 @@ function Dot({ color }: { color: string }) {
   return <View style={[styles.dot, { backgroundColor: color }]} />;
 }
 
+function AnimatedRingingBell({ colors }: { colors: any }) {
+  const rotation = useSharedValue(0);
+
+  useEffect(() => {
+    rotation.value = withRepeat(
+      withSequence(
+        withTiming(15, { duration: 150 }),
+        withTiming(-15, { duration: 300 }),
+        withTiming(10, { duration: 250 }),
+        withTiming(-10, { duration: 200 }),
+        withTiming(0, { duration: 150 }),
+        withTiming(0, { duration: 2000 })
+      ),
+      -1,
+      false
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
+  }));
+
+  return (
+    <Animated.View style={animatedStyle}>
+      <Feather name="bell" size={24} color={colors.primary} />
+    </Animated.View>
+  );
+}
+
+const formatAlarmTime = (h: number, m: number) => {
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 || 12;
+  const minStr = m < 10 ? '0' + m : m;
+  return `${hour12}:${minStr} ${ampm}`;
+};
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
@@ -392,6 +429,7 @@ export default function HomeScreen() {
   const params = useLocalSearchParams();
   const highlight = params.highlight;
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const insets = useSafeAreaInsets();
   
   const isDark = scheme === 'dark';
   const themeColors = Colors[scheme];
@@ -443,6 +481,7 @@ export default function HomeScreen() {
   const [waterHourlyMap, setWaterHourlyMap] = useState<Record<number, boolean>>({});
   const [waterSaving, setWaterSaving] = useState(false);
   const [waterGoal, setWaterGoal] = useState(WaterStorage.DEFAULT_DAILY_GOAL);
+  const [alarmConfig, setAlarmConfig] = useState<BarcodeAlarmStorage.BarcodeAlarmConfig | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
 
   const newBadgeY = useSharedValue(0);
@@ -484,6 +523,9 @@ export default function HomeScreen() {
 
           const userGoal = await WaterStorage.getUserWaterGoal();
           setWaterGoal(userGoal);
+
+          const alarm = await BarcodeAlarmStorage.getAlarmConfig();
+          setAlarmConfig(alarm);
         } catch (e) {
           console.error('load metrics failed', e);
         } finally {
@@ -550,7 +592,7 @@ export default function HomeScreen() {
           style={styles.scroll}
           contentContainerStyle={[
             styles.content,
-            { paddingBottom: BottomTabInset + Spacing.six },
+            { paddingBottom: BottomTabInset + insets.bottom + Spacing.three },
           ]}
           showsVerticalScrollIndicator={false}
         >
@@ -740,20 +782,20 @@ export default function HomeScreen() {
                         {/* Inline water controls */}
                         <View style={styles.widgetControlRowLeft}>
                           {waterSaving ? (
-                            <View style={[styles.widgetControlBtn, { backgroundColor: colors.primary + '18', width: 66, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' }]}>
-                              <ActivityIndicator size="small" color={colors.primary} style={{ transform: [{ scale: 0.8 }] }} />
+                            <View style={[styles.widgetControlBtn, { backgroundColor: colors.primary + '18', width: 90, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' }]}>
+                              <ActivityIndicator size="small" color={colors.primary} style={{ transform: [{ scale: 0.9 }] }} />
                             </View>
                           ) : (
                             <>
                               <TouchableOpacity onPress={() => removeWater()} style={[styles.widgetControlBtn, { backgroundColor: colors.primary + '18' }]} activeOpacity={0.7}>
-                                <Feather name="minus" size={13} color={colors.primary} />
+                                <Feather name="minus" size={18} color={colors.primary} />
                               </TouchableOpacity>
                               <TouchableOpacity onPress={() => addWater(250)} style={[styles.widgetControlBtn, { backgroundColor: colors.primary + '18' }]} activeOpacity={0.7}>
-                                <Feather name="plus" size={13} color={colors.primary} />
+                                <Feather name="plus" size={18} color={colors.primary} />
                               </TouchableOpacity>
                             </>
                           )}
-                          <Text style={[styles.statusText, { color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, marginLeft: 4 }]}>
+                          <Text style={[styles.statusText, { color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, marginLeft: 6 }]}>
                             {trackedHours} logs today
                           </Text>
                         </View>
@@ -767,6 +809,33 @@ export default function HomeScreen() {
                   </GlassView>
                 </Animated.View>
               </Animated.View>
+
+              {/* ── Row 3: Barcode Alarm (Conditionally Rendered when Active) ── */}
+              {alarmConfig?.enabled && (
+                <Animated.View entering={FadeInDown.duration(600).springify()}>
+                  <AnimatedPressable
+                    onPress={() => router.push('/alarm/setup' as any)}
+                    style={{ marginTop: 16 }}
+                  >
+                    <GlassView style={[styles.widgetFullWidth, { backgroundColor: colors.surface, borderColor: colors.border, height: 100 }]}>
+                      <View style={styles.alarmLayout}>
+                        <View style={{ flex: 1, gap: 4 }}>
+                          <Label text="BARCODE ALARM ACTIVE" color={isDark ? '#94A3B8' : '#64748B'} />
+                          <Text style={[styles.alarmTimeText, { color: isDark ? '#F8FAFC' : '#0F172A' }]}>
+                            {formatAlarmTime(alarmConfig.hour, alarmConfig.minute)}
+                          </Text>
+                          <Text style={[styles.statusText, { color: isDark ? '#94A3B8' : '#64748B', fontSize: 11 }]}>
+                            {alarmConfig.soundName || 'Default Sound'} • Scan barcode to dismiss
+                          </Text>
+                        </View>
+                        <View style={styles.alarmIconContainer}>
+                          <AnimatedRingingBell colors={colors} />
+                        </View>
+                      </View>
+                    </GlassView>
+                  </AnimatedPressable>
+                </Animated.View>
+              )}
             </>
           )}
 
@@ -939,9 +1008,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   widgetControlBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1076,5 +1145,25 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontWeight: '900',
     letterSpacing: 0.5,
+  },
+  alarmLayout: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  alarmTimeText: {
+    fontSize: 32,
+    fontWeight: '800',
+    letterSpacing: -1,
+    lineHeight: 38,
+  },
+  alarmIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

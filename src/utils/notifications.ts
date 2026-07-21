@@ -32,6 +32,7 @@ if (!Notifications) {
     setNotificationChannelAsync: async () => null,
     setNotificationCategoryAsync: async () => null,
     getAllScheduledNotificationsAsync: async () => [],
+    dismissAllNotificationsAsync: async () => {},
     AndroidImportance: { MAX: 5 },
     SchedulableTriggerInputTypes: { DAILY: 'daily', TIME_INTERVAL: 'timeInterval' },
     DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',

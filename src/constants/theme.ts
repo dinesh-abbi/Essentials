@@ -7,6 +7,7 @@ import '@/global.css';
 
 import { Platform } from 'react-native';
 
+
 export const Colors = {
   light: {
     text: '#111111',
@@ -91,5 +92,12 @@ export const Radius = {
   xl: 28,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+/**
+ * Padding bottom that screens should add to their scrollable content so that
+ * the last element clears the floating tab bar.
+ *   TAB_BAR_HEIGHT (64) + FLOAT_OFFSET (12) + buffer (8) = 84 dp
+ * Add useSafeAreaInsets().bottom on top of this for phones with home indicators.
+ */
+export const BottomTabInset = 84;
 export const MaxContentWidth = 800;
+

@@ -20,7 +20,7 @@ export interface PurchaseLog {
   id: string;
   name: string;
   cost: number;
-  category: 'Groceries' | 'Dairy' | 'Veggies' | 'Snacks' | 'Transport' | 'Bills' | 'Health' | 'Food' | 'Shopping' | 'Misc';
+  category: string;
   timestamp: number;
 }
 
@@ -144,7 +144,7 @@ export async function getPurchases(): Promise<PurchaseLog[]> {
 export async function savePurchase(
   name: string,
   cost: number,
-  category: 'Groceries' | 'Dairy' | 'Veggies' | 'Snacks' | 'Transport' | 'Bills' | 'Health' | 'Food' | 'Shopping' | 'Misc',
+  category: string,
   timestamp: number = Date.now()
 ): Promise<PurchaseLog> {
   const id = generateId();

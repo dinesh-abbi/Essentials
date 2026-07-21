@@ -43,4 +43,7 @@ example
 # generated native folders
 /ios
 /android
-CatalystEssentials.apk
+
+# APK build outputs — keep changelogs but never commit APK binaries
+CatalystEssentials*.apk
+*.apk

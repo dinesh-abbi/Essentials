@@ -87,8 +87,37 @@ if [ -t 0 ]; then
   fi
 fi
 
+# --- Changelog Auto-Creation Step ---
+echo -e "\n${BOLD}[ CHANGELOG CHECK ] Preparing release changelog...${RESET}"
+CHANGELOG_INFO=$(node scripts/prepare-changelog.js)
+CHANGELOG_STATUS=$(echo "$CHANGELOG_INFO" | cut -d':' -f1)
+CHANGELOG_VER=$(echo "$CHANGELOG_INFO" | cut -d':' -f2)
+CHANGELOG_PATH=$(echo "$CHANGELOG_INFO" | cut -d':' -f3)
+
+if [ "$CHANGELOG_STATUS" = "CREATED" ]; then
+  echo -e "${GREEN}📝 Drafted new changelog at ${CHANGELOG_PATH} (v${CHANGELOG_VER})${RESET}"
+  if [ -t 0 ]; then
+    echo -n -e "${CYAN}${BOLD}Would you like to open it in your editor to add notes? (y/N): ${RESET}"
+    read -r OPEN_EDITOR
+    OPEN_EDITOR=$(echo "$OPEN_EDITOR" | tr '[:upper:]' '[:lower:]')
+    if [ "$OPEN_EDITOR" = "y" ] || [ "$OPEN_EDITOR" = "yes" ]; then
+      EDITOR_CMD="nano"
+      if command -v nano &> /dev/null; then
+        EDITOR_CMD="nano"
+      elif command -v vim &> /dev/null; then
+        EDITOR_CMD="vim"
+      elif command -v vi &> /dev/null; then
+        EDITOR_CMD="vi"
+      fi
+      $EDITOR_CMD "$CHANGELOG_PATH"
+    fi
+  fi
+else
+  echo -e "${GREEN}✓ Using existing changelog at ${CHANGELOG_PATH} (v${CHANGELOG_VER})${RESET}"
+fi
+
 # --- STEP 1: Environment Checks ---
-echo -e "${BOLD}[ STEP 1/4 ] Verifying build environment...${RESET}"
+echo -e "\n${BOLD}[ STEP 1/4 ] Verifying build environment...${RESET}"
 
 # Check Node.js
 if ! command -v node &> /dev/null; then
@@ -161,8 +190,9 @@ if [ "$PUBLISH_BUILD" = "true" ]; then
     TIMESTAMP=$(TZ='Asia/Kolkata' date +"%d-%m-%Y_%I-%M_%p")
     APK_DEST="CatalystEssentials_${TIMESTAMP}.apk"
     if [ -f "$APK_SRC" ]; then
-      rm -f CatalystEssentials_*.apk
       cp "$APK_SRC" "$APK_DEST"
+      # Keep only the 2 most recent apks, delete older ones
+      ls -t CatalystEssentials_*.apk 2>/dev/null | tail -n +3 | xargs -r rm -f
       END_TIME=$(date +%s)
       DURATION=$((END_TIME - START_TIME))
       MINUTES=$((DURATION / 60))
@@ -227,9 +257,9 @@ TIMESTAMP=$(TZ='Asia/Kolkata' date +"%d-%m-%Y_%I-%M_%p")
 APK_DEST="CatalystEssentials_${TIMESTAMP}.apk"
 
 if [ -f "$APK_SRC" ]; then
-  # Clear old destination first to avoid confusion if copy fails
-  rm -f CatalystEssentials_*.apk
   cp "$APK_SRC" "$APK_DEST"
+  # Keep only the 2 most recent apks, delete older ones
+  ls -t CatalystEssentials_*.apk 2>/dev/null | tail -n +3 | xargs -r rm -f
   END_TIME=$(date +%s)
   DURATION=$((END_TIME - START_TIME))
   MINUTES=$((DURATION / 60))

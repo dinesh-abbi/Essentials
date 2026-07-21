@@ -203,14 +203,18 @@ try {
 // ─────────────────────────────────────────────────────────────────────────────
 // 6. Commit version bump and push changes to git
 // ─────────────────────────────────────────────────────────────────────────────
-console.log('\n💾  Committing version bump to git...');
+console.log('\n💾  Committing version bump and changelog to git...');
 try {
   runCmd('git add app.json');
   if (packageJson) {
     runCmd('git add package.json');
   }
-  runCmd(`git commit -m "chore: bump version to ${tag}"`);
-  console.log('✅  Version bump committed.');
+  const versionedChangelogRelative = path.join('changelogs', `v${newVersion}.md`);
+  if (fs.existsSync(path.join(__dirname, versionedChangelogRelative))) {
+    runCmd(`git add "${versionedChangelogRelative}"`);
+  }
+  runCmd(`git commit -m "chore: bump version to ${tag} and add changelog"`);
+  console.log('✅  Version bump and changelog committed.');
 
   console.log('📤  Pushing commit and tag to git upstream...');
   let branchName = 'main';
@@ -237,9 +241,14 @@ console.log(`\n🚀  Creating GitHub Release ${tag} and uploading APK...\n`);
 
 let notesArg = '--generate-notes';
 const releaseNotesPath = path.join(__dirname, 'release-notes.md');
+const versionedChangelogPath = path.join(__dirname, 'changelogs', `v${newVersion}.md`);
+
 if (fs.existsSync(releaseNotesPath)) {
   console.log(`📝  Found custom release-notes.md. Using it for release notes...`);
   notesArg = `--notes-file "${releaseNotesPath}"`;
+} else if (fs.existsSync(versionedChangelogPath)) {
+  console.log(`📝  Found versioned changelog at ${versionedChangelogPath}. Using it for release notes...`);
+  notesArg = `--notes-file "${versionedChangelogPath}"`;
 }
 
 const releaseCommand = [

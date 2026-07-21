@@ -412,8 +412,8 @@ export async function getWaterLogsBetween(startMs: number, endMs: number): Promi
 /**
  * Get daily intake totals for the current week (Monday to Sunday).
  */
-export async function getWeeklyData(): Promise<{ date: Date; totalMl: number; logsCount: number }[]> {
-  const now = new Date();
+export async function getWeeklyData(refDateMs?: number): Promise<{ date: Date; totalMl: number; logsCount: number }[]> {
+  const now = refDateMs ? new Date(refDateMs) : new Date();
   // Find Monday of the current week
   const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon...
   const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
