@@ -4,6 +4,7 @@ import { AppState, NativeModules, useColorScheme } from 'react-native';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import * as WaterStorage from '@/utils/WaterStorage';
+import * as WidgetSync from '@/utils/WidgetSync';
 import { ensureNotificationsScheduled, Notifications, triggerWaterGoalNotification } from '@/utils/notifications';
 import { auth, waitForAuth } from '@/utils/firebase';
 import OTAUpdateChecker from '@/components/OTAUpdateChecker';
@@ -92,6 +93,7 @@ function AppStack() {
             const userGoal = await WaterStorage.getUserWaterGoal();
             await WaterStorage.logWaterIntake(250);
             const freshTotal = await WaterStorage.getTodayTotalMl();
+            WidgetSync.sync();
             if (freshTotal >= userGoal) {
               triggerWaterGoalNotification().catch((e) =>
                 console.warn('Goal notification (YES_ACTION) failed:', e)

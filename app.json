@@ -35,6 +35,7 @@
     },
     "plugins": [
       "./withAndroidQueries",
+      "./withWaterWidget",
       "expo-router",
       [
         "expo-splash-screen",

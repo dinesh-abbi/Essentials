@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Wide card (>=~2 columns). Ring+drop icon on the left, numbers in the
+  middle, time-of-day glyph top-right, a small +250ml chip bottom-right.
+  Root click opens the app; the chip has its own click target for the
+  quick-log action so a casual glance doesn't accidentally open the app.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_water_bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp">
+
+        <ImageView
+            android:id="@+id/iv_ring"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:contentDescription="@string/widget_water_description" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="14dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/widget_text"
+                android:textSize="19sp"
+                android:fontFamily="sans-serif-medium"
+                android:text="0 ml" />
+
+            <TextView
+                android:id="@+id/tv_sub"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:textColor="@color/widget_text_secondary"
+                android:textSize="12sp"
+                android:text="today" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/iv_time"
+        android:layout_width="14dp"
+        android:layout_height="14dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="14dp"
+        android:layout_marginEnd="16dp"
+        android:contentDescription="@null" />
+
+    <FrameLayout
+        android:id="@+id/btn_quicklog"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="10dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/widget_quicklog_chip_bg">
+
+        <ImageView
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_widget_plus"
+            android:contentDescription="Log 250ml" />
+    </FrameLayout>
+
+</FrameLayout>

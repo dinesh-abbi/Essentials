@@ -33,6 +33,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import * as WaterStorage from '@/utils/WaterStorage';
+import * as WidgetSync from '@/utils/WidgetSync';
 import { triggerWaterGoalNotification } from '@/utils/notifications';
 
 // ── Water Wave Animation Component ──────────────────────────────────────────
@@ -312,6 +313,7 @@ export default function WaterDashboardScreen() {
       setGoal(newGoal);
       setIsGoalModalOpen(false);
       setCustomGoalInput('');
+      WidgetSync.sync();
     } catch (e) {
       Alert.alert('Error', 'Failed to update hydration target.');
     }
@@ -323,6 +325,7 @@ export default function WaterDashboardScreen() {
       const prevTotal = totalDrank;
       await WaterStorage.logWaterIntake(ml);
       await refreshDailyData(false);
+      WidgetSync.sync();
 
       if (prevTotal < WaterStorage.DEFAULT_DAILY_GOAL) {
         const freshTotal = await WaterStorage.getTodayTotalMl();
@@ -350,6 +353,7 @@ export default function WaterDashboardScreen() {
           try {
             await WaterStorage.deleteWaterLog(id);
             await refreshDailyData(false);
+            WidgetSync.sync();
           } catch (e) {
             Alert.alert('Error', 'Could not delete entry.');
           } finally {

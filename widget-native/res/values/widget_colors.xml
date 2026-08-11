@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Light-mode widget palette — mirrors the exact tokens used by the in-app
+  water dashboard (src/app/(tabs)/index.tsx `colors` object), so the widget
+  never looks like a different app.
+-->
+<resources>
+    <color name="widget_text">#111111</color>
+    <color name="widget_text_secondary">#777777</color>
+    <color name="widget_primary">#3B82F6</color>
+    <color name="widget_track">#143B82F6</color>
+    <!-- surface: rgba(255,255,255,0.75) -->
+    <color name="widget_surface">#BFFFFFFF</color>
+    <!-- border: rgba(0,0,0,0.04) -->
+    <color name="widget_border">#0A000000</color>
+    <!-- quick-log chip fill: primary @ 14% -->
+    <color name="widget_chip_fill">#243B82F6</color>
+</resources>

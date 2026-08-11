@@ -40,6 +40,7 @@ import {
 import * as AttendanceStorage from '@/utils/AttendanceStorage';
 import * as PurchasesStorage from '@/utils/PurchasesStorage';
 import * as WaterStorage from '@/utils/WaterStorage';
+import * as WidgetSync from '@/utils/WidgetSync';
 import * as NotificationsUtil from '@/utils/notifications'; // kept for future use
 import { useAuth } from '@/contexts/AuthContext';
 import * as BarcodeAlarmStorage from '@/utils/BarcodeAlarmStorage';
@@ -428,6 +429,7 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const params = useLocalSearchParams();
   const highlight = params.highlight;
+  const quicklog = params.quicklog;
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const insets = useSafeAreaInsets();
   
@@ -454,6 +456,18 @@ export default function HomeScreen() {
       router.setParams({ highlight: undefined });
     }
   }, [highlight]);
+
+  // Quick-log from the home-screen widget's "+" tap (essentials:///?quicklog=250).
+  // Cleared immediately after consuming so a repeat tap with the same amount
+  // still triggers — mirrors how the notification YES_ACTION flow behaves.
+  useEffect(() => {
+    if (!quicklog) return;
+    const amount = Number(quicklog);
+    router.setParams({ quicklog: undefined });
+    if (!Number.isNaN(amount) && amount > 0) {
+      addWater(amount);
+    }
+  }, [quicklog]);
 
   const highlightStyle = useAnimatedStyle(() => {
     const borderColor = interpolateColor(
@@ -526,6 +540,8 @@ export default function HomeScreen() {
 
           const alarm = await BarcodeAlarmStorage.getAlarmConfig();
           setAlarmConfig(alarm);
+
+          WidgetSync.sync();
         } catch (e) {
           console.error('load metrics failed', e);
         } finally {
@@ -544,6 +560,7 @@ export default function HomeScreen() {
       const hourly = await WaterStorage.getTodayHourlyStatus();
       setWaterTotalMl(total);
       setWaterHourlyMap(hourly);
+      WidgetSync.sync();
     } catch (e) {
       console.error('Add water failed', e);
     } finally {
@@ -562,6 +579,7 @@ export default function HomeScreen() {
         const hourly = await WaterStorage.getTodayHourlyStatus();
         setWaterTotalMl(total);
         setWaterHourlyMap(hourly);
+        WidgetSync.sync();
       }
     } catch (e) {
       console.error('Remove water failed', e);
