@@ -8,10 +8,8 @@
     <color name="widget_text_secondary">#888888</color>
     <color name="widget_primary">#60A5FA</color>
     <color name="widget_track">#1460A5FA</color>
-    <!-- surface: rgba(30,41,59,0.55) -->
-    <color name="widget_surface">#8C1E293B</color>
-    <!-- border: rgba(255,255,255,0.08) -->
-    <color name="widget_border">#14FFFFFF</color>
     <!-- quick-log chip fill: primary @ 16% -->
     <color name="widget_chip_fill">#2960A5FA</color>
+    <!-- tap ripple: light @ 20%, since the widget sits on an arbitrary wallpaper -->
+    <color name="widget_ripple">#33FFFFFF</color>
 </resources>

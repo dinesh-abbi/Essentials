@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Text pill variant of widget_quicklog_chip_bg, for the +100/+250/+500
+     row on the large widget layout — same tint, rounded-rect instead of oval
+     so text labels get breathing room, with the same ripple layered on top. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="@color/widget_ripple">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/widget_chip_fill" />
+            <corners android:radius="14dp" />
+        </shape>
+    </item>
+</ripple>

@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Subtle circular +250ml tap target — a soft tint, not a bright button. -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
-    <solid android:color="@color/widget_chip_fill" />
-</shape>
+<!-- Subtle circular +250ml tap target — a soft tint, not a bright button,
+     with a ripple layered on top so the tap itself has feedback. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="@color/widget_ripple">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/widget_chip_fill" />
+        </shape>
+    </item>
+</ripple>

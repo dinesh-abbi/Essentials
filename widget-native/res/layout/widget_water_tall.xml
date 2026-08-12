@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Compact card, used when the user resizes the widget down to roughly a
-  square. Same elements as the wide layout, just stacked instead of in a row.
+  Narrow-but-tall layout (roughly 1 column x 3+ rows). Same elements as the
+  square layout, just given a bigger capsule and centered as a cluster in
+  the extra vertical space rather than stretched or pinned to the top.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
@@ -16,18 +17,25 @@
         android:gravity="center">
 
         <ImageView
+            android:id="@+id/iv_time"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:layout_marginBottom="10dp"
+            android:contentDescription="@null" />
+
+        <ImageView
             android:id="@+id/iv_ring"
-            android:layout_width="26dp"
-            android:layout_height="42dp"
+            android:layout_width="34dp"
+            android:layout_height="72dp"
             android:contentDescription="@string/widget_water_description" />
 
         <TextView
             android:id="@+id/tv_amount"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="10dp"
             android:textColor="@color/widget_text"
-            android:textSize="15sp"
+            android:textSize="16sp"
             android:fontFamily="sans-serif-medium"
             android:shadowColor="#66000000"
             android:shadowDx="0"
@@ -39,39 +47,28 @@
             android:id="@+id/tv_sub"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
             android:textColor="@color/widget_text_secondary"
-            android:textSize="10sp"
+            android:textSize="11sp"
             android:shadowColor="#66000000"
             android:shadowDx="0"
             android:shadowDy="1"
             android:shadowRadius="2.5"
             android:text="today" />
+
+        <FrameLayout
+            android:id="@+id/btn_quicklog"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/widget_quicklog_chip_bg">
+
+            <ImageView
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_widget_plus"
+                android:contentDescription="Log 250ml" />
+        </FrameLayout>
     </LinearLayout>
-
-    <ImageView
-        android:id="@+id/iv_time"
-        android:layout_width="13dp"
-        android:layout_height="13dp"
-        android:layout_gravity="top|end"
-        android:layout_marginTop="10dp"
-        android:layout_marginEnd="10dp"
-        android:contentDescription="@null" />
-
-    <FrameLayout
-        android:id="@+id/btn_quicklog"
-        android:layout_width="28dp"
-        android:layout_height="28dp"
-        android:layout_gravity="bottom|end"
-        android:layout_marginEnd="8dp"
-        android:layout_marginBottom="8dp"
-        android:background="@drawable/widget_quicklog_chip_bg">
-
-        <ImageView
-            android:layout_width="13dp"
-            android:layout_height="13dp"
-            android:layout_gravity="center"
-            android:src="@drawable/ic_widget_plus"
-            android:contentDescription="Log 250ml" />
-    </FrameLayout>
-
 </FrameLayout>

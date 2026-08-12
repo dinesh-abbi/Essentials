@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  1x1-class layout — as small as a launcher grid cell goes. Just the
+  capsule and the raw number; no unit, no sub-label, no quick-log chip —
+  there isn't room for a second tap target without mis-taps, so the whole
+  cell opens the app instead.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_ripple_root">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center">
+
+        <ImageView
+            android:id="@+id/iv_ring"
+            android:layout_width="18dp"
+            android:layout_height="28dp"
+            android:contentDescription="@string/widget_water_description" />
+
+        <TextView
+            android:id="@+id/tv_amount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:textColor="@color/widget_text"
+            android:textSize="12sp"
+            android:fontFamily="sans-serif-medium"
+            android:shadowColor="#66000000"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="2.5"
+            android:text="0" />
+    </LinearLayout>
+</FrameLayout>

@@ -97,6 +97,38 @@ const withWidgetManifest = (config) =>
       });
     }
 
+    const quickLogAlreadyRegistered = app.receiver.some(
+      (r) => r.$?.['android:name'] === '.WidgetQuickLogReceiver'
+    );
+
+    if (!quickLogAlreadyRegistered) {
+      app.receiver.push({
+        $: {
+          'android:name': '.WidgetQuickLogReceiver',
+          // Exported for the same reason as WaterWidgetProvider above — the
+          // PendingIntent is fired via the launcher/AppWidgetHost process.
+          'android:exported': 'true',
+        },
+      });
+    }
+
+    if (!Array.isArray(app.service)) {
+      app.service = [];
+    }
+
+    const taskServiceAlreadyRegistered = app.service.some(
+      (s) => s.$?.['android:name'] === '.WidgetQuickLogTaskService'
+    );
+
+    if (!taskServiceAlreadyRegistered) {
+      app.service.push({
+        $: {
+          'android:name': '.WidgetQuickLogTaskService',
+          'android:exported': 'false',
+        },
+      });
+    }
+
     return config;
   });
 
