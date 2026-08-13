@@ -26,6 +26,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 
 type Mode = 'login' | 'signup';
@@ -198,21 +199,16 @@ export default function LoginScreen() {
               </View>
 
               {/* Submit */}
-              <TouchableOpacity
+              <Button
                 id="login-submit"
-                style={[styles.submitBtn, { backgroundColor: colors.primary }]}
+                variant="primary"
+                size="lg"
+                fullWidth
+                loading={submitting}
+                title={mode === 'login' ? 'Sign In' : 'Create Account'}
                 onPress={handleSubmit}
-                disabled={submitting}
-                activeOpacity={0.85}
-              >
-                {submitting ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={styles.submitText}>
-                    {mode === 'login' ? 'Sign In' : 'Create Account'}
-                  </Text>
-                )}
-              </TouchableOpacity>
+                style={{ marginTop: 4 }}
+              />
             </Animated.View>
 
             {/* ── Divider ───────────────────────────────────────────────────── */}
@@ -224,32 +220,21 @@ export default function LoginScreen() {
 
             {/* ── Google Button ─────────────────────────────────────────────── */}
             <Animated.View entering={FadeInDown.delay(400).duration(500)}>
-              <TouchableOpacity
+              <Button
                 id="google-signin"
-                style={[
-                  styles.googleBtn,
-                  {
-                    backgroundColor: colors.backgroundElement,
-                    borderColor: colors.border,
-                  },
-                ]}
+                variant="secondary"
+                size="lg"
+                fullWidth
+                loading={googleLoading}
                 onPress={handleGoogle}
-                disabled={googleLoading}
-                activeOpacity={0.85}
               >
-                {googleLoading ? (
-                  <ActivityIndicator color={colors.text} size="small" />
-                ) : (
-                  <>
-                    <View style={styles.googleIcon}>
-                      <Text style={styles.googleG}>G</Text>
-                    </View>
-                    <Text style={[styles.googleText, { color: colors.text }]}>
-                      Continue with Google
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
+                <View style={styles.googleIcon}>
+                  <Text style={styles.googleG}>G</Text>
+                </View>
+                <Text style={[styles.googleText, { color: colors.text }]}>
+                  Continue with Google
+                </Text>
+              </Button>
             </Animated.View>
 
             {/* ── Footer ────────────────────────────────────────────────────── */}

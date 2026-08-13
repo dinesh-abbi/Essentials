@@ -7,7 +7,6 @@ import {
   Text,
   View,
   useColorScheme,
-  Dimensions,
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
@@ -25,14 +24,16 @@ import Animated, {
   Easing,
   useAnimatedProps,
   interpolateColor,
+  useReducedMotion,
 } from 'react-native-reanimated';
-import { GlassView } from 'expo-glass-effect';
+import type { ViewProps } from 'react-native';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import Skeleton from '@/components/SkeletonLoader';
 import {
   BottomTabInset,
   Colors,
+  Fonts,
   MaxContentWidth,
   Radius,
   Spacing,
@@ -45,77 +46,26 @@ import * as NotificationsUtil from '@/utils/notifications'; // kept for future u
 import { useAuth } from '@/contexts/AuthContext';
 import * as BarcodeAlarmStorage from '@/utils/BarcodeAlarmStorage';
 
-const { width } = Dimensions.get('window');
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
-// ─── Animated Ambient Blobs ───────────────────────────────────────────────────
-
-function AnimatedBlob({ color, initialTop, initialLeft, initialRight }: { color: string; initialTop: number; initialLeft?: number; initialRight?: number }) {
-  const svScale = useSharedValue(1);
-  const svTranslateX = useSharedValue(0);
-  const svTranslateY = useSharedValue(0);
-
-  useEffect(() => {
-    svScale.value = withRepeat(
-      withSequence(
-        withTiming(1.15, { duration: 4000, easing: Easing.inOut(Easing.quad) }),
-        withTiming(1, { duration: 4000, easing: Easing.inOut(Easing.quad) })
-      ),
-      -1,
-      true
-    );
-    svTranslateX.value = withRepeat(
-      withSequence(
-        withTiming(20, { duration: 5000, easing: Easing.inOut(Easing.quad) }),
-        withTiming(-20, { duration: 6000, easing: Easing.inOut(Easing.quad) }),
-        withTiming(0, { duration: 4000, easing: Easing.inOut(Easing.quad) })
-      ),
-      -1,
-      true
-    );
-    svTranslateY.value = withRepeat(
-      withSequence(
-        withTiming(15, { duration: 4500, easing: Easing.inOut(Easing.quad) }),
-        withTiming(-15, { duration: 5500, easing: Easing.inOut(Easing.quad) }),
-        withTiming(0, { duration: 4500, easing: Easing.inOut(Easing.quad) })
-      ),
-      -1,
-      true
-    );
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: svScale.value },
-      { translateX: svTranslateX.value },
-      { translateY: svTranslateY.value }
-    ]
-  }));
-
-  const positionStyle: any = { top: initialTop };
-  if (initialLeft !== undefined) positionStyle.left = initialLeft;
-  if (initialRight !== undefined) positionStyle.right = initialRight;
-
-  return (
-    <Animated.View
-      style={[
-        styles.bgBlob,
-        { backgroundColor: color },
-        positionStyle,
-        animatedStyle,
-      ]}
-    />
-  );
+// Solid graphite panel — replaces the former translucent GlassView. Depth now
+// comes from the surface/border tokens, not a blur layer (cheaper + de-glassed).
+function Panel({ style, ...rest }: ViewProps) {
+  return <View style={style} {...rest} />;
 }
 
 // ─── Odometer Number Counter ─────────────────────────────────────────────────
 
 function AnimatedNumber({ value, style, prefix = '' }: { value: number; style: any; prefix?: string }) {
   const animatedValue = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
-    animatedValue.value = withTiming(value, { duration: 1500, easing: Easing.out(Easing.quad) });
-  }, [value]);
+    // Count-up on value change — but snap instantly under reduced motion.
+    animatedValue.value = reduceMotion
+      ? value
+      : withTiming(value, { duration: 1500, easing: Easing.out(Easing.quad) });
+  }, [value, reduceMotion]);
 
   const animatedProps = useAnimatedProps(() => {
     return {
@@ -129,7 +79,9 @@ function AnimatedNumber({ value, style, prefix = '' }: { value: number; style: a
       editable={false}
       value={`${prefix}${value}`} // Fallback
       animatedProps={animatedProps}
-      style={[style, { padding: 0, margin: 0 }]}
+      // Instrument readout: monospaced + tabular figures so digits keep equal
+      // width and the count-up doesn't jitter the layout.
+      style={[style, { padding: 0, margin: 0, fontFamily: Fonts?.mono, fontVariant: ['tabular-nums'] }]}
     />
   );
 }
@@ -139,16 +91,17 @@ function AnimatedNumber({ value, style, prefix = '' }: { value: number; style: a
 function PulseDot({ color, isActive, size = 12 }: { color: string; isActive: boolean; size?: number }) {
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0.4);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
-    if (isActive) {
+    if (isActive && !reduceMotion) {
       scale.value = withRepeat(withTiming(2.2, { duration: 1200, easing: Easing.out(Easing.quad) }), -1, false);
       opacity.value = withRepeat(withSequence(withTiming(0, { duration: 1200, easing: Easing.out(Easing.quad) })), -1, false);
     } else {
       scale.value = 1;
       opacity.value = 0;
     }
-  }, [isActive]);
+  }, [isActive, reduceMotion]);
 
   const ringStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -221,10 +174,11 @@ function SpendPowerCore({ spend, limit = 2000, isDark }: { spend: number; limit?
       <View style={styles.powerCoreRow}>
         {Array.from({ length: 4 }, (_, i) => {
           const isActive = i < activeSegments;
-          let color = isDark ? '#60A5FA' : '#3B82F6'; // Cool blue
-          if (i === 1) color = '#F59E0B'; // Amber
-          if (i === 2) color = '#EF4444'; // Red
-          if (i === 3) color = '#EC4899'; // Hot pink
+          const c = isDark ? Colors.dark : Colors.light;
+          // Calm → caution → alarm as spend climbs (semantic, not a rainbow).
+          let color = c.signal;
+          if (i === 2) color = c.warn;
+          if (i === 3) color = c.alert;
 
           return (
             <View
@@ -232,8 +186,8 @@ function SpendPowerCore({ spend, limit = 2000, isDark }: { spend: number; limit?
               style={[
                 styles.powerCoreSegment,
                 {
-                  backgroundColor: isActive ? color : isDark ? '#27272A' : '#E4E4E7',
-                  opacity: isActive ? 1 : 0.25,
+                  backgroundColor: isActive ? color : c.border,
+                  opacity: isActive ? 1 : 0.4,
                 },
               ]}
             />
@@ -249,8 +203,13 @@ function SpendPowerCore({ spend, limit = 2000, isDark }: { spend: number; limit?
 function CameraViewfinder({ offlineCount, colors, isDark }: { offlineCount: number; colors: any; isDark: boolean }) {
   const scanLineY = useSharedValue(0);
   const pulseOpacity = useSharedValue(0.4);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reduceMotion) {
+      pulseOpacity.value = 1;
+      return;
+    }
     scanLineY.value = withRepeat(
       withSequence(
         withTiming(32, { duration: 1500, easing: Easing.inOut(Easing.quad) }),
@@ -268,7 +227,7 @@ function CameraViewfinder({ offlineCount, colors, isDark }: { offlineCount: numb
       -1,
       true
     );
-  }, []);
+  }, [reduceMotion]);
 
   const laserStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: scanLineY.value }],
@@ -301,13 +260,8 @@ function CameraViewfinder({ offlineCount, colors, isDark }: { offlineCount: numb
 function WaterChamber({ percent, colors, isDark }: { percent: number; colors: any; isDark: boolean }) {
   return (
     <View style={[styles.chamberContainer, { borderColor: colors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }]}>
-      {/* Dynamic filling water block */}
+      {/* Dynamic filling water block — bubbles removed (ambient loop) */}
       <AnimatedWaterFill percent={percent} colors={colors} />
-      
-      {/* Floating bubbles rising physics */}
-      <Bubble delay={0} duration={2200} />
-      <Bubble delay={800} duration={2800} />
-      <Bubble delay={1600} duration={3400} />
     </View>
   );
 }
@@ -327,51 +281,11 @@ function AnimatedWaterFill({ percent, colors }: { percent: number; colors: any }
     <Animated.View
       style={[
         styles.chamberFill,
-        { backgroundColor: colors.primary },
+        { backgroundColor: colors.aqua },
         animatedStyle,
       ]}
     />
   );
-}
-
-function Bubble({ delay, duration }: { delay: number; duration: number }) {
-  const progress = useSharedValue(0);
-  const randomXSeed = useSharedValue(Math.random());
-
-  useEffect(() => {
-    let timeout = setTimeout(() => {
-      progress.value = withRepeat(
-        withTiming(1, { duration, easing: Easing.linear }),
-        -1,
-        false
-      );
-    }, delay);
-    return () => clearTimeout(timeout);
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => {
-    const ty = 100 - progress.value * 115;
-    const tx = Math.sin(progress.value * Math.PI * 3) * 6 * (randomXSeed.value > 0.5 ? 1 : -1);
-    
-    let op = 0;
-    if (progress.value < 0.15) {
-      op = (progress.value / 0.15) * 0.7;
-    } else if (progress.value > 0.8) {
-      op = ((1 - progress.value) / 0.2) * 0.7;
-    } else {
-      op = 0.7;
-    }
-
-    return {
-      transform: [
-        { translateY: ty },
-        { translateX: tx },
-      ],
-      opacity: op,
-    };
-  });
-
-  return <Animated.View style={[styles.bubbleParticle, animatedStyle]} />;
 }
 
 // ─── Primitive Layout Utilities ────────────────────────────────────────────────
@@ -388,8 +302,10 @@ function Dot({ color }: { color: string }) {
 
 function AnimatedRingingBell({ colors }: { colors: any }) {
   const rotation = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reduceMotion) return;
     rotation.value = withRepeat(
       withSequence(
         withTiming(15, { duration: 150 }),
@@ -402,7 +318,7 @@ function AnimatedRingingBell({ colors }: { colors: any }) {
       -1,
       false
     );
-  }, []);
+  }, [reduceMotion]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.value}deg` }],
@@ -436,12 +352,12 @@ export default function HomeScreen() {
   const isDark = scheme === 'dark';
   const themeColors = Colors[scheme];
   
+  // Colors come straight from the Cockpit tokens now — no local slate/blue
+  // overrides. `surface` is a solid graphite panel (glass removed); water uses
+  // the `aqua` domain tint so hydration reads distinct from the signal accent.
   const colors = {
     ...themeColors,
-    primary: isDark ? '#60A5FA' : '#3B82F6',
-    accent: isDark ? '#A78BFA' : '#8B5CF6',
-    surface: isDark ? 'rgba(30, 41, 59, 0.55)' : 'rgba(255, 255, 255, 0.75)',
-    border: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)',
+    surface: themeColors.backgroundElement,
   };
 
   const waterHighlight = useSharedValue(0);
@@ -497,23 +413,6 @@ export default function HomeScreen() {
   const [waterGoal, setWaterGoal] = useState(WaterStorage.DEFAULT_DAILY_GOAL);
   const [alarmConfig, setAlarmConfig] = useState<BarcodeAlarmStorage.BarcodeAlarmConfig | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
-
-  const newBadgeY = useSharedValue(0);
-
-  useEffect(() => {
-    newBadgeY.value = withRepeat(
-      withSequence(
-        withTiming(-4, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
-        withTiming(4, { duration: 1200, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-  }, []);
-
-  const bobbingStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: newBadgeY.value }],
-  }));
 
   useFocusEffect(
     useCallback(() => {
@@ -600,11 +499,7 @@ export default function HomeScreen() {
   const displayName = user?.displayName ?? user?.email?.split('@')[0] ?? 'User';
 
   return (
-    <View style={[styles.root, { backgroundColor: isDark ? '#0A0B10' : '#F8FAFC' }]}>
-      {/* Background Animated Blobs */}
-      <AnimatedBlob color={colors.primary} initialTop={-120} initialLeft={-120} />
-      <AnimatedBlob color={colors.accent} initialTop={250} initialRight={-160} />
-      
+    <View style={[styles.root, { backgroundColor: themeColors.background }]}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView
           style={styles.scroll}
@@ -618,11 +513,11 @@ export default function HomeScreen() {
           {/* ── Header ───────────────────────────────────────────────────── */}
           <Animated.View entering={FadeInDown.duration(600).springify()} style={styles.header}>
             <View>
-              <Text style={[styles.greeting, { color: isDark ? '#94A3B8' : '#64748B' }]}>{greeting},</Text>
-              <Text style={[styles.appName, { color: isDark ? '#F8FAFC' : '#0F172A' }]}>{displayName}.</Text>
+              <Text style={[styles.greeting, { color: themeColors.textSecondary }]}>{greeting},</Text>
+              <Text style={[styles.appName, { color: themeColors.text }]}>{displayName}.</Text>
             </View>
-            <View style={[styles.dateBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}>
-              <Text style={[styles.dateStr, { color: isDark ? '#E2E8F0' : '#334155' }]}>{dayStr}</Text>
+            <View style={[styles.dateBadge, { backgroundColor: themeColors.backgroundSelected }]}>
+              <Text style={[styles.dateStr, { color: themeColors.text }]}>{dayStr}</Text>
             </View>
           </Animated.View>
 
@@ -631,7 +526,7 @@ export default function HomeScreen() {
               {/* Row 1 Skeletons */}
               <View style={styles.widgetGridRow}>
                 {/* Spend widget skeleton */}
-                <GlassView style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Panel style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <View style={{ width: '100%', gap: 10 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Skeleton width={50} height={12} />
@@ -641,10 +536,10 @@ export default function HomeScreen() {
                     <Skeleton width={90} height={12} style={{ marginTop: 8 }} />
                     <Skeleton width="100%" height={8} borderRadius={4} style={{ marginTop: 8 }} />
                   </View>
-                </GlassView>
+                </Panel>
 
                 {/* Check-in widget skeleton */}
-                <GlassView style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border, alignItems: 'center' }]}>
+                <Panel style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border, alignItems: 'center' }]}>
                   <View style={{ width: '100%', gap: 10 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Skeleton width={60} height={12} />
@@ -653,16 +548,16 @@ export default function HomeScreen() {
                     <Skeleton width={56} height={56} borderRadius={28} style={{ alignSelf: 'center', marginTop: 4 }} />
                     <Skeleton width={80} height={12} style={{ alignSelf: 'center', marginTop: 6 }} />
                   </View>
-                </GlassView>
+                </Panel>
               </View>
 
               {/* Row 2 Skeleton */}
-              <GlassView style={[styles.widgetFullWidth, { backgroundColor: colors.surface, borderColor: 'transparent', borderWidth: 0 }]}>
+              <Panel style={[styles.widgetFullWidth, { backgroundColor: colors.surface, borderColor: 'transparent', borderWidth: 0 }]}>
                 <View style={{ flexDirection: 'row', width: '100%' }}>
                   <View style={{ flex: 1, gap: 12, paddingVertical: 4 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Skeleton width={130} height={12} />
-                      <Feather name="droplet" size={14} color={colors.primary} />
+                      <Feather name="droplet" size={14} color={colors.aqua} />
                     </View>
                     <Skeleton width={120} height={32} style={{ marginTop: 4 }} />
                     {/* Timeline capsules row skeleton */}
@@ -681,7 +576,7 @@ export default function HomeScreen() {
                     <Skeleton width={50} height={100} borderRadius={25} />
                   </View>
                 </View>
-              </GlassView>
+              </Panel>
             </View>
           ) : (
             <>
@@ -690,9 +585,9 @@ export default function HomeScreen() {
                 
                 {/* Spend widget */}
                 <AnimatedPressable onPress={() => router.push('/purchases')} style={{ flex: 1 }}>
-                  <GlassView style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Panel style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     <View style={styles.widgetHeader}>
-                      <Label text="SPEND" color={isDark ? '#94A3B8' : '#64748B'} />
+                      <Label text="SPEND" color={themeColors.textSecondary} />
                       <Feather name="credit-card" size={14} color={colors.accent} />
                     </View>
                     
@@ -700,17 +595,17 @@ export default function HomeScreen() {
                       <AnimatedNumber
                         value={todaySpend}
                         prefix="₹"
-                        style={[styles.widgetNumber, { color: isDark ? '#F8FAFC' : '#0F172A' }]}
+                        style={[styles.widgetNumber, { color: themeColors.text }]}
                       />
                     </View>
 
                     <View style={{ width: '100%', gap: 4 }}>
-                      <Text style={[styles.statusText, { color: isDark ? '#94A3B8' : '#64748B', fontSize: 11 }]}>
+                      <Text style={[styles.statusText, { color: themeColors.textSecondary, fontSize: 11 }]}>
                         today's expenses
                       </Text>
                       <SpendPowerCore spend={todaySpend} isDark={isDark} />
                     </View>
-                  </GlassView>
+                  </Panel>
                 </AnimatedPressable>
 
                 {/* Attendance Viewfinder widget */}
@@ -728,9 +623,9 @@ export default function HomeScreen() {
                       : null;
 
                     return (
-                      <GlassView style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border, alignItems: 'center' }]}>
+                      <Panel style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border, alignItems: 'center' }]}>
                         <View style={[styles.widgetHeader, { width: '100%' }]}>
-                          <Label text="CHECK-IN" color={isDark ? '#94A3B8' : '#64748B'} />
+                          <Label text="CHECK-IN" color={themeColors.textSecondary} />
                           <Feather name="aperture" size={13} color={colors.accent} />
                         </View>
                         
@@ -744,7 +639,7 @@ export default function HomeScreen() {
                               : (checkInTimeStr ? `Synced • ${checkInTimeStr}` : 'Synced')}
                           </Text>
                         </View>
-                      </GlassView>
+                      </Panel>
                     );
                   })()}
                 </AnimatedPressable>
@@ -754,25 +649,25 @@ export default function HomeScreen() {
               {/* ── Row 2: Unified Combined Water & Timeline Widget ─────────── */}
               <Animated.View entering={FadeInUp.delay(200).duration(600).springify()}>
                 <Animated.View style={highlightStyle}>
-                  <GlassView style={[styles.widgetFullWidth, { backgroundColor: colors.surface, borderColor: 'transparent', borderWidth: 0 }]}>
+                  <Panel style={[styles.widgetFullWidth, { backgroundColor: colors.surface, borderColor: 'transparent', borderWidth: 0 }]}>
                     <View style={styles.horizontalSplit}>
                       <View style={{ flex: 1, gap: 10 }}>
                         <AnimatedPressable onPress={() => router.push('/water')} style={{ width: '100%' }}>
                           <View style={styles.widgetHeader}>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                              <Label text="WATER & TIMELINE" color={isDark ? '#94A3B8' : '#64748B'} />
+                              <Label text="WATER & TIMELINE" color={themeColors.textSecondary} />
                             </View>
-                            <Feather name="droplet" size={14} color={colors.primary} />
+                            <Feather name="droplet" size={14} color={colors.aqua} />
                           </View>
                           
                           <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
                             <AnimatedNumber
                               value={waterTotalMl}
                               prefix=""
-                              style={[styles.widgetNumber, { color: colors.primary }]}
+                              style={[styles.widgetNumber, { color: colors.aqua }]}
                             />
-                            <Text style={[styles.widgetNumberUnit, { color: colors.primary }]}>ml</Text>
-                            <Text style={[styles.statusText, { color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, marginLeft: 8 }]}>
+                            <Text style={[styles.widgetNumberUnit, { color: colors.aqua }]}>ml</Text>
+                            <Text style={[styles.statusText, { color: themeColors.textSecondary, fontSize: 11, marginLeft: 8 }]}>
                               ({waterPct}% of goal)
                             </Text>
                           </View>
@@ -785,9 +680,9 @@ export default function HomeScreen() {
                             const done = waterHourlyMap[hour] === true;
                             const isCurrentHour = hour === currentHour;
                             
-                            let dotColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
-                            if (done) dotColor = colors.primary;
-                            if (isCurrentHour && !done) dotColor = colors.accent;
+                            let dotColor = themeColors.hairline;
+                            if (done) dotColor = colors.aqua;               // water logged
+                            if (isCurrentHour && !done) dotColor = colors.signal; // "now" marker
 
                             return (
                               <View key={hour} style={styles.hourCellCompact}>
@@ -813,7 +708,7 @@ export default function HomeScreen() {
                               </TouchableOpacity>
                             </>
                           )}
-                          <Text style={[styles.statusText, { color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, marginLeft: 6 }]}>
+                          <Text style={[styles.statusText, { color: themeColors.textSecondary, fontSize: 11, marginLeft: 6 }]}>
                             {trackedHours} logs today
                           </Text>
                         </View>
@@ -824,7 +719,7 @@ export default function HomeScreen() {
                         <WaterChamber percent={waterPct} colors={colors} isDark={isDark} />
                       </AnimatedPressable>
                     </View>
-                  </GlassView>
+                  </Panel>
                 </Animated.View>
               </Animated.View>
 
@@ -835,14 +730,14 @@ export default function HomeScreen() {
                     onPress={() => router.push('/alarm/setup' as any)}
                     style={{ marginTop: 16 }}
                   >
-                    <GlassView style={[styles.widgetFullWidth, { backgroundColor: colors.surface, borderColor: colors.border, height: 100 }]}>
+                    <Panel style={[styles.widgetFullWidth, { backgroundColor: colors.surface, borderColor: colors.border, height: 100 }]}>
                       <View style={styles.alarmLayout}>
                         <View style={{ flex: 1, gap: 4 }}>
-                          <Label text="BARCODE ALARM ACTIVE" color={isDark ? '#94A3B8' : '#64748B'} />
-                          <Text style={[styles.alarmTimeText, { color: isDark ? '#F8FAFC' : '#0F172A' }]}>
+                          <Label text="BARCODE ALARM ACTIVE" color={themeColors.textSecondary} />
+                          <Text style={[styles.alarmTimeText, { color: themeColors.text }]}>
                             {formatAlarmTime(alarmConfig.hour, alarmConfig.minute)}
                           </Text>
-                          <Text style={[styles.statusText, { color: isDark ? '#94A3B8' : '#64748B', fontSize: 11 }]}>
+                          <Text style={[styles.statusText, { color: themeColors.textSecondary, fontSize: 11 }]}>
                             {alarmConfig.soundName || 'Default Sound'} • Scan barcode to dismiss
                           </Text>
                         </View>
@@ -850,7 +745,7 @@ export default function HomeScreen() {
                           <AnimatedRingingBell colors={colors} />
                         </View>
                       </View>
-                    </GlassView>
+                    </Panel>
                   </AnimatedPressable>
                 </Animated.View>
               )}
@@ -866,14 +761,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-  },
-  bgBlob: {
-    position: 'absolute',
-    width: width * 0.85,
-    height: width * 0.85,
-    borderRadius: width * 0.425,
-    opacity: 0.14,
-    filter: [{ blur: 70 }],
   },
   safeArea: {
     flex: 1,
@@ -1132,37 +1019,6 @@ const styles = StyleSheet.create({
     right: 0,
     borderTopLeftRadius: 6,
     borderTopRightRadius: 6,
-  },
-  bubbleParticle: {
-    position: 'absolute',
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: '#FFFFFF',
-    bottom: 0,
-    left: '50%',
-  },
-  wateryBadge: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 6,
-    marginLeft: 6,
-    borderWidth: 1,
-    borderColor: '#60A5FA',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#3B82F6',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.4,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  wateryBadgeText: {
-    color: '#FFF',
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 0.5,
   },
   alarmLayout: {
     flexDirection: 'row',

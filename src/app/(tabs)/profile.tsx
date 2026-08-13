@@ -21,6 +21,7 @@ import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 import { BottomTabInset, Colors, Radius, Spacing } from '@/constants/theme';
 import * as BarcodeAlarmStorage from '@/utils/BarcodeAlarmStorage';
 
@@ -334,14 +335,14 @@ export default function ProfileScreen() {
                   <Text
                     style={[
                       styles.rowValue,
-                      { color: isLinked ? '#10B981' : colors.textSecondary },
+                      { color: isLinked ? colors.success : colors.textSecondary },
                     ]}
                     numberOfLines={1}
                   >
                     {isLinked ? 'Connected ✓' : 'Not linked'}
                   </Text>
                 </View>
-                <View style={[styles.statusDot, { backgroundColor: isLinked ? '#10B981' : colors.textSecondary }]} />
+                <View style={[styles.statusDot, { backgroundColor: isLinked ? colors.success : colors.textSecondary }]} />
                 <Feather
                   name={discordExpanded ? 'chevron-up' : 'chevron-down'}
                   size={16}
@@ -504,9 +505,9 @@ export default function ProfileScreen() {
                             </Text>
                           </View>
                           {alarmConfig.barcodePayload ? (
-                            <View style={[styles.alarmMetaBadge, { backgroundColor: '#10B98118' }]}>
-                              <Feather name="check" size={10} color="#10B981" style={{ marginRight: 4 }} />
-                              <Text style={[styles.alarmMetaBadgeText, { color: '#10B981' }]}>
+                            <View style={[styles.alarmMetaBadge, { backgroundColor: colors.success + '18' }]}>
+                              <Feather name="check" size={10} color={colors.success} style={{ marginRight: 4 }} />
+                              <Text style={[styles.alarmMetaBadgeText, { color: colors.success }]}>
                                 Barcode Registered
                               </Text>
                             </View>
@@ -528,14 +529,15 @@ export default function ProfileScreen() {
                   )}
 
                   {/* Setup Edit Action Button */}
-                  <TouchableOpacity
+                  <Button
+                    variant="secondary"
+                    fullWidth
+                    icon="sliders"
+                    title="Configure Settings"
                     onPress={() => router.push('/alarm/setup' as any)}
-                    style={[styles.alarmSetupBtn, { backgroundColor: colors.backgroundSelected }]}
-                    activeOpacity={0.7}
-                  >
-                    <Feather name="sliders" size={13} color={colors.text} />
-                    <Text style={[styles.alarmSetupBtnText, { color: colors.text }]}>Configure Settings</Text>
-                  </TouchableOpacity>
+                    style={{ marginTop: 8 }}
+                    textStyle={{ fontSize: 13 }}
+                  />
                 </View>
               )}
             </View>
@@ -543,15 +545,15 @@ export default function ProfileScreen() {
 
           {/* ── Sign Out ────────────────────────────────────────────────────── */}
           <Animated.View entering={FadeInDown.delay(300).duration(400)}>
-            <TouchableOpacity
+            <Button
               id="signout-button"
-              style={[styles.signOutBtn, { borderColor: colors.alert }]}
+              variant="destructive"
+              size="lg"
+              fullWidth
+              icon="log-out"
+              title="Sign Out"
               onPress={handleSignOut}
-              activeOpacity={0.8}
-            >
-              <Feather name="log-out" size={16} color={colors.alert} />
-              <Text style={[styles.signOutText, { color: colors.alert }]}>Sign Out</Text>
-            </TouchableOpacity>
+            />
           </Animated.View>
 
         </ScrollView>
