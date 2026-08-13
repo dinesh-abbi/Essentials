@@ -23,6 +23,7 @@ import Animated, {
   FadeInUp,
   interpolate,
   useDerivedValue,
+  useReducedMotion,
 } from 'react-native-reanimated';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import * as WaterStorage from '@/utils/WaterStorage';
@@ -44,8 +45,10 @@ function WaterDroplet({
   const translateY = useSharedValue(SCREEN_HEIGHT * 0.6);
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.5);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reduceMotion) return; // no floating droplets under reduced motion
     translateY.value = withDelay(
       delay,
       withRepeat(
@@ -86,7 +89,7 @@ function WaterDroplet({
     width: size,
     height: size * 1.3,
     borderRadius: size / 2,
-    backgroundColor: '#60A5FA',
+    backgroundColor: '#5AD7EC',
     transform: [{ translateY: translateY.value }, { scale: scale.value }],
     opacity: opacity.value,
   }));
@@ -98,6 +101,7 @@ function WaterDroplet({
 function RisingWave({ delay, color }: { delay: number; color: string }) {
   const translateY = useSharedValue(SCREEN_HEIGHT);
   const rotation = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     translateY.value = withDelay(
@@ -107,11 +111,13 @@ function RisingWave({ delay, color }: { delay: number; color: string }) {
         easing: Easing.out(Easing.cubic),
       })
     );
-    rotation.value = withRepeat(
-      withTiming(360, { duration: 12000, easing: Easing.linear }),
-      -1,
-      false
-    );
+    if (!reduceMotion) {
+      rotation.value = withRepeat(
+        withTiming(360, { duration: 12000, easing: Easing.linear }),
+        -1,
+        false
+      );
+    }
   }, []);
 
   const style = useAnimatedStyle(() => ({
@@ -135,23 +141,26 @@ function RisingWave({ delay, color }: { delay: number; color: string }) {
 function TrophyIcon() {
   const scale = useSharedValue(0);
   const glow = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     scale.value = withDelay(
       600,
       withSpring(1, { damping: 8, stiffness: 100 })
     );
-    glow.value = withDelay(
-      1000,
-      withRepeat(
-        withSequence(
-          withTiming(1, { duration: 1200 }),
-          withTiming(0.4, { duration: 1200 })
-        ),
-        -1,
-        true
-      )
-    );
+    if (!reduceMotion) {
+      glow.value = withDelay(
+        1000,
+        withRepeat(
+          withSequence(
+            withTiming(1, { duration: 1200 }),
+            withTiming(0.4, { duration: 1200 })
+          ),
+          -1,
+          true
+        )
+      );
+    }
   }, []);
 
   const containerStyle = useAnimatedStyle(() => ({
@@ -230,9 +239,9 @@ export default function WaterGoalScreen() {
   return (
     <View style={styles.root}>
       {/* ── Background wave layers ── */}
-      <RisingWave delay={0} color="#1E3A5F" />
-      <RisingWave delay={200} color="#1D4ED820" />
-      <RisingWave delay={400} color="#3B82F615" />
+      <RisingWave delay={0} color="#0C3540" />
+      <RisingWave delay={200} color="#0E8FA820" />
+      <RisingWave delay={400} color="#34C6DE15" />
 
       {/* ── Floating droplet particles ── */}
       {droplets.map((d, i) => (
@@ -326,7 +335,7 @@ export default function WaterGoalScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0A1628',
+    backgroundColor: '#07171E',
     overflow: 'hidden',
   },
   safeArea: {
@@ -364,17 +373,17 @@ const styles = StyleSheet.create({
     width: 130,
     height: 130,
     borderRadius: 65,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#22B8D4',
   },
   trophyInner: {
     width: 110,
     height: 110,
     borderRadius: 55,
-    backgroundColor: '#1E40AF',
+    backgroundColor: '#0B5566',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
-    borderColor: '#60A5FA',
+    borderColor: '#5AD7EC',
   },
   trophyEmoji: {
     fontSize: 52,
@@ -391,7 +400,7 @@ const styles = StyleSheet.create({
   subline: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#93C5FD',
+    color: '#9BE7F3',
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 32,
@@ -402,7 +411,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF12',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#3B82F630',
+    borderColor: '#34C6DE30',
     padding: 20,
     marginBottom: 28,
     gap: 16,
@@ -426,13 +435,13 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#60A5FA',
+    color: '#5AD7EC',
     letterSpacing: 0.8,
   },
   statDivider: {
     width: 1,
     height: 36,
-    backgroundColor: '#3B82F630',
+    backgroundColor: '#34C6DE30',
   },
   progressTrack: {
     height: 6,
@@ -443,12 +452,12 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     borderRadius: 3,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#22B8D4',
   },
   progressLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#93C5FD',
+    color: '#9BE7F3',
     textAlign: 'center',
     letterSpacing: 0.3,
     marginTop: -4,
@@ -461,7 +470,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2563EB',
+    backgroundColor: '#0E8FA8',
     borderRadius: 16,
     paddingVertical: 16,
     paddingHorizontal: 24,

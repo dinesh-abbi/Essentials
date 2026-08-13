@@ -26,6 +26,7 @@ import Animated, {
   Easing,
   interpolate,
   FadeInDown,
+  useReducedMotion,
 } from 'react-native-reanimated';
 
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -46,8 +47,10 @@ function WaterWave({ percent, colors, isLoading, pulseStyle }: { percent: number
   const bubbleY1 = useSharedValue(0);
   const bubbleY2 = useSharedValue(0);
   const bubbleY3 = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reduceMotion) return; // no ambient rotation/bubbles under reduced motion
     rotation1.value = withRepeat(
       withTiming(360, { duration: 9000, easing: Easing.linear }),
       -1,
@@ -74,7 +77,7 @@ function WaterWave({ percent, colors, isLoading, pulseStyle }: { percent: number
       -1,
       false
     );
-  }, []);
+  }, [reduceMotion]);
 
   useEffect(() => {
     animatedPercent.value = withTiming(Math.min(percent, 1), {
@@ -138,14 +141,14 @@ function WaterWave({ percent, colors, isLoading, pulseStyle }: { percent: number
         style={[
           styles.waveLayer,
           waveStyle1,
-          { backgroundColor: '#3B82F690', borderRadius: 130 },
+          { backgroundColor: colors.aqua + 'D0', borderRadius: 130 },
         ]}
       />
       <Animated.View
         style={[
           styles.waveLayer,
           waveStyle2,
-          { backgroundColor: '#60A5FAe0', borderRadius: 125 },
+          { backgroundColor: colors.aqua + 'E0', borderRadius: 125 },
         ]}
       />
 
@@ -195,8 +198,8 @@ function AnimatedBar({
   }));
 
   const getBarColor = () => {
-    if (totalMl >= goal) return '#10B981';
-    if (totalMl > 0) return colors.primary;
+    if (totalMl >= goal) return colors.success;
+    if (totalMl > 0) return colors.aqua;
     return colors.border;
   };
 
@@ -254,6 +257,7 @@ export default function WaterDashboardScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = Colors[scheme];
   const isDark = scheme === 'dark';
+  const reduceMotion = useReducedMotion();
   const { width: windowWidth } = useWindowDimensions();
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -262,12 +266,16 @@ export default function WaterDashboardScreen() {
   // Shared pulse animation for loading states
   const pulseVal = useSharedValue(0.35);
   useEffect(() => {
+    if (reduceMotion) {
+      pulseVal.value = 0.6;
+      return;
+    }
     pulseVal.value = withRepeat(
       withTiming(0.8, { duration: 1000, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }),
       -1,
       true
     );
-  }, []);
+  }, [reduceMotion]);
 
   const skeletonPulseStyle = useAnimatedStyle(() => ({
     opacity: pulseVal.value,
@@ -529,10 +537,10 @@ export default function WaterDashboardScreen() {
   const monthNameName = currentDate.toLocaleString('default', { month: 'long' });
 
   const getCellColor = (ml: number, isSelected: boolean) => {
-    if (ml === 0) return isDark ? '#1C1C1C' : '#EFEFEA';
-    if (ml < goal / 3) return '#3B82F635';
-    if (ml < goal) return '#3B82F660';
-    return '#3B82F6';
+    if (ml === 0) return isDark ? colors.surfaceSunken : colors.backgroundSelected;
+    if (ml < goal / 3) return colors.aqua + '35';
+    if (ml < goal) return colors.aqua + '60';
+    return colors.aqua;
   };
 
   const getCellTextColor = (ml: number) => {
@@ -666,7 +674,7 @@ export default function WaterDashboardScreen() {
                             <ActivityIndicator size="small" color={colors.primary} />
                           ) : (
                             <>
-                              <Feather name="droplet" size={14} color={colors.primary} />
+                              <Feather name="droplet" size={14} color={colors.aqua} />
                               <Text style={[styles.quickBtnText, { color: colors.text }]}>+{ml}ml</Text>
                             </>
                           )}
@@ -699,8 +707,8 @@ export default function WaterDashboardScreen() {
                                   style={[
                                     styles.timelineDot,
                                     {
-                                      backgroundColor: drank ? '#3B82F6' : colors.backgroundSelected,
-                                      borderColor: drank ? '#60A5FA' : colors.border,
+                                      backgroundColor: drank ? colors.aqua : colors.backgroundSelected,
+                                      borderColor: drank ? colors.aqua : colors.border,
                                     },
                                   ]}
                                 />
@@ -724,8 +732,8 @@ export default function WaterDashboardScreen() {
                   style={[styles.logCard, { borderColor: colors.border }]}
                 >
                   <View style={styles.logLeft}>
-                    <View style={[styles.logIcon, { backgroundColor: '#3B82F618' }]}>
-                      <Feather name="droplet" size={14} color="#3B82F6" />
+                    <View style={[styles.logIcon, { backgroundColor: colors.aqua + '18' }]}>
+                      <Feather name="droplet" size={14} color={colors.aqua} />
                     </View>
                     <View>
                       <Text style={[styles.logAmount, { color: colors.text }]}>{item.amountMl} ml</Text>
@@ -838,13 +846,13 @@ export default function WaterDashboardScreen() {
                     </View>
 
                     <View style={[styles.statItem, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-                      <Feather name="droplet" size={16} color="#3B82F6" />
+                      <Feather name="droplet" size={16} color={colors.aqua} />
                       <Text style={[styles.statVal, { color: colors.text }]}>{weeklyAverageVolume}ml</Text>
                       <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Daily Average</Text>
                     </View>
 
                     <View style={[styles.statItem, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-                      <Feather name="award" size={16} color="#10B981" />
+                      <Feather name="award" size={16} color={colors.success} />
                       <Text style={[styles.statVal, { color: colors.text }]}>{weeklyDaysGoalMet}/7</Text>
                       <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Days Goal Met</Text>
                     </View>
@@ -941,10 +949,10 @@ export default function WaterDashboardScreen() {
               {/* Legend */}
               <View style={styles.legendRow}>
                 <Text style={[styles.legendLabel, { color: colors.textSecondary }]}>Less</Text>
-                <View style={[styles.legendDot, { backgroundColor: isDark ? '#1C1C1C' : '#EFEFEA' }]} />
-                <View style={[styles.legendDot, { backgroundColor: '#3B82F625' }]} />
-                <View style={[styles.legendDot, { backgroundColor: '#3B82F660' }]} />
-                <View style={[styles.legendDot, { backgroundColor: '#3B82F6' }]} />
+                <View style={[styles.legendDot, { backgroundColor: isDark ? colors.surfaceSunken : colors.backgroundSelected }]} />
+                <View style={[styles.legendDot, { backgroundColor: colors.aqua + '25' }]} />
+                <View style={[styles.legendDot, { backgroundColor: colors.aqua + '60' }]} />
+                <View style={[styles.legendDot, { backgroundColor: colors.aqua }]} />
                 <Text style={[styles.legendLabel, { color: colors.textSecondary }]}>More (Goal)</Text>
               </View>
 
@@ -962,7 +970,7 @@ export default function WaterDashboardScreen() {
                 ) : (
                   <>
                     <View style={[styles.statItem, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-                      <Feather name="droplet" size={16} color="#3B82F6" />
+                      <Feather name="droplet" size={16} color={colors.aqua} />
                       <Text style={[styles.statVal, { color: colors.text }]}>{(monthlyTotalLitres / 1000).toFixed(1)}L</Text>
                       <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Total Drank</Text>
                     </View>
@@ -974,7 +982,7 @@ export default function WaterDashboardScreen() {
                     </View>
 
                     <View style={[styles.statItem, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-                      <Feather name="award" size={16} color="#10B981" />
+                      <Feather name="award" size={16} color={colors.success} />
                       <Text style={[styles.statVal, { color: colors.text }]}>{monthlyDaysGoalMet} days</Text>
                       <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Target Hit</Text>
                     </View>
@@ -1141,7 +1149,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-    backgroundColor: '#1E293B',
+    backgroundColor: '#0B2530', // deep teal gauge well (aqua family, fixed both themes)
   },
   waveLayer: {
     position: 'absolute',

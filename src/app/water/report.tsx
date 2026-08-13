@@ -173,7 +173,7 @@ export default function WaterDailyReportScreen() {
                         {percentMet.toFixed(0)}%
                       </Text>
                     </View>
-                    <View style={[styles.progressBarTrack, { backgroundColor: '#E2E8F015' }]}>
+                    <View style={[styles.progressBarTrack, { backgroundColor: colors.surfaceSunken }]}>
                       <Animated.View style={[styles.progressBarFill, progressStyle, { backgroundColor: colors.primary }]} />
                     </View>
                   </View>

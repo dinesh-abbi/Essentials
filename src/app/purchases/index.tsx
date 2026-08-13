@@ -22,6 +22,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   withRepeat,
+  useReducedMotion,
   Easing,
   FadeInDown,
 } from 'react-native-reanimated';
@@ -587,7 +588,7 @@ function CategoryBar({ category, amount, percentage, color, textColor }: any) {
           ₹{amount.toFixed(2)} ({percentage.toFixed(0)}%)
         </Text>
       </View>
-      <View style={[styles.progressBarTrack, { backgroundColor: '#E2E8F015' }]}>
+      <View style={[styles.progressBarTrack, { backgroundColor: 'rgba(120,132,148,0.15)' }]}>
         <Animated.View
           style={[
             styles.progressBarFill,
@@ -640,14 +641,19 @@ function SpendTrackerContent() {
   const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly'>('daily');
 
   // Shared pulse animation for loading states
+  const reduceMotion = useReducedMotion();
   const pulseVal = useSharedValue(0.35);
   useEffect(() => {
+    if (reduceMotion) {
+      pulseVal.value = 0.6;
+      return;
+    }
     pulseVal.value = withRepeat(
       withTiming(0.8, { duration: 1000, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }),
       -1,
       true
     );
-  }, []);
+  }, [reduceMotion]);
 
   const skeletonPulseStyle = useAnimatedStyle(() => ({
     opacity: pulseVal.value,
@@ -1308,13 +1314,13 @@ function SpendTrackerContent() {
                     </View>
 
                     <View style={[styles.statItem, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-                      <Feather name="trending-up" size={16} color="#10B981" />
+                      <Feather name="trending-up" size={16} color={colors.success} />
                       <Text style={[styles.statVal, { color: colors.text }]}>₹{weeklyAvg.toFixed(2)}</Text>
                       <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Daily Average</Text>
                     </View>
 
                     <View style={[styles.statItem, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-                      <Feather name="award" size={16} color="#F59E0B" />
+                      <Feather name="award" size={16} color={colors.warn} />
                       <Text style={[styles.statVal, { color: colors.text }]}>₹{weeklyMax.toFixed(2)}</Text>
                       <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Highest Spend</Text>
                     </View>
@@ -1531,7 +1537,7 @@ const styles = StyleSheet.create({
     borderRadius: 9,
   },
   tabActiveBtn: {
-    shadowColor: '#000',
+    shadowColor: '#1B2430',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 3,
