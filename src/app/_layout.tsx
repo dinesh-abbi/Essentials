@@ -9,6 +9,7 @@ import { ensureNotificationsScheduled, Notifications, triggerWaterGoalNotificati
 import { auth, waitForAuth } from '@/utils/firebase';
 import OTAUpdateChecker from '@/components/OTAUpdateChecker';
 import AppLoader from '@/components/AppLoader';
+import { Motion } from '@/constants/theme';
 
 // ── Inner layout that can access AuthContext ───────────────────────────────────
 function AppStack() {
@@ -131,7 +132,7 @@ function AppStack() {
   }
 
   return (
-    <Stack>
+    <Stack screenOptions={{ animationDuration: Motion.duration.screen }}>
       {/* Login screen — shown only when not authenticated */}
       <Stack.Screen
         name="login"

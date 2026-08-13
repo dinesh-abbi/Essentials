@@ -8,7 +8,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, Radius } from '@/constants/theme';
+import { Colors, Motion, Spacing, Radius } from '@/constants/theme';
 
 const { width: windowWidth } = Dimensions.get('window');
 const MAX_BAR_WIDTH = 480;
@@ -25,7 +25,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   const isDark = scheme === 'dark';
   const themeColors = Colors[scheme];
 
-  const primary = isDark ? '#6366F1' : '#4F46E5';
+  const primary = themeColors.signal;
 
   // Filter out hidden routes by name — reliable across expo-router versions
   const visibleRoutes = state.routes.filter(
@@ -44,11 +44,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
   useEffect(() => {
     if (activeIndex !== -1) {
-      indicatorOffset.value = withSpring(activeIndex * tabWidth, {
-        damping: 18,
-        stiffness: 140,
-        mass: 1,
-      });
+      indicatorOffset.value = withSpring(activeIndex * tabWidth, Motion.spring);
     }
   }, [activeIndex, tabWidth]);
 
@@ -58,18 +54,17 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
   const bottomPosition = insets.bottom + FLOAT_OFFSET;
 
-  // Solid frosted surface — no content bleed, dark/light adaptive
+  // Frosted graphite surface — floats over content, dark/light adaptive
   const surfaceColor = isDark
-    ? 'rgba(28, 28, 30, 0.96)'   // near-black with tiny transparency
-    : 'rgba(252, 252, 252, 0.96)'; // near-white
+    ? 'rgba(20, 26, 35, 0.96)'    // ≈ graphite surface #141A23
+    : 'rgba(255, 255, 255, 0.96)';
 
   const borderColor = isDark
     ? 'rgba(255, 255, 255, 0.09)'
     : 'rgba(0, 0, 0, 0.08)';
 
-  const pillColor = isDark
-    ? 'rgba(255, 255, 255, 0.10)'
-    : 'rgba(0, 0, 0, 0.07)';
+  // Active pill picks up a subtle signal tint (matches the active icon).
+  const pillColor = themeColors.signalWeak;
 
   return (
     <View
@@ -83,7 +78,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
             width: containerWidth,
             backgroundColor: surfaceColor,
             borderColor,
-            shadowColor: isDark ? '#000' : '#6B7280',
+            shadowColor: isDark ? '#000' : '#1B2430',
           },
         ]}
       >
@@ -136,11 +131,11 @@ function TabItemButton({ isFocused, onPress, name, primary, textSecondary }: any
   }));
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.86, { damping: 14, stiffness: 240 });
+    scale.value = withSpring(0.86, Motion.spring);
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 14, stiffness: 240 });
+    scale.value = withSpring(1, Motion.spring);
   };
 
   return (
