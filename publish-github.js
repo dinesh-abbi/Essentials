@@ -282,38 +282,10 @@ try {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 8. Clean up older GitHub releases and tags
+// 8. Older releases are intentionally preserved
 // ─────────────────────────────────────────────────────────────────────────────
-console.log('\n🧹  Cleaning up older GitHub releases and tags...');
-try {
-  const releasesRaw = execSync('gh release list --json tagName', { encoding: 'utf8', stdio: 'pipe' }).trim();
-  if (releasesRaw) {
-    const releases = JSON.parse(releasesRaw);
-    const oldTags = releases
-      .map(r => r.tagName?.trim())
-      .filter(t => t && /^v\d+\.\d+\.\d+$/.test(t) && t !== tag);
-
-    if (oldTags.length > 0) {
-      console.log(`Found ${oldTags.length} older releases to delete: ${oldTags.join(', ')}`);
-      for (const oldTag of oldTags) {
-        console.log(`Deleteting old release and remote tag: ${oldTag}`);
-        try {
-          execSync(`gh release delete "${oldTag}" --yes --cleanup-tag`, { stdio: 'ignore' });
-        } catch (e) {
-          console.warn(`Failed to delete release/tag ${oldTag} from remote:`, e.message);
-        }
-
-        try {
-          execSync(`git tag -d "${oldTag}"`, { stdio: 'ignore' });
-        } catch (e) {
-          // ignore if local tag delete fails
-        }
-      }
-      console.log('✅  Cleanup complete. Only the latest release remains.');
-    } else {
-      console.log('No older releases found to clean up.');
-    }
-  }
-} catch (err) {
-  console.warn('⚠️   Warning: Cleanup of old releases failed:', err.message);
-}
+// Previous behaviour pruned every release/tag except the latest. That is
+// disabled on purpose: old versions are kept so users can roll back and the
+// full release history stays intact. To re-enable pruning, restore the
+// `gh release delete ... --cleanup-tag` loop from version-control history.
+console.log('\n📦  Keeping all previous GitHub releases and tags (cleanup disabled).');
