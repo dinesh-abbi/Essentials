@@ -84,9 +84,9 @@ export function Button({
   const dims = SIZES[size];
 
   // ── Variant → colors ───────────────────────────────────────────────────
-  let backgroundColor = 'transparent';
-  let foreground = theme.signal;
-  let borderColor = 'transparent';
+  let backgroundColor: string = 'transparent';
+  let foreground: string = theme.signal;
+  let borderColor: string = 'transparent';
 
   switch (variant) {
     case 'primary':
@@ -189,7 +189,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },

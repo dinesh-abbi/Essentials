@@ -176,7 +176,7 @@ function SpendPowerCore({ spend, limit = 2000, isDark }: { spend: number; limit?
           const isActive = i < activeSegments;
           const c = isDark ? Colors.dark : Colors.light;
           // Calm → caution → alarm as spend climbs (semantic, not a rainbow).
-          let color = c.signal;
+          let color: string = c.signal;
           if (i === 2) color = c.warn;
           if (i === 3) color = c.alert;
 
@@ -680,7 +680,7 @@ export default function HomeScreen() {
                             const done = waterHourlyMap[hour] === true;
                             const isCurrentHour = hour === currentHour;
                             
-                            let dotColor = themeColors.hairline;
+                            let dotColor: string = themeColors.hairline;
                             if (done) dotColor = colors.aqua;               // water logged
                             if (isCurrentHour && !done) dotColor = colors.signal; // "now" marker
 
