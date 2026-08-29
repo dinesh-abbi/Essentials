@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { FontFace, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import { saveUpiTransaction } from '@/utils/UpiStorage';
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: FontFace.bold,
   },
   content: {
     flex: 1,
@@ -294,11 +294,12 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
+    fontFamily: FontFace.regular,
     marginBottom: Spacing.two,
   },
   upiIdText: {
     fontSize: 20,
-    fontWeight: '600',
+    fontFamily: FontFace.semibold,
     marginBottom: Spacing.six,
   },
   amountContainer: {
@@ -308,12 +309,12 @@ const styles = StyleSheet.create({
   },
   currencySymbol: {
     fontSize: 42,
-    fontWeight: '600',
+    fontFamily: FontFace.semibold,
     marginRight: Spacing.two,
   },
   amountInput: {
     fontSize: 48,
-    fontWeight: 'bold',
+    fontFamily: FontFace.bold,
     minWidth: 100,
     textAlign: 'center',
   },
@@ -326,7 +327,7 @@ const styles = StyleSheet.create({
   payBtnText: {
     color: '#FFF',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: FontFace.bold,
   },
   formCard: {
     padding: Spacing.four,
@@ -337,7 +338,7 @@ const styles = StyleSheet.create({
   },
   formLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FontFace.semibold,
     marginBottom: Spacing.two,
   },
   formInput: {
@@ -346,6 +347,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: Spacing.three,
     fontSize: 16,
+    fontFamily: FontFace.regular,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   categoryContainer: {
@@ -364,6 +366,6 @@ const styles = StyleSheet.create({
   },
   categoryChipText: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontFamily: FontFace.bold,
   },
 });

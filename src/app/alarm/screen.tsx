@@ -22,7 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { FontFace, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import * as BarcodeAlarmStorage from '@/utils/BarcodeAlarmStorage';
 
@@ -164,7 +164,7 @@ export default function ActiveAlarmScreen() {
             style={[styles.btn, { backgroundColor: theme.primary }]}
             onPress={requestPermission}
           >
-            <Text style={{ color: '#FFF', fontWeight: '800' }}>Grant Camera Permission</Text>
+            <Text style={{ color: '#FFF', fontFamily: FontFace.bold }}>Grant Camera Permission</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -217,7 +217,7 @@ export default function ActiveAlarmScreen() {
 
         <View style={styles.countdownContainer}>
           <Text style={styles.countdownText}>
-            Auto-snooze in <Text style={{ fontWeight: '900', color: theme.primary }}>{secondsRemaining}s</Text>
+            Auto-snooze in <Text style={{ fontFamily: FontFace.bold, color: theme.primary }}>{secondsRemaining}s</Text>
           </Text>
         </View>
       </View>
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   },
   clockText: {
     fontSize: 48,
-    fontWeight: '900',
+    fontFamily: FontFace.bold,
     color: '#FFF',
     letterSpacing: 2,
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
   statusText: {
     color: '#FFF',
     fontSize: 14,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: 3,
     marginTop: Spacing.one,
     backgroundColor: '#DC2626',
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   promptText: {
     color: '#FFF',
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
     textAlign: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
     paddingHorizontal: Spacing.four,
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#FF4444',
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     textAlign: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.85)',
     borderColor: '#FF4444',
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
   countdownText: {
     color: '#DDD',
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: FontFace.semibold,
   },
   // HUD Overlays
   hudOverlay: {

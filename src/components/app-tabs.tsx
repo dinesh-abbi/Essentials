@@ -1,31 +1,49 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Pressable, useColorScheme, Dimensions } from 'react-native';
+import { View, StyleSheet, useColorScheme, Dimensions } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import Animated, {
+  Easing,
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
+  useReducedMotion,
+  withTiming,
+  interpolate,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Motion, Spacing, Radius } from '@/constants/theme';
+import { AnimatedPressable } from '@/components/ui/animated-pressable';
+import { Colors, Motion, Radius, Spacing, TabBar } from '@/constants/theme';
+import { tabBarTranslateY, tabBarHideDistance } from '@/utils/tabBarVisibility';
 
 const { width: windowWidth } = Dimensions.get('window');
-const MAX_BAR_WIDTH = 480;
-export const TAB_BAR_HEIGHT = 64;
-const PADDING = 8;
-const FLOAT_OFFSET = 12;
+
+// ── Compact bar sizing ────────────────────────────────────────────────────────
+// Only two visible tabs (Home + Profile) → the bar is a tight floating pill.
+const MAX_BAR_WIDTH = 220;
+export const TAB_BAR_HEIGHT = TabBar.height;
+const PADDING = 5;
+const FLOAT_OFFSET = TabBar.floatOffset;
 
 // Routes that should NEVER appear in the tab bar
 const HIDDEN_ROUTES = new Set(['explore']);
 
+/**
+ * The floating nav pill — minimal, per the design thesis. `bg` fill, one
+ * `hairline` border, no shadow (this system has none). The active tab is
+ * marked two ways: `water` (the ONE accent in the whole app, spent nowhere
+ * else in the nav) tints the icon, and a quiet `surface2` lozenge slides
+ * behind it. Inactive icons are `textMid` — `textLow` only reaches 2.7:1 as a
+ * graphic here, under the 3:1 floor, so it can't be used on this surface.
+ *
+ * Icon-only: with two tabs and unambiguous glyphs a text label would be
+ * redundant chrome; `accessibilityLabel` still carries the name for screen
+ * readers.
+ */
 function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
+  const reduceMotion = useReducedMotion();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const isDark = scheme === 'dark';
-  const themeColors = Colors[scheme];
-
-  const primary = themeColors.signal;
+  const colors = Colors[scheme];
 
   // Filter out hidden routes by name — reliable across expo-router versions
   const visibleRoutes = state.routes.filter(
@@ -40,13 +58,17 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   const totalTabs = visibleRoutes.length;
   const tabWidth = (containerWidth - PADDING * 2) / totalTabs;
 
-  const indicatorOffset = useSharedValue(activeIndex !== -1 ? activeIndex * tabWidth : 0);
+  const indicatorOffset = useSharedValue(activeIndex !== -1 ? activeIndex * tabWidth + PADDING : 0);
 
   useEffect(() => {
-    if (activeIndex !== -1) {
-      indicatorOffset.value = withSpring(activeIndex * tabWidth, Motion.spring);
-    }
-  }, [activeIndex, tabWidth]);
+    if (activeIndex === -1) return;
+    const target = activeIndex * tabWidth + PADDING;
+    // Precise, not bouncy — a short ease rather than a spring, matching the
+    // rest of this system's motion.
+    indicatorOffset.value = reduceMotion
+      ? target
+      : withTiming(target, { duration: Motion.duration.fast, easing: Easing.out(Easing.cubic) });
+  }, [activeIndex, tabWidth, reduceMotion, indicatorOffset]);
 
   const animatedIndicatorStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: indicatorOffset.value }],
@@ -54,41 +76,61 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
   const bottomPosition = insets.bottom + FLOAT_OFFSET;
 
-  // Frosted graphite surface — floats over content, dark/light adaptive
-  const surfaceColor = isDark
-    ? 'rgba(20, 26, 35, 0.96)'    // ≈ graphite surface #141A23
-    : 'rgba(255, 255, 255, 0.96)';
+  const hideDistance = TAB_BAR_HEIGHT + FLOAT_OFFSET + insets.bottom + 12;
+  useEffect(() => {
+    tabBarHideDistance.value = hideDistance;
+  }, [hideDistance]);
 
-  const borderColor = isDark
-    ? 'rgba(255, 255, 255, 0.09)'
-    : 'rgba(0, 0, 0, 0.08)';
+  const revealStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: tabBarTranslateY.value }],
+    opacity: interpolate(
+      tabBarTranslateY.value,
+      [0, hideDistance * 0.6, hideDistance],
+      [1, 0.7, 0],
+      'clamp',
+    ),
+  }));
 
-  // Active pill picks up a subtle signal tint (matches the active icon).
-  const pillColor = themeColors.signalWeak;
+  // Final beat of the entrance sequence (greeting → hero → cards → nav).
+  // `entering` fires on mount only, and the bar is mounted by the navigator
+  // rather than by a screen, so this does not replay on every tab switch.
+  const enteringOpacity = useSharedValue(reduceMotion ? 1 : 0);
+  const enteringY = useSharedValue(reduceMotion ? 0 : Motion.entranceOffset);
+  useEffect(() => {
+    if (reduceMotion) return;
+    enteringOpacity.value = withTiming(1, {
+      duration: Motion.duration.entrance,
+      easing: Easing.out(Easing.cubic),
+    });
+    enteringY.value = withTiming(0, {
+      duration: Motion.duration.entrance,
+      easing: Easing.out(Easing.cubic),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const enteringStyle = useAnimatedStyle(() => ({
+    opacity: enteringOpacity.value,
+    transform: [{ translateY: enteringY.value }],
+  }));
 
   return (
-    <View
-      style={[styles.absoluteContainer, { bottom: bottomPosition }]}
+    <Animated.View
+      style={[styles.absoluteContainer, { bottom: bottomPosition }, revealStyle, enteringStyle]}
       pointerEvents="box-none"
     >
       <View
         style={[
           styles.tabBarContainer,
-          {
-            width: containerWidth,
-            backgroundColor: surfaceColor,
-            borderColor,
-            shadowColor: isDark ? '#000' : '#1B2430',
-          },
+          { width: containerWidth, backgroundColor: colors.bg, borderColor: colors.hairline },
         ]}
       >
-        {/* Sliding active pill indicator */}
         <Animated.View
           style={[
             styles.activeIndicator,
             animatedIndicatorStyle,
-            { width: tabWidth, backgroundColor: pillColor },
+            { width: tabWidth - PADDING * 2, backgroundColor: colors.surface2 },
           ]}
+          pointerEvents="none"
         />
 
         {/* Tab buttons */}
@@ -107,52 +149,25 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           };
 
           return (
-            <TabItemButton
+            <AnimatedPressable
               key={route.key}
-              isFocused={isFocused}
               onPress={onPress}
-              name={route.name}
-              primary={primary}
-              textSecondary={themeColors.textSecondary}
-            />
+              haptic="light"
+              style={styles.tabBtn}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isFocused }}
+              accessibilityLabel={descriptors?.[route.key]?.options?.title ?? route.name}
+            >
+              <Feather
+                name={getIconName(route.name)}
+                size={21}
+                color={isFocused ? colors.water : colors.textMid}
+              />
+            </AnimatedPressable>
           );
         })}
       </View>
-    </View>
-  );
-}
-
-// ─── Individual Tab Button ────────────────────────────────────────────────────
-function TabItemButton({ isFocused, onPress, name, primary, textSecondary }: any) {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.86, Motion.spring);
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, Motion.spring);
-  };
-
-  return (
-    <Pressable
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      style={styles.tabBtn}
-    >
-      <Animated.View style={[styles.iconWrapper, animatedStyle]}>
-        <Feather
-          name={getIconName(name)}
-          size={22}
-          color={isFocused ? primary : textSecondary}
-        />
-      </Animated.View>
-    </Pressable>
+    </Animated.View>
   );
 }
 
@@ -160,12 +175,9 @@ function getIconName(routeName: string): any {
   switch (routeName) {
     case 'index':   return 'home';
     case 'profile': return 'user';
-    default:        return 'home'; // fallback — should never be reached
+    default:        return 'home';
   }
 }
-
-// Bottom padding screens should add: bar height + float offset + buffer
-export const TAB_BAR_BOTTOM_INSET = TAB_BAR_HEIGHT + FLOAT_OFFSET + 8;
 
 export default function AppTabs() {
   return (
@@ -205,36 +217,25 @@ const styles = StyleSheet.create({
   },
   tabBarContainer: {
     height: TAB_BAR_HEIGHT,
-    borderRadius: Radius.xl,
-    borderWidth: 1,
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: PADDING,
-    // Elevation for subtle lift, no content bleed
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
-    elevation: 10,
-    overflow: 'hidden',
+    // No shadow — this system has none; the pill separates from the page by
+    // its hairline border alone, same as every card.
   },
   activeIndicator: {
     position: 'absolute',
     top: PADDING,
     bottom: PADDING,
     left: PADDING,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.pill,
   },
   tabBtn: {
     flex: 1,
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  iconWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
   },
 });

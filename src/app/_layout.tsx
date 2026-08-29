@@ -1,15 +1,32 @@
 import { useEffect } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider, Stack, useRouter, useSegments } from 'expo-router';
 import { AppState, NativeModules, useColorScheme } from 'react-native';
+import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
+// Per-weight subpaths, NOT the package index. Each index module `require()`s
+// every weight and italic it ships, so importing from it would make Metro
+// bundle 5-9 unused faces per family. These four back the "Technical, but
+// kind" screens (Home, Profile, Water, Purchases, Alarm, …) via
+// constants/theme.ts.
+import { SpaceGrotesk_500Medium } from '@expo-google-fonts/space-grotesk/500Medium';
+import { SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk/700Bold';
+import { Onest_400Regular } from '@expo-google-fonts/onest/400Regular';
+import { Onest_500Medium } from '@expo-google-fonts/onest/500Medium';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import * as WaterStorage from '@/utils/WaterStorage';
 import * as WidgetSync from '@/utils/WidgetSync';
 import { ensureNotificationsScheduled, Notifications, triggerWaterGoalNotification } from '@/utils/notifications';
 import { auth, waitForAuth } from '@/utils/firebase';
+import { cleanOldApks, handlePendingInstallIfActive } from '@/utils/updates';
 import OTAUpdateChecker from '@/components/OTAUpdateChecker';
 import AppLoader from '@/components/AppLoader';
 import { Motion } from '@/constants/theme';
+
+// Hold the native splash until the type ramp's faces are in memory. Swapping
+// in a JS loader instead would paint one surface, then the real one — a visible
+// flash of differently-metricked text on every cold start.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // ── Inner layout that can access AuthContext ───────────────────────────────────
 function AppStack() {
@@ -63,12 +80,15 @@ function AppStack() {
     // Check & clear on mount
     checkAlarmLaunch();
     clearNotifications();
+    handlePendingInstallIfActive();
+    cleanOldApks();
 
     // Check & clear when App returns to foreground (e.g. via SingleTop activity launch)
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
         checkAlarmLaunch();
         clearNotifications();
+        handlePendingInstallIfActive();
       }
     });
 
@@ -181,6 +201,16 @@ function AppStack() {
         name="alarm/screen"
         options={{ headerShown: false, animation: 'none', gestureEnabled: false }}
       />
+
+      {/* Release notes & OTA update readers */}
+      <Stack.Screen
+        name="whats-new"
+        options={{ headerShown: false, animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="update"
+        options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }}
+      />
     </Stack>
   );
 }
@@ -188,6 +218,26 @@ function AppStack() {
 // ── Root layout — wraps everything in providers ────────────────────────────────
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+
+  // The type ramp in `theme.ts` names these four faces directly, so nothing
+  // text-bearing may render until they resolve — otherwise the first frame
+  // paints in system Roboto at the wrong metrics and visibly reflows.
+  // A load *failure* is not worth blocking the app on: fall through and let
+  // RN substitute the system face rather than hanging on the loader forever.
+  const [fontsLoaded, fontError] = useFonts({
+    SpaceGrotesk_500Medium,
+    SpaceGrotesk_700Bold,
+    Onest_400Regular,
+    Onest_500Medium,
+  });
+
+  useEffect(() => {
+    // A load *failure* must still release the splash, or the app hangs on it
+    // forever; RN just substitutes the system face in that case.
+    if (fontsLoaded || fontError) SplashScreen.hideAsync().catch(() => {});
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) return null;
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

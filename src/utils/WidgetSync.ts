@@ -25,6 +25,29 @@ export async function sync(): Promise<void> {
   }
 }
 
+export interface WidgetData {
+  waterMl: number;
+  waterGoal: number;
+  logsToday: number;
+  isStale: boolean;
+}
+
+/**
+ * Reads the widget's current SharedPreferences state so the app can reconcile
+ * with Firestore/AsyncStorage on resume. Returns null when the native module
+ * isn't available (iOS, or a build without the widget wired up).
+ */
+export async function readWidgetData(): Promise<WidgetData | null> {
+  try {
+    if (!NativeWidgetStorage?.getWidgetData) return null;
+    const data = await NativeWidgetStorage.getWidgetData();
+    return data ?? null;
+  } catch (error) {
+    console.warn('[WidgetSync] Failed to read widget data', error);
+    return null;
+  }
+}
+
 /**
  * Headless task run by WidgetQuickLogTaskService (native) when the user taps
  * a "+Nml" chip directly on the home-screen widget. Runs with no Activity —

@@ -27,7 +27,7 @@ import Animated, {
 
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, FontFace, Radius, Spacing } from '@/constants/theme';
 
 type Mode = 'login' | 'signup';
 
@@ -290,18 +290,18 @@ const styles = StyleSheet.create({
   },
   logoLetter: {
     fontSize: 28,
-    fontWeight: '900',
+    fontFamily: FontFace.bold,
     color: '#FFFFFF',
     letterSpacing: -1,
   },
   appName: {
     fontSize: 34,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: -1.2,
   },
   tagline: {
     fontSize: 15,
-    fontWeight: '400',
+    fontFamily: FontFace.regular,
   },
 
   // ── Mode toggle ─────────────────────────────────────────────────────────────
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   },
   modeLabel: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
     letterSpacing: -0.3,
     paddingBottom: 8,
   },
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 15,
-    fontWeight: '400',
+    fontFamily: FontFace.regular,
   },
   submitBtn: {
     borderRadius: Radius.md,
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
   submitText: {
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
     letterSpacing: 0.2,
   },
 
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
   },
   dividerLabel: {
     fontSize: 13,
-    fontWeight: '500',
+    fontFamily: FontFace.medium,
   },
 
   // ── Google ──────────────────────────────────────────────────────────────────
@@ -399,17 +399,17 @@ const styles = StyleSheet.create({
   googleG: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '900',
+    fontFamily: FontFace.bold,
   },
   googleText: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: FontFace.semibold,
   },
   googleNote: {
     fontSize: 11,
     textAlign: 'center',
     marginTop: 6,
-    fontWeight: '400',
+    fontFamily: FontFace.regular,
   },
 
   // ── Footer ──────────────────────────────────────────────────────────────────
@@ -418,6 +418,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 12,
+    fontFamily: FontFace.regular,
     textAlign: 'center',
     lineHeight: 18,
   },

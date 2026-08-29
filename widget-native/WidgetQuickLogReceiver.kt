@@ -35,8 +35,15 @@ class WidgetQuickLogReceiver : BroadcastReceiver() {
         if (amount <= 0) return
 
         val prefs = context.getSharedPreferences(WaterWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
-        val current = prefs.getInt(WaterWidgetProvider.KEY_WATER_ML, 0)
-        prefs.edit().putInt(WaterWidgetProvider.KEY_WATER_ML, current + amount).apply()
+        val today = WaterWidgetProvider.todayDateKey()
+        val isStale = prefs.getInt(WaterWidgetProvider.KEY_SYNC_DATE_KEY, 0) != today
+        val current = if (isStale) 0 else prefs.getInt(WaterWidgetProvider.KEY_WATER_ML, 0)
+        val currentLogs = if (isStale) 0 else prefs.getInt(WaterWidgetProvider.KEY_LOGS_TODAY, 0)
+        prefs.edit()
+            .putInt(WaterWidgetProvider.KEY_WATER_ML, current + amount)
+            .putInt(WaterWidgetProvider.KEY_LOGS_TODAY, currentLogs + 1)
+            .putInt(WaterWidgetProvider.KEY_SYNC_DATE_KEY, today)
+            .apply()
         WaterWidgetProvider.updateAll(context)
 
         HeadlessJsTaskService.acquireWakeLockNow(context)

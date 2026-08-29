@@ -77,6 +77,12 @@ class WaterWidgetProvider : AppWidgetProvider() {
         const val KEY_WATER_ML = "water_ml"
         const val KEY_WATER_GOAL = "water_goal"
         const val KEY_LOGS_TODAY = "logs_today"
+        // Local calendar date (YYYYMMDD) the cached water_ml/logs_today were
+        // last written for. water_ml has no concept of "today" on its own —
+        // without this tag, a widget that never gets reopened/tapped after
+        // midnight keeps showing yesterday's total forever, since nothing
+        // else ever tells it the day rolled over.
+        const val KEY_SYNC_DATE_KEY = "sync_date_key"
         private const val DEFAULT_GOAL = 3000
 
         private const val ACTION_OPEN = "essentials:///?highlight=water"
@@ -95,6 +101,18 @@ class WaterWidgetProvider : AppWidgetProvider() {
         private const val LARGE_MIN_WIDTH_DP = 250
         private const val LARGE_MIN_HEIGHT_DP = 160
 
+        /**
+         * Local calendar date as an YYYYMMDD int — deliberately the device's
+         * local timezone (not UTC epoch days), so rollover happens at local
+         * midnight, matching WaterStorage.ts's own "today" definition.
+         */
+        fun todayDateKey(): Int {
+            val cal = Calendar.getInstance()
+            return cal.get(Calendar.YEAR) * 10000 +
+                (cal.get(Calendar.MONTH) + 1) * 100 +
+                cal.get(Calendar.DAY_OF_MONTH)
+        }
+
         /** Push the latest numbers to every placed instance of this widget. */
         fun updateAll(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
@@ -106,9 +124,25 @@ class WaterWidgetProvider : AppWidgetProvider() {
 
         private fun updateWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
             val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val waterMl = prefs.getInt(KEY_WATER_ML, 0)
+
+            // Roll the cached total over to 0 once the local date has moved on —
+            // this runs on every render, including the OS's periodic 30-minute
+            // onUpdate tick, so the widget resets itself even if the app is
+            // never reopened after midnight. waterGoal is a setting, not a
+            // daily total, so it's read regardless of staleness.
+            val today = todayDateKey()
+            val isStale = prefs.getInt(KEY_SYNC_DATE_KEY, 0) != today
+            if (isStale) {
+                prefs.edit()
+                    .putInt(KEY_WATER_ML, 0)
+                    .putInt(KEY_LOGS_TODAY, 0)
+                    .putInt(KEY_SYNC_DATE_KEY, today)
+                    .apply()
+            }
+
+            val waterMl = if (isStale) 0 else prefs.getInt(KEY_WATER_ML, 0)
             val waterGoal = prefs.getInt(KEY_WATER_GOAL, DEFAULT_GOAL).let { if (it <= 0) DEFAULT_GOAL else it }
-            val logsToday = prefs.getInt(KEY_LOGS_TODAY, 0)
+            val logsToday = if (isStale) 0 else prefs.getInt(KEY_LOGS_TODAY, 0)
 
             val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
             val minWidthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, WIDE_MIN_WIDTH_DP)

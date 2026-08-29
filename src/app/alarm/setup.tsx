@@ -23,7 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, FontFace, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import * as BarcodeAlarmStorage from '@/utils/BarcodeAlarmStorage';
 
@@ -316,7 +316,7 @@ export default function AlarmSetupScreen() {
                 Alarms may trigger late or be blocked by Android power saving.
               </ThemedText>
               <TouchableOpacity onPress={requestExactAlarmPermission} style={{ marginTop: Spacing.one }}>
-                <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>Configure Permission</Text>
+                <Text style={{ color: theme.primary, fontFamily: FontFace.bold, fontSize: 13 }}>Configure Permission</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -369,7 +369,7 @@ export default function AlarmSetupScreen() {
             <TouchableOpacity onPress={() => setIsScannerVisible(false)} style={styles.scannerClose}>
               <Feather name="x" size={24} color="#FFF" />
             </TouchableOpacity>
-            <ThemedText style={{ color: '#FFF', fontWeight: '800' }}>Align Barcode in Frame</ThemedText>
+            <ThemedText style={{ color: '#FFF', fontFamily: FontFace.bold }}>Align Barcode in Frame</ThemedText>
             <TouchableOpacity onPress={handleSelectFromGallery} style={styles.scannerClose}>
               <Feather name="image" size={20} color="#FFF" />
             </TouchableOpacity>
@@ -451,7 +451,7 @@ function WheelPickerColumn({ items, selectedValue, onValueChange, theme, visible
               <Text
                 style={{
                   fontSize: isSelected ? 22 : 16,
-                  fontWeight: isSelected ? '800' : '400',
+                  fontFamily: isSelected ? FontFace.bold : FontFace.regular,
                   color: isSelected ? theme.primary : theme.textSecondary,
                   opacity: isSelected ? 1 : 0.4,
                 }}
@@ -537,7 +537,7 @@ function TimePickerModal({ visible, onClose, selectedDate, onSelectTime, theme }
               visible={visible}
             />
 
-            <Text style={{ fontSize: 20, fontWeight: '800', color: theme.textSecondary, marginTop: -4 }}>:</Text>
+            <Text style={{ fontSize: 20, fontFamily: FontFace.bold, color: theme.textSecondary, marginTop: -4 }}>:</Text>
 
             {/* Minutes Column */}
             <WheelPickerColumn
@@ -565,7 +565,7 @@ function TimePickerModal({ visible, onClose, selectedDate, onSelectTime, theme }
               <ThemedText type="small">Cancel</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleSave} style={[styles.dialogBtn, { backgroundColor: theme.primary, borderWidth: 0 }]}>
-              <Text style={{ color: '#FFF', fontWeight: '700' }}>Save</Text>
+              <Text style={{ color: '#FFF', fontFamily: FontFace.bold }}>Save</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -655,6 +655,7 @@ const styles = StyleSheet.create({
   },
   digitText: {
     fontSize: 28,
+    fontFamily: FontFace.regular,
     marginVertical: Spacing.one,
   },
   btnRow: {

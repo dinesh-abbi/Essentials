@@ -29,7 +29,7 @@ import Animated, {
   useReducedMotion,
 } from 'react-native-reanimated';
 
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, FontFace, Radius, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
@@ -205,7 +205,7 @@ function AnimatedBar({
 
   return (
     <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={styles.barCol}>
-      <Text style={[styles.barValText, { color: isSelected ? colors.primary : colors.textSecondary, fontWeight: isSelected ? '900' : '700' }]}>
+      <Text style={[styles.barValText, { color: isSelected ? colors.primary : colors.textSecondary, fontFamily: FontFace.bold }]}>
         {totalMl > 0 ? `${(totalMl / 1000).toFixed(1)}L` : '0'}
       </Text>
       <View style={[styles.barTrack, { backgroundColor: colors.backgroundSelected, borderColor: isSelected ? colors.primary : 'transparent', borderWidth: isSelected ? 1.5 : 0 }]}>
@@ -217,7 +217,7 @@ function AnimatedBar({
           ]}
         />
       </View>
-      <Text style={[styles.barLabel, { color: isSelected ? colors.primary : colors.text, fontWeight: isSelected ? '900' : '700' }]}>{dayName}</Text>
+      <Text style={[styles.barLabel, { color: isSelected ? colors.primary : colors.text, fontFamily: FontFace.bold }]}>{dayName}</Text>
     </TouchableOpacity>
   );
 }
@@ -1009,7 +1009,7 @@ export default function WaterDashboardScreen() {
           <View style={styles.modalOverlay}>
             <View style={[styles.editCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
               <Text style={[styles.editTitle, { color: colors.text }]}>Set Daily Target</Text>
-              <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 16 }}>
+              <Text style={{ color: colors.textSecondary, fontFamily: FontFace.regular, fontSize: 12, marginBottom: 16 }}>
                 Adjust your daily target water intake to keep track of your hydration progress.
               </Text>
 
@@ -1021,14 +1021,14 @@ export default function WaterDashboardScreen() {
                     onPress={() => handleSaveGoal(presetMl)}
                     style={[styles.presetBtn, { borderColor: colors.border }]}
                   >
-                    <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>
+                    <Text style={{ color: colors.primary, fontFamily: FontFace.bold, fontSize: 13 }}>
                       {presetMl / 1000}L
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={{ color: colors.textSecondary, fontSize: 10, fontWeight: '700', marginTop: 12, marginBottom: 6 }}>
+              <Text style={{ color: colors.textSecondary, fontSize: 10, fontFamily: FontFace.bold, marginTop: 12, marginBottom: 6 }}>
                 CUSTOM TARGET (ML)
               </Text>
               
@@ -1057,7 +1057,7 @@ export default function WaterDashboardScreen() {
                   }}
                   style={[styles.actionBtn, { borderColor: colors.border }]}
                 >
-                  <Text style={{ color: colors.text, fontWeight: '700', fontSize: 13 }}>Cancel</Text>
+                  <Text style={{ color: colors.text, fontFamily: FontFace.bold, fontSize: 13 }}>Cancel</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -1067,7 +1067,7 @@ export default function WaterDashboardScreen() {
                   }}
                   style={[styles.actionBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
                 >
-                  <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Save</Text>
+                  <Text style={{ color: '#FFF', fontFamily: FontFace.bold, fontSize: 13 }}>Save</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1099,7 +1099,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: 1.5,
   },
   centered: {
@@ -1129,7 +1129,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -1166,12 +1166,12 @@ const styles = StyleSheet.create({
   },
   percentNum: {
     fontSize: 42,
-    fontWeight: '900',
+    fontFamily: FontFace.bold,
     letterSpacing: -1,
   },
   percentLabel: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: 1,
     marginTop: -2,
   },
@@ -1190,16 +1190,16 @@ const styles = StyleSheet.create({
   },
   mainVol: {
     fontSize: 34,
-    fontWeight: '900',
+    fontFamily: FontFace.bold,
     letterSpacing: -1,
   },
   volUnit: {
     fontSize: 18,
-    fontWeight: '500',
+    fontFamily: FontFace.medium,
   },
   goalLabel: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: FontFace.semibold,
   },
   quickAddRow: {
     flexDirection: 'row',
@@ -1219,7 +1219,7 @@ const styles = StyleSheet.create({
   },
   quickBtnText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
   },
   timelineCard: {
     width: '100%',
@@ -1231,7 +1231,7 @@ const styles = StyleSheet.create({
   },
   timelineTitle: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: 0.8,
   },
   timelineDotsRow: {
@@ -1251,12 +1251,12 @@ const styles = StyleSheet.create({
   },
   dotLabel: {
     fontSize: 8,
-    fontWeight: '600',
+    fontFamily: FontFace.semibold,
   },
   sectionTitle: {
     alignSelf: 'flex-start',
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: 0.8,
     marginTop: 24,
     marginBottom: 8,
@@ -1282,10 +1282,11 @@ const styles = StyleSheet.create({
   },
   logAmount: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
   },
   logTime: {
     fontSize: 11,
+    fontFamily: FontFace.regular,
     marginTop: 1,
   },
   deleteBtn: {
@@ -1298,7 +1299,7 @@ const styles = StyleSheet.create({
   },
   emptyLogsText: {
     fontSize: 13,
-    fontWeight: '500',
+    fontFamily: FontFace.medium,
   },
   modalOverlay: {
     flex: 1,
@@ -1317,7 +1318,7 @@ const styles = StyleSheet.create({
   },
   editTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: -0.5,
     marginBottom: 4,
   },
@@ -1341,6 +1342,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 13,
+    fontFamily: FontFace.regular,
   },
   modalActions: {
     flexDirection: 'row',
@@ -1370,7 +1372,7 @@ const styles = StyleSheet.create({
   },
   monthLabel: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
   },
   chartCard: {
     borderRadius: Radius.md,
@@ -1383,12 +1385,12 @@ const styles = StyleSheet.create({
   },
   chartTitle: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: 0.8,
   },
   chartSubtitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
   },
   barsContainer: {
     flexDirection: 'row',
@@ -1404,6 +1406,7 @@ const styles = StyleSheet.create({
   },
   barValText: {
     fontSize: 9,
+    fontFamily: FontFace.regular,
   },
   barTrack: {
     width: 14,
@@ -1418,6 +1421,7 @@ const styles = StyleSheet.create({
   },
   barLabel: {
     fontSize: 10,
+    fontFamily: FontFace.regular,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -1434,12 +1438,12 @@ const styles = StyleSheet.create({
   },
   statVal: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     marginTop: 4,
   },
   statLabel: {
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: FontFace.semibold,
   },
   breakdownCard: {
     borderRadius: Radius.md,
@@ -1460,7 +1464,7 @@ const styles = StyleSheet.create({
     width: 32,
     textAlign: 'center',
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
   },
   gridContainer: {
     flexDirection: 'row',
@@ -1480,7 +1484,7 @@ const styles = StyleSheet.create({
   },
   cellText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
   },
   legendRow: {
     flexDirection: 'row',
@@ -1491,7 +1495,7 @@ const styles = StyleSheet.create({
   },
   legendLabel: {
     fontSize: 9,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
   },
   legendDot: {
     width: 10,

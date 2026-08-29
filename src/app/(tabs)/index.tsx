@@ -1,194 +1,422 @@
 import { Feather } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import {
-  ScrollView,
+  ActivityIndicator,
   StyleSheet,
   Text,
+  TextInput,
   View,
   useColorScheme,
-  TextInput,
-  TouchableOpacity,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop, ClipPath, Rect, Circle, G } from 'react-native-svg';
 import Animated, {
-  FadeInDown,
-  FadeInUp,
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withSequence,
-  withTiming,
-  withSpring,
   Easing,
   useAnimatedProps,
-  interpolateColor,
+  useAnimatedStyle,
   useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
 } from 'react-native-reanimated';
-import type { ViewProps } from 'react-native';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import Skeleton from '@/components/SkeletonLoader';
+import Plant from '@/components/illustrations/Plant';
+import Sun from '@/components/illustrations/Sun';
+import Wallet from '@/components/illustrations/Wallet';
 import {
   BottomTabInset,
   Colors,
-  Fonts,
+  HitTarget,
   MaxContentWidth,
+  Motion,
   Radius,
   Spacing,
+  Type,
 } from '@/constants/theme';
 import * as AttendanceStorage from '@/utils/AttendanceStorage';
 import * as PurchasesStorage from '@/utils/PurchasesStorage';
 import * as WaterStorage from '@/utils/WaterStorage';
 import * as WidgetSync from '@/utils/WidgetSync';
-import * as NotificationsUtil from '@/utils/notifications'; // kept for future use
 import { useAuth } from '@/contexts/AuthContext';
 import * as BarcodeAlarmStorage from '@/utils/BarcodeAlarmStorage';
+import { useTabBarScrollHandler, showTabBar } from '@/utils/tabBarVisibility';
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
-// Solid graphite panel — replaces the former translucent GlassView. Depth now
-// comes from the surface/border tokens, not a blur layer (cheaper + de-glassed).
-function Panel({ style, ...rest }: ViewProps) {
-  return <View style={style} {...rest} />;
-}
+type Palette = typeof Colors.dark;
 
-// ─── Odometer Number Counter ─────────────────────────────────────────────────
+/**
+ * A presentation-layer budget. There is no budget concept in the data model —
+ * `PurchaseLog` is {id, name, cost, category, timestamp} and nothing persists a
+ * target — so this is a UI constant, not a stored setting. Hydration
+ * deliberately does NOT work this way: it reads the real, user-configurable
+ * goal from WaterStorage.getUserWaterGoal().
+ */
+const DAILY_SPEND_BUDGET = 800;
 
-function AnimatedNumber({ value, style, prefix = '' }: { value: number; style: any; prefix?: string }) {
-  const animatedValue = useSharedValue(0);
-  const reduceMotion = useReducedMotion();
+const SPARK_DAYS = 7;
+const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+
+// ─── Number counter ───────────────────────────────────────────────────────────
+
+/**
+ * Counts to `value` on the UI thread by driving a disabled TextInput's `text`
+ * prop — RN's <Text> has no animatable text prop.
+ *
+ * Both loaded faces ship the `tnum` OpenType feature (verified against the
+ * shipped .ttf), so the tabular figures are real fixed-width digits and the
+ * 84px hero cannot jitter its own width — or shove "ml" beside it — mid-count.
+ */
+function AnimatedNumber({
+  value,
+  prefix = '',
+  textStyle,
+  color,
+  reduceMotion,
+}: {
+  value: number;
+  prefix?: string;
+  textStyle: any;
+  color: string;
+  reduceMotion: boolean;
+}) {
+  const shown = useSharedValue(0);
 
   useEffect(() => {
-    // Count-up on value change — but snap instantly under reduced motion.
-    animatedValue.value = reduceMotion
+    shown.value = reduceMotion
       ? value
-      : withTiming(value, { duration: 1500, easing: Easing.out(Easing.quad) });
-  }, [value, reduceMotion]);
+      : withTiming(value, { duration: Motion.duration.count, easing: Easing.out(Easing.cubic) });
+  }, [value, reduceMotion, shown]);
 
   const animatedProps = useAnimatedProps(() => {
-    return {
-      text: `${prefix}${Math.round(animatedValue.value)}`,
-    } as any;
+    return { text: `${prefix}${Math.round(shown.value).toLocaleString('en-IN')}` } as any;
   });
 
   return (
     <AnimatedTextInput
       underlineColorAndroid="transparent"
       editable={false}
-      value={`${prefix}${value}`} // Fallback
+      accessible={false}
+      importantForAccessibility="no"
+      value={`${prefix}${value}`}
       animatedProps={animatedProps}
-      // Instrument readout: monospaced + tabular figures so digits keep equal
-      // width and the count-up doesn't jitter the layout.
-      style={[style, { padding: 0, margin: 0, fontFamily: Fonts?.mono, fontVariant: ['tabular-nums'] }]}
+      style={[textStyle, styles.numberInput, { color }]}
     />
   );
 }
 
-// ─── Pulse Dot Indicator ──────────────────────────────────────────────────────
+// ─── Water vessel ─────────────────────────────────────────────────────────────
 
-function PulseDot({ color, isActive, size = 12 }: { color: string; isActive: boolean; size?: number }) {
-  const scale = useSharedValue(1);
-  const opacity = useSharedValue(0.4);
-  const reduceMotion = useReducedMotion();
+const VESSEL_WIDTH = 60;
+const VESSEL_HEIGHT = 124;
+const WAVE_AMPLITUDE = 3.2;
+// Points sampled across the width to draw the curve, connected with straight
+// `L` segments rather than bezier curves (cheaper inside a per-frame
+// worklet). At this density (~3dp between samples against a 3.2dp
+// amplitude) the facets are well below what's perceptible on a phone
+// screen — the wave reads as smooth without the extra bezier-control-point
+// math.
+const WAVE_SAMPLES = 18;
+
+/**
+ * A pill/capsule vessel — full stadium shape, liquid rising from the bottom.
+ * Built entirely as one SVG so the wave can genuinely clip to the pill's
+ * rounded corners (a plain View's overflow:hidden can't clip a jagged
+ * animated path the way a `<ClipPath>` can). Two sine curves at different
+ * speed/amplitude/opacity for a bit of parallax, plus bubbles clipped to the
+ * live liquid region.
+ */
+function WaterVessel({
+  ratio,
+  colors,
+  reduceMotion,
+  logTick,
+}: {
+  ratio: number;
+  colors: Palette;
+  reduceMotion: boolean;
+  /** Bumped by the screen on every successful `addWater`; 0 = "since mount,
+   *  nothing logged yet" so the pulse never fires on first paint. */
+  logTick: number;
+}) {
+  const level = useSharedValue(0); // 0..1, the fill fraction
+  const phase1 = useSharedValue(0);
+  const phase2 = useSharedValue(0);
+  const bubble1 = useSharedValue(0);
+  const bubble2 = useSharedValue(0);
+  const pulse = useSharedValue(0);
+  const hasMounted = useRef(false);
 
   useEffect(() => {
-    if (isActive && !reduceMotion) {
-      scale.value = withRepeat(withTiming(2.2, { duration: 1200, easing: Easing.out(Easing.quad) }), -1, false);
-      opacity.value = withRepeat(withSequence(withTiming(0, { duration: 1200, easing: Easing.out(Easing.quad) })), -1, false);
-    } else {
-      scale.value = 1;
-      opacity.value = 0;
+    const target = clamp01(ratio);
+    if (reduceMotion) {
+      level.value = target;
+      hasMounted.current = true;
+      return;
     }
-  }, [isActive, reduceMotion]);
+    // First paint charges the vessel with a clean ease. Every change after
+    // that is a direct response to a tap, so it's allowed a small spring
+    // overshoot — water actually slops up and settles when you pour more in.
+    level.value = hasMounted.current
+      ? withSpring(target, { damping: 11, stiffness: 120, mass: 0.7 })
+      : withTiming(target, { duration: Motion.duration.entrance + 150, easing: Easing.out(Easing.cubic) });
+    hasMounted.current = true;
+  }, [ratio, reduceMotion, level]);
 
-  const ringStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }));
-
-  const radius = size / 2;
-
-  return (
-    <View style={styles.pulseContainer}>
-      {isActive && (
-        <Animated.View
-          style={[
-            styles.pulseRing,
-            {
-              backgroundColor: color,
-              width: size,
-              height: size,
-              borderRadius: radius,
-            },
-            ringStyle,
-          ]}
-        />
-      )}
-      <View
-        style={[
-          styles.solidDot,
-          {
-            backgroundColor: color,
-            width: size,
-            height: size,
-            borderRadius: radius,
-          },
-        ]}
-      />
-    </View>
-  );
-}
-
-// ─── Progress Strip for Water Widget ──────────────────────────────────────────
-
-function ProgressStrip({ percent, trackColor, fillColor }: { percent: number; trackColor: string; fillColor: string; }) {
-  const animatedWidth = useSharedValue(0);
-
+  // Two independent, opposite-direction loops — so the combined surface
+  // never repeats in an obviously mechanical way. Skipped under reduce-motion.
   useEffect(() => {
-    animatedWidth.value = withSpring(percent, { damping: 15, stiffness: 90 });
-  }, [percent]);
+    if (reduceMotion) return;
+    phase1.value = withRepeat(withTiming(Math.PI * 2, { duration: 2600, easing: Easing.linear }), -1, false);
+    phase2.value = withRepeat(withTiming(-Math.PI * 2, { duration: 3400, easing: Easing.linear }), -1, false);
+    bubble1.value = withRepeat(withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.sin) }), -1, false);
+    bubble2.value = withRepeat(withTiming(1, { duration: 2800, easing: Easing.inOut(Easing.sin) }), -1, false);
+  }, [reduceMotion, phase1, phase2, bubble1, bubble2]);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    width: `${animatedWidth.value}%`
-  }));
+  // One water-tinted flash per log.
+  useEffect(() => {
+    if (logTick === 0 || reduceMotion) return;
+    pulse.value = withSequence(
+      withTiming(1, { duration: 100, easing: Easing.out(Easing.cubic) }),
+      withTiming(0, { duration: 300, easing: Easing.out(Easing.cubic) }),
+    );
+  }, [logTick, reduceMotion, pulse]);
+
+  const wavePath = (amp: number, ph: number) => {
+    'worklet';
+    const levelY = VESSEL_HEIGHT - level.value * VESSEL_HEIGHT;
+    let d = '';
+    for (let i = 0; i <= WAVE_SAMPLES; i++) {
+      const x = (VESSEL_WIDTH / WAVE_SAMPLES) * i;
+      const y = levelY + Math.sin((i / WAVE_SAMPLES) * Math.PI * 2 + ph) * amp;
+      d += i === 0 ? `M ${x},${y}` : ` L ${x.toFixed(1)},${y.toFixed(1)}`;
+    }
+    d += ` L ${VESSEL_WIDTH},${VESSEL_HEIGHT} L 0,${VESSEL_HEIGHT} Z`;
+    return d;
+  };
+
+  const fillProps = useAnimatedProps(() => ({ d: wavePath(WAVE_AMPLITUDE, phase1.value) } as any));
+  const clipFillProps = useAnimatedProps(() => ({ d: wavePath(WAVE_AMPLITUDE, phase1.value) } as any));
+  const linePropsMain = useAnimatedProps(() => {
+    'worklet';
+    const levelY = VESSEL_HEIGHT - level.value * VESSEL_HEIGHT;
+    let d = '';
+    for (let i = 0; i <= WAVE_SAMPLES; i++) {
+      const x = (VESSEL_WIDTH / WAVE_SAMPLES) * i;
+      const y = levelY + Math.sin((i / WAVE_SAMPLES) * Math.PI * 2 + phase1.value) * WAVE_AMPLITUDE;
+      d += i === 0 ? `M ${x},${y}` : ` L ${x.toFixed(1)},${y.toFixed(1)}`;
+    }
+    return { d } as any;
+  });
+  const fillProps2 = useAnimatedProps(() => ({ d: wavePath(WAVE_AMPLITUDE * 0.6, phase2.value) } as any));
+  const pulseProps = useAnimatedProps(() => ({ opacity: pulse.value * 0.5 } as any));
+
+  const bubbleTravel = VESSEL_HEIGHT * 0.42;
+  const bubble1Props = useAnimatedProps(() => {
+    'worklet';
+    const baseY = VESSEL_HEIGHT - 14;
+    return {
+      cx: VESSEL_WIDTH * 0.36,
+      cy: baseY - bubble1.value * bubbleTravel,
+      opacity: reduceMotion ? 0 : Math.sin(bubble1.value * Math.PI) * 0.55,
+    } as any;
+  });
+  const bubble2Props = useAnimatedProps(() => {
+    'worklet';
+    const baseY = VESSEL_HEIGHT - 22;
+    return {
+      cx: VESSEL_WIDTH * 0.62,
+      cy: baseY - bubble2.value * bubbleTravel,
+      opacity: reduceMotion ? 0 : Math.sin(bubble2.value * Math.PI) * 0.4,
+    } as any;
+  });
+
+  const outlineR = VESSEL_WIDTH / 2;
 
   return (
-    <View style={[styles.strip, { backgroundColor: trackColor }]}>
-      <Animated.View
-        style={[styles.stripFill, { backgroundColor: fillColor }, animatedStyle]}
-      />
+    <View
+      accessible={false}
+      importantForAccessibility="no-hide-descendants"
+      style={styles.vesselWrap}
+    >
+      <Svg width={VESSEL_WIDTH} height={VESSEL_HEIGHT} viewBox={`0 0 ${VESSEL_WIDTH} ${VESSEL_HEIGHT}`}>
+        <Defs>
+          <ClipPath id="vesselOutline">
+            <Rect x={0} y={0} width={VESSEL_WIDTH} height={VESSEL_HEIGHT} rx={outlineR} ry={outlineR} />
+          </ClipPath>
+          <ClipPath id="liquidOnly">
+            <AnimatedPath animatedProps={clipFillProps} />
+          </ClipPath>
+          <SvgGradient id="vesselFillGrad" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={colors.waterStrong} />
+            <Stop offset="1" stopColor={colors.water} />
+          </SvgGradient>
+        </Defs>
+
+        <G clipPath="url(#vesselOutline)">
+          <Rect x={0} y={0} width={VESSEL_WIDTH} height={VESSEL_HEIGHT} fill={colors.surface} />
+          <AnimatedPath animatedProps={fillProps2} fill={colors.water} opacity={0.35} />
+          <AnimatedPath animatedProps={fillProps} fill="url(#vesselFillGrad)" />
+
+          <G clipPath="url(#liquidOnly)">
+            <AnimatedCircle r={2} fill={colors.textHi} animatedProps={bubble1Props} />
+            <AnimatedCircle r={1.4} fill={colors.textHi} animatedProps={bubble2Props} />
+          </G>
+
+          <AnimatedPath
+            animatedProps={linePropsMain}
+            fill="none"
+            stroke={colors.waterStrong}
+            strokeWidth={1.4}
+          />
+
+          <AnimatedRect
+            x={0}
+            y={0}
+            width={VESSEL_WIDTH}
+            height={VESSEL_HEIGHT}
+            fill={colors.waterStrong}
+            animatedProps={pulseProps}
+          />
+        </G>
+
+        <Rect
+          x={0.75}
+          y={0.75}
+          width={VESSEL_WIDTH - 1.5}
+          height={VESSEL_HEIGHT - 1.5}
+          rx={outlineR - 0.75}
+          ry={outlineR - 0.75}
+          fill="none"
+          stroke={colors.hairline}
+          strokeWidth={1.5}
+        />
+      </Svg>
     </View>
   );
 }
 
-// ─── Spend Power Core (Compact) ───────────────────────────────────────────────
+// ─── Sparkline ────────────────────────────────────────────────────────────────
 
-function SpendPowerCore({ spend, limit = 2000, isDark }: { spend: number; limit?: number; isDark: boolean }) {
-  const ratio = Math.min(spend / limit, 1);
-  const activeSegments = Math.ceil(ratio * 4); // 0 to 4 segments to fit neatly
+/**
+ * Seven days of spend, drawn by hand in react-native-svg. Every point is
+ * real: bucketed from the same `getPurchases()` result the total comes from.
+ * Stroke is `textMid`, not `water` — the one-accent rule reserves `water` for
+ * hydration; spend stays inside the neutral ramp.
+ */
+function Sparkline({ series, colors }: { series: number[]; colors: Palette }) {
+  const W = 60;
+  const H = 22;
+  const max = Math.max(...series, 1);
+  const pts = series.map((v, i) => {
+    const x = (i / (SPARK_DAYS - 1)) * W;
+    const y = H - 2 - (v / max) * (H - 5);
+    return [x, y] as const;
+  });
+  const line = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const area = `${line} L ${W},${H} L 0,${H} Z`;
 
   return (
-    <View style={styles.powerCoreContainer}>
-      <View style={styles.powerCoreRow}>
-        {Array.from({ length: 4 }, (_, i) => {
-          const isActive = i < activeSegments;
-          const c = isDark ? Colors.dark : Colors.light;
-          // Calm → caution → alarm as spend climbs (semantic, not a rainbow).
-          let color: string = c.signal;
-          if (i === 2) color = c.warn;
-          if (i === 3) color = c.alert;
+    <Svg width={W} height={H} accessibilityLabel="Spend over the last seven days">
+      <Defs>
+        <SvgGradient id="sparkFade" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={colors.textMid} stopOpacity="0.22" />
+          <Stop offset="1" stopColor={colors.textMid} stopOpacity="0" />
+        </SvgGradient>
+      </Defs>
+      <Path d={area} fill="url(#sparkFade)" />
+      <Path d={line} fill="none" stroke={colors.textMid} strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
 
+// ─── Secondary card shell ─────────────────────────────────────────────────────
+
+/**
+ * A quiet card: `surface` fill, one `hairline` border, no shadow. Separation
+ * from the background comes entirely from that hairline plus the space around
+ * it — not elevation. The bracket label stands in for a plain title.
+ */
+function StatCard({
+  bracket,
+  onPress,
+  colors,
+  accessibilityLabel,
+  illustration,
+  children,
+}: {
+  bracket: string;
+  onPress: () => void;
+  colors: Palette;
+  accessibilityLabel: string;
+  illustration: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      haptic="light"
+      pressOpacity={0.85}
+      style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.hairline }]}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+    >
+      <Text style={[Type.bracketLabel, { color: colors.textMid }]}>{bracket}</Text>
+      <View style={styles.statBody}>{children}</View>
+      {/* At most one illustration per card, low emphasis, corner-tucked. */}
+      <View style={styles.statIllo} pointerEvents="none">
+        {illustration}
+      </View>
+    </AnimatedPressable>
+  );
+}
+
+// ─── Hourly hydration (AM / PM) ─────────────────────────────────────────────
+
+/**
+ * Restyled AM/PM dot grid. Only draws the real tracked window (6-22 —
+ * WaterStorage.getTodayHourlyStatus()'s own window), not a fake 24-hour grid,
+ * so there's no dead cell pretending to be trackable.
+ */
+const AM_HOURS = [6, 7, 8, 9, 10, 11];
+const PM_HOURS = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
+
+function HourlyDots({
+  hourlyMap,
+  currentHour,
+  colors,
+}: {
+  hourlyMap: Record<number, boolean>;
+  currentHour: number;
+  colors: Palette;
+}) {
+  const loggedCount = Object.values(hourlyMap).filter(Boolean).length;
+  const totalCount = AM_HOURS.length + PM_HOURS.length;
+
+  const renderRow = (label: string, hours: number[]) => (
+    <View style={styles.hourRow}>
+      <Text style={[Type.subline, styles.hourRowLabel, { color: colors.textMid }]}>{label}</Text>
+      <View style={styles.hourDotsWrap}>
+        {hours.map((h) => {
+          const on = hourlyMap[h] === true;
+          const isNow = h === currentHour;
           return (
             <View
-              key={i}
+              key={h}
               style={[
-                styles.powerCoreSegment,
-                {
-                  backgroundColor: isActive ? color : c.border,
-                  opacity: isActive ? 1 : 0.4,
-                },
+                styles.hourDot,
+                { backgroundColor: on ? colors.water : colors.hairline },
+                isNow && { borderWidth: 1.5, borderColor: colors.water },
               ]}
             />
           );
@@ -196,223 +424,62 @@ function SpendPowerCore({ spend, limit = 2000, isDark }: { spend: number; limit?
       </View>
     </View>
   );
-}
-
-// ─── Camera Viewfinder Scanner ───────────────────────────────────────────────
-
-function CameraViewfinder({ offlineCount, colors, isDark }: { offlineCount: number; colors: any; isDark: boolean }) {
-  const scanLineY = useSharedValue(0);
-  const pulseOpacity = useSharedValue(0.4);
-  const reduceMotion = useReducedMotion();
-
-  useEffect(() => {
-    if (reduceMotion) {
-      pulseOpacity.value = 1;
-      return;
-    }
-    scanLineY.value = withRepeat(
-      withSequence(
-        withTiming(32, { duration: 1500, easing: Easing.inOut(Easing.quad) }),
-        withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.quad) })
-      ),
-      -1,
-      true
-    );
-
-    pulseOpacity.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 1000 }),
-        withTiming(0.4, { duration: 1000 })
-      ),
-      -1,
-      true
-    );
-  }, [reduceMotion]);
-
-  const laserStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: scanLineY.value }],
-  }));
-
-  const bracketStyle = useAnimatedStyle(() => ({
-    opacity: pulseOpacity.value,
-  }));
-
-  const indicatorColor = offlineCount > 0 ? colors.alert : colors.success;
 
   return (
-    <View style={styles.viewfinderContainer}>
-      <Animated.View style={[styles.viewfinderBrackets, bracketStyle]}>
-        <View style={[styles.bracketTL, { borderColor: indicatorColor }]} />
-        <View style={[styles.bracketTR, { borderColor: indicatorColor }]} />
-        <View style={[styles.bracketBL, { borderColor: indicatorColor }]} />
-        <View style={[styles.bracketBR, { borderColor: indicatorColor }]} />
-        
-        <Feather name="camera" size={16} color={indicatorColor} />
-
-        <Animated.View style={[styles.laserLine, { backgroundColor: indicatorColor }, laserStyle]} />
-      </Animated.View>
+    <View
+      style={styles.hourlySection}
+      accessible
+      accessibilityLabel={`Hourly hydration. ${loggedCount} of ${totalCount} tracked hours logged today.`}
+    >
+      <Text style={[Type.bracketLabel, { color: colors.textMid }]}>[ HOURS ]</Text>
+      <View style={styles.hourRows}>
+        {renderRow('AM', AM_HOURS)}
+        {renderRow('PM', PM_HOURS)}
+      </View>
     </View>
   );
 }
 
-// ─── Water Fluid Chamber Bottle ──────────────────────────────────────────────
-
-function WaterChamber({ percent, colors, isDark }: { percent: number; colors: any; isDark: boolean }) {
-  return (
-    <View style={[styles.chamberContainer, { borderColor: colors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }]}>
-      {/* Dynamic filling water block — bubbles removed (ambient loop) */}
-      <AnimatedWaterFill percent={percent} colors={colors} />
-    </View>
-  );
-}
-
-function AnimatedWaterFill({ percent, colors }: { percent: number; colors: any }) {
-  const animatedHeight = useSharedValue(0);
-
-  useEffect(() => {
-    animatedHeight.value = withSpring(percent, { damping: 15, stiffness: 90 });
-  }, [percent]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    height: `${animatedHeight.value}%`,
-  }));
-
-  return (
-    <Animated.View
-      style={[
-        styles.chamberFill,
-        { backgroundColor: colors.aqua },
-        animatedStyle,
-      ]}
-    />
-  );
-}
-
-// ─── Primitive Layout Utilities ────────────────────────────────────────────────
-
-function Label({ text, color }: { text: string; color: string }) {
-  return (
-    <Text style={[styles.label, { color }]}>{text}</Text>
-  );
-}
-
-function Dot({ color }: { color: string }) {
-  return <View style={[styles.dot, { backgroundColor: color }]} />;
-}
-
-function AnimatedRingingBell({ colors }: { colors: any }) {
-  const rotation = useSharedValue(0);
-  const reduceMotion = useReducedMotion();
-
-  useEffect(() => {
-    if (reduceMotion) return;
-    rotation.value = withRepeat(
-      withSequence(
-        withTiming(15, { duration: 150 }),
-        withTiming(-15, { duration: 300 }),
-        withTiming(10, { duration: 250 }),
-        withTiming(-10, { duration: 200 }),
-        withTiming(0, { duration: 150 }),
-        withTiming(0, { duration: 2000 })
-      ),
-      -1,
-      false
-    );
-  }, [reduceMotion]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
-  }));
-
-  return (
-    <Animated.View style={animatedStyle}>
-      <Feather name="bell" size={24} color={colors.primary} />
-    </Animated.View>
-  );
-}
-
-const formatAlarmTime = (h: number, m: number) => {
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const hour12 = h % 12 || 12;
-  const minStr = m < 10 ? '0' + m : m;
-  return `${hour12}:${minStr} ${ampm}`;
-};
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const params = useLocalSearchParams();
-  const highlight = params.highlight;
   const quicklog = params.quicklog;
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const insets = useSafeAreaInsets();
-  
-  const isDark = scheme === 'dark';
-  const themeColors = Colors[scheme];
-  
-  // Colors come straight from the Cockpit tokens now — no local slate/blue
-  // overrides. `surface` is a solid graphite panel (glass removed); water uses
-  // the `aqua` domain tint so hydration reads distinct from the signal accent.
-  const colors = {
-    ...themeColors,
-    surface: themeColors.backgroundElement,
-  };
+  const reduceMotion = useReducedMotion();
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const colors = Colors[scheme] as Palette;
 
-  const waterHighlight = useSharedValue(0);
+  useFocusEffect(
+    useCallback(() => {
+      showTabBar();
+    }, [])
+  );
 
-  useEffect(() => {
-    if (highlight === 'water') {
-      waterHighlight.value = 0;
-      waterHighlight.value = withSequence(
-        withTiming(1, { duration: 600, easing: Easing.out(Easing.cubic) }),
-        withTiming(0, { duration: 1400, easing: Easing.inOut(Easing.ease) })
-      );
-      router.setParams({ highlight: undefined });
-    }
-  }, [highlight]);
-
-  // Quick-log from the home-screen widget's "+" tap (essentials:///?quicklog=250).
-  // Cleared immediately after consuming so a repeat tap with the same amount
-  // still triggers — mirrors how the notification YES_ACTION flow behaves.
-  useEffect(() => {
-    if (!quicklog) return;
-    const amount = Number(quicklog);
-    router.setParams({ quicklog: undefined });
-    if (!Number.isNaN(amount) && amount > 0) {
-      addWater(amount);
-    }
-  }, [quicklog]);
-
-  const highlightStyle = useAnimatedStyle(() => {
-    const borderColor = interpolateColor(
-      waterHighlight.value,
-      [0, 1],
-      ['transparent', colors.primary]
-    );
-    const shadowOpacity = waterHighlight.value * 0.6;
-    const shadowRadius = waterHighlight.value * 16;
-    return {
-      borderWidth: 2,
-      borderColor,
-      shadowColor: colors.primary,
-      shadowOpacity,
-      shadowRadius,
-      elevation: waterHighlight.value * 8,
-      borderRadius: Radius.xl,
-    };
-  });
+  const tabBarScrollHandler = useTabBarScrollHandler();
 
   const [offlineCount, setOfflineCount] = useState(0);
   const [lastCheckInTime, setLastCheckInTime] = useState<number | null>(null);
   const [todaySpend, setTodaySpend] = useState(0);
+  const [spendCount, setSpendCount] = useState(0);
+  const [spendSeries, setSpendSeries] = useState<number[]>(() => Array(SPARK_DAYS).fill(0));
   const [waterTotalMl, setWaterTotalMl] = useState(0);
   const [waterHourlyMap, setWaterHourlyMap] = useState<Record<number, boolean>>({});
   const [waterSaving, setWaterSaving] = useState(false);
+  // 0 = "nothing logged since mount" — WaterVessel reads this to skip the
+  // celebratory pulse on first paint and fire it only on a real tap.
+  const [logTick, setLogTick] = useState(0);
   const [waterGoal, setWaterGoal] = useState(WaterStorage.DEFAULT_DAILY_GOAL);
   const [alarmConfig, setAlarmConfig] = useState<BarcodeAlarmStorage.BarcodeAlarmConfig | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
+
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -430,8 +497,27 @@ export default function HomeScreen() {
           midnight.setHours(0, 0, 0, 0);
           const todayPs = purchases.filter((p) => p.timestamp >= midnight.getTime());
           setTodaySpend(todayPs.reduce((a, c) => a + c.cost, 0));
+          setSpendCount(todayPs.length);
 
-          setWaterTotalMl(await WaterStorage.getTodayTotalMl());
+          // Bucket the previous SPARK_DAYS days out of the same result — no
+          // extra fetch, and the sparkline is real data rather than ornament.
+          const buckets = Array(SPARK_DAYS).fill(0);
+          const dayMs = 86_400_000;
+          for (const p of purchases) {
+            const age = Math.floor((midnight.getTime() - p.timestamp) / dayMs);
+            const idx = SPARK_DAYS - 1 - (age + 1);
+            if (p.timestamp >= midnight.getTime()) buckets[SPARK_DAYS - 1] += p.cost;
+            else if (idx >= 0 && idx < SPARK_DAYS - 1) buckets[idx] += p.cost;
+          }
+          setSpendSeries(buckets);
+
+          let waterTotal = await WaterStorage.getTodayTotalMl();
+
+          const widgetData = await WidgetSync.readWidgetData();
+          if (widgetData && !widgetData.isStale && widgetData.waterMl > waterTotal) {
+            waterTotal = widgetData.waterMl;
+          }
+          setWaterTotalMl(waterTotal);
           setWaterHourlyMap(await WaterStorage.getTodayHourlyStatus());
 
           const userGoal = await WaterStorage.getUserWaterGoal();
@@ -440,6 +526,7 @@ export default function HomeScreen() {
           const alarm = await BarcodeAlarmStorage.getAlarmConfig();
           setAlarmConfig(alarm);
 
+          setNow(new Date());
           WidgetSync.sync();
         } catch (e) {
           console.error('load metrics failed', e);
@@ -456,9 +543,9 @@ export default function HomeScreen() {
     try {
       await WaterStorage.logWaterIntake(amount);
       const total = await WaterStorage.getTodayTotalMl();
-      const hourly = await WaterStorage.getTodayHourlyStatus();
       setWaterTotalMl(total);
-      setWaterHourlyMap(hourly);
+      setWaterHourlyMap(await WaterStorage.getTodayHourlyStatus());
+      setLogTick((n) => n + 1);
       WidgetSync.sync();
     } catch (e) {
       console.error('Add water failed', e);
@@ -475,9 +562,8 @@ export default function HomeScreen() {
         todayLogs.sort((a, b) => b.timestamp - a.timestamp);
         await WaterStorage.deleteWaterLog(todayLogs[0].id);
         const total = await WaterStorage.getTodayTotalMl();
-        const hourly = await WaterStorage.getTodayHourlyStatus();
         setWaterTotalMl(total);
-        setWaterHourlyMap(hourly);
+        setWaterHourlyMap(await WaterStorage.getTodayHourlyStatus());
         WidgetSync.sync();
       }
     } catch (e) {
@@ -487,557 +573,469 @@ export default function HomeScreen() {
     }
   };
 
-  const trackedHours = Object.values(waterHourlyMap).filter(Boolean).length;
-  const waterPct = Math.min(Math.round((waterTotalMl / waterGoal) * 100), 100);
+  // A quick-log fired from the home-screen widget arrives as a route param.
+  // Declared below addWater on purpose: referencing it from above captures the
+  // binding before initialisation, so the widget path could call a stale one.
+  useEffect(() => {
+    if (!quicklog) return;
+    const amount = Number(quicklog);
+    router.setParams({ quicklog: undefined });
+    if (!Number.isNaN(amount) && amount > 0) {
+      addWater(amount);
+    }
+  }, [quicklog]);
 
-  const now = new Date();
-  const greeting =
-    now.getHours() < 12 ? 'Good morning' : now.getHours() < 18 ? 'Good afternoon' : 'Good evening';
-  const currentHour = now.getHours();
+  // ── Derived ─────────────────────────────────────────────────────────────────
+  const ratio = waterGoal > 0 ? waterTotalMl / waterGoal : 0;
+  const waterPct = Math.min(100, Math.round(ratio * 100));
 
-  const dayStr = now.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' });
-  const displayName = user?.displayName ?? user?.email?.split('@')[0] ?? 'User';
+  const hours = now.getHours();
+  const headline = hours < 12 ? 'Good morning' : hours < 18 ? 'Good afternoon' : 'Good evening';
+  const firstName = (user?.displayName ?? user?.email?.split('@')[0] ?? 'there').split(' ')[0];
+  const initials = firstName.slice(0, 2).toUpperCase();
+  const photoUrl = user?.photoURL ?? null;
+
+  const hasCheckedIn = lastCheckInTime !== null;
+  const checkInStr = lastCheckInTime ? formatClock(new Date(lastCheckInTime)) : null;
 
   return (
-    <View style={[styles.root, { backgroundColor: themeColors.background }]}>
+    <View style={[styles.root, { backgroundColor: colors.bg }]}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <ScrollView
+        <Animated.ScrollView
           style={styles.scroll}
           contentContainerStyle={[
             styles.content,
-            { paddingBottom: BottomTabInset + insets.bottom + Spacing.three },
+            { paddingBottom: BottomTabInset + insets.bottom + Spacing.four },
           ]}
           showsVerticalScrollIndicator={false}
+          onScroll={tabBarScrollHandler}
+          scrollEventThrottle={16}
         >
-
-          {/* ── Header ───────────────────────────────────────────────────── */}
-          <Animated.View entering={FadeInDown.duration(600).springify()} style={styles.header}>
-            <View>
-              <Text style={[styles.greeting, { color: themeColors.textSecondary }]}>{greeting},</Text>
-              <Text style={[styles.appName, { color: themeColors.text }]}>{displayName}.</Text>
-            </View>
-            <View style={[styles.dateBadge, { backgroundColor: themeColors.backgroundSelected }]}>
-              <Text style={[styles.dateStr, { color: themeColors.text }]}>{dayStr}</Text>
-            </View>
-          </Animated.View>
-
-          {dashboardLoading ? (
-            <View style={{ gap: 16 }}>
-              {/* Row 1 Skeletons */}
-              <View style={styles.widgetGridRow}>
-                {/* Spend widget skeleton */}
-                <Panel style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <View style={{ width: '100%', gap: 10 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Skeleton width={50} height={12} />
-                      <Feather name="credit-card" size={14} color={colors.accent} />
-                    </View>
-                    <Skeleton width={100} height={32} style={{ marginTop: 4 }} />
-                    <Skeleton width={90} height={12} style={{ marginTop: 8 }} />
-                    <Skeleton width="100%" height={8} borderRadius={4} style={{ marginTop: 8 }} />
-                  </View>
-                </Panel>
-
-                {/* Check-in widget skeleton */}
-                <Panel style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border, alignItems: 'center' }]}>
-                  <View style={{ width: '100%', gap: 10 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Skeleton width={60} height={12} />
-                      <Feather name="aperture" size={13} color={colors.accent} />
-                    </View>
-                    <Skeleton width={56} height={56} borderRadius={28} style={{ alignSelf: 'center', marginTop: 4 }} />
-                    <Skeleton width={80} height={12} style={{ alignSelf: 'center', marginTop: 6 }} />
-                  </View>
-                </Panel>
-              </View>
-
-              {/* Row 2 Skeleton */}
-              <Panel style={[styles.widgetFullWidth, { backgroundColor: colors.surface, borderColor: 'transparent', borderWidth: 0 }]}>
-                <View style={{ flexDirection: 'row', width: '100%' }}>
-                  <View style={{ flex: 1, gap: 12, paddingVertical: 4 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Skeleton width={130} height={12} />
-                      <Feather name="droplet" size={14} color={colors.aqua} />
-                    </View>
-                    <Skeleton width={120} height={32} style={{ marginTop: 4 }} />
-                    {/* Timeline capsules row skeleton */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '90%', paddingVertical: 6 }}>
-                      {Array.from({ length: 17 }).map((_, i) => (
-                        <Skeleton key={i} width={5} height={14} borderRadius={2.5} />
-                      ))}
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 }}>
-                      <Skeleton width={32} height={28} borderRadius={14} />
-                      <Skeleton width={32} height={28} borderRadius={14} />
-                      <Skeleton width={80} height={12} style={{ marginLeft: 6 }} />
-                    </View>
-                  </View>
-                  <View style={{ width: 60, height: 110, justifyContent: 'center', alignItems: 'center' }}>
-                    <Skeleton width={50} height={100} borderRadius={25} />
-                  </View>
-                </View>
-              </Panel>
-            </View>
-          ) : (
-            <>
-              {/* ── Row 1: Spend & Check-in Squares (Apple Grid) ──────────────── */}
-              <Animated.View entering={FadeInUp.delay(100).duration(600).springify()} style={styles.widgetGridRow}>
-                
-                {/* Spend widget */}
-                <AnimatedPressable onPress={() => router.push('/purchases')} style={{ flex: 1 }}>
-                  <Panel style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <View style={styles.widgetHeader}>
-                      <Label text="SPEND" color={themeColors.textSecondary} />
-                      <Feather name="credit-card" size={14} color={colors.accent} />
-                    </View>
-                    
-                    <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
-                      <AnimatedNumber
-                        value={todaySpend}
-                        prefix="₹"
-                        style={[styles.widgetNumber, { color: themeColors.text }]}
-                      />
-                    </View>
-
-                    <View style={{ width: '100%', gap: 4 }}>
-                      <Text style={[styles.statusText, { color: themeColors.textSecondary, fontSize: 11 }]}>
-                        today's expenses
-                      </Text>
-                      <SpendPowerCore spend={todaySpend} isDark={isDark} />
-                    </View>
-                  </Panel>
-                </AnimatedPressable>
-
-                {/* Attendance Viewfinder widget */}
+          {/* ── Greeting ──────────────────────────────────────────────────
+              Big top margin, deliberate — the calm/uncrowded read starts
+              here, not just at the hero. */}
+          <EntranceView index={0} reduceMotion={reduceMotion} style={styles.greetingRow}>
+            <View style={styles.greetingText}>
+              <Text style={[Type.greeting, { color: colors.textMid }]}>Hi {firstName},</Text>
+              <View style={styles.headlineRow}>
+                <Text style={[Type.headline, { color: colors.textHi }]}>{headline}</Text>
                 <AnimatedPressable
-                  onPress={() => router.push('/attendance')}
-                  style={{ flex: 1 }}
+                  onPress={() => router.navigate('/profile' as any)}
+                  haptic="light"
+                  style={[styles.avatar, { backgroundColor: colors.surface, borderColor: colors.hairline }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open your profile"
                 >
-                  {(() => {
-                    const checkInTimeStr = lastCheckInTime
-                      ? new Date(lastCheckInTime).toLocaleTimeString('en-IN', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          timeZone: 'Asia/Kolkata',
-                        })
-                      : null;
+                  {photoUrl ? (
+                    <Image source={{ uri: photoUrl }} style={styles.avatarImage} contentFit="cover" />
+                  ) : (
+                    <Text style={[Type.bracketLabel, styles.avatarInitials, { color: colors.textMid }]}>
+                      {initials}
+                    </Text>
+                  )}
+                </AnimatedPressable>
+              </View>
+              <Text style={[Type.bracketLabel, styles.statusRow, { color: colors.textMid }]}>
+                <Text style={{ color: colors.water }}>[ TODAY ]</Text>
+                {'  ·  ' + formatDayStamp(now) + '  ·  ' + formatRemaining(now) + ' left'}
+              </Text>
+            </View>
+          </EntranceView>
 
-                    return (
-                      <Panel style={[styles.widgetSquare, { backgroundColor: colors.surface, borderColor: colors.border, alignItems: 'center' }]}>
-                        <View style={[styles.widgetHeader, { width: '100%' }]}>
-                          <Label text="CHECK-IN" color={themeColors.textSecondary} />
-                          <Feather name="aperture" size={13} color={colors.accent} />
-                        </View>
-                        
-                        <CameraViewfinder offlineCount={offlineCount} colors={colors} isDark={isDark} />
+          {/* ── Hydration hero ───────────────────────────────────────────
+              No card. Sits directly on `bg`, framed by space and a single
+              hairline top border that closes the section — not a shadow,
+              not a gradient, not a second surface. */}
+          <EntranceView index={1} reduceMotion={reduceMotion} style={styles.heroSection}>
+            {dashboardLoading ? (
+              <View style={{ gap: Spacing.three }}>
+                <Skeleton width={140} height={13} />
+                <View style={styles.heroTopRow}>
+                  <View style={{ gap: Spacing.two }}>
+                    <Skeleton width={200} height={88} />
+                    <Skeleton width={120} height={13} />
+                  </View>
+                  <Skeleton width={VESSEL_WIDTH} height={VESSEL_HEIGHT} borderRadius={VESSEL_WIDTH / 2} />
+                </View>
+              </View>
+            ) : (
+              <>
+                <AnimatedPressable
+                  onPress={() => router.push('/water')}
+                  haptic="light"
+                  accessibilityRole="button"
+                  accessibilityLabel={`Hydration. ${waterTotalMl} of ${waterGoal} millilitres, ${waterPct} percent. Open hydration detail.`}
+                >
+                  <View style={styles.heroHeadRow}>
+                    <Text style={[Type.bracketLabel, { color: colors.water }]}>[ HYDRATION ]</Text>
+                    <Text style={[Type.bracketLabel, { color: colors.textMid }]}>{waterPct}%</Text>
+                  </View>
 
-                        <View style={styles.statusRow}>
-                          <Dot color={offlineCount > 0 ? themeColors.alert : themeColors.success} />
-                          <Text style={[styles.statusText, { color: offlineCount > 0 ? themeColors.alert : themeColors.success, fontSize: 12 }]} numberOfLines={1}>
-                            {offlineCount > 0
-                              ? (checkInTimeStr ? `Pending • ${checkInTimeStr}` : `${offlineCount} log pending`)
-                              : (checkInTimeStr ? `Synced • ${checkInTimeStr}` : 'Synced')}
-                          </Text>
-                        </View>
-                      </Panel>
-                    );
-                  })()}
+                  {/* Number column sits beside the vessel — the vessel is
+                      what "water" is on this screen. */}
+                  <View style={styles.heroTopRow}>
+                    <View style={styles.heroNumberCol}>
+                      <View style={styles.heroNumberRow}>
+                        <AnimatedNumber
+                          value={waterTotalMl}
+                          textStyle={Type.hero}
+                          color={colors.textHi}
+                          reduceMotion={reduceMotion}
+                        />
+                        <Text style={[Type.heroUnit, styles.heroUnitText, { color: colors.textMid }]}>ml</Text>
+                      </View>
+                      <Text style={[Type.subline, { color: colors.textMid }]}>
+                        of {waterGoal.toLocaleString('en-IN')} ml
+                      </Text>
+                    </View>
+
+                    <WaterVessel ratio={ratio} colors={colors} reduceMotion={reduceMotion} logTick={logTick} />
+                  </View>
                 </AnimatedPressable>
 
-              </Animated.View>
-
-              {/* ── Row 2: Unified Combined Water & Timeline Widget ─────────── */}
-              <Animated.View entering={FadeInUp.delay(200).duration(600).springify()}>
-                <Animated.View style={highlightStyle}>
-                  <Panel style={[styles.widgetFullWidth, { backgroundColor: colors.surface, borderColor: 'transparent', borderWidth: 0 }]}>
-                    <View style={styles.horizontalSplit}>
-                      <View style={{ flex: 1, gap: 10 }}>
-                        <AnimatedPressable onPress={() => router.push('/water')} style={{ width: '100%' }}>
-                          <View style={styles.widgetHeader}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                              <Label text="WATER & TIMELINE" color={themeColors.textSecondary} />
-                            </View>
-                            <Feather name="droplet" size={14} color={colors.aqua} />
-                          </View>
-                          
-                          <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
-                            <AnimatedNumber
-                              value={waterTotalMl}
-                              prefix=""
-                              style={[styles.widgetNumber, { color: colors.aqua }]}
-                            />
-                            <Text style={[styles.widgetNumberUnit, { color: colors.aqua }]}>ml</Text>
-                            <Text style={[styles.statusText, { color: themeColors.textSecondary, fontSize: 11, marginLeft: 8 }]}>
-                              ({waterPct}% of goal)
-                            </Text>
-                          </View>
-                        </AnimatedPressable>
-
-                        {/* Compact grid timeline */}
-                        <View style={styles.hourGridCompactLeft}>
-                          {Array.from({ length: 17 }, (_, i) => {
-                            const hour = i + 6; // 6 AM to 10 PM
-                            const done = waterHourlyMap[hour] === true;
-                            const isCurrentHour = hour === currentHour;
-                            
-                            let dotColor: string = themeColors.hairline;
-                            if (done) dotColor = colors.aqua;               // water logged
-                            if (isCurrentHour && !done) dotColor = colors.signal; // "now" marker
-
-                            return (
-                              <View key={hour} style={styles.hourCellCompact}>
-                                <PulseDot color={dotColor} isActive={isCurrentHour} size={8} />
-                              </View>
-                            );
-                          })}
-                        </View>
-
-                        {/* Inline water controls */}
-                        <View style={styles.widgetControlRowLeft}>
-                          {waterSaving ? (
-                            <View style={[styles.widgetControlBtn, { backgroundColor: colors.primary + '18', width: 90, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' }]}>
-                              <ActivityIndicator size="small" color={colors.primary} style={{ transform: [{ scale: 0.9 }] }} />
-                            </View>
-                          ) : (
-                            <>
-                              <TouchableOpacity onPress={() => removeWater()} style={[styles.widgetControlBtn, { backgroundColor: colors.primary + '18' }]} activeOpacity={0.7}>
-                                <Feather name="minus" size={18} color={colors.primary} />
-                              </TouchableOpacity>
-                              <TouchableOpacity onPress={() => addWater(250)} style={[styles.widgetControlBtn, { backgroundColor: colors.primary + '18' }]} activeOpacity={0.7}>
-                                <Feather name="plus" size={18} color={colors.primary} />
-                              </TouchableOpacity>
-                            </>
-                          )}
-                          <Text style={[styles.statusText, { color: themeColors.textSecondary, fontSize: 11, marginLeft: 6 }]}>
-                            {trackedHours} logs today
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* Animated Bottle Fluid Chamber */}
-                      <AnimatedPressable onPress={() => router.push('/water')}>
-                        <WaterChamber percent={waterPct} colors={colors} isDark={isDark} />
-                      </AnimatedPressable>
-                    </View>
-                  </Panel>
-                </Animated.View>
-              </Animated.View>
-
-              {/* ── Row 3: Barcode Alarm (Conditionally Rendered when Active) ── */}
-              {alarmConfig?.enabled && (
-                <Animated.View entering={FadeInDown.duration(600).springify()}>
+                {/* Controls sit outside the pressable above so a tap on
+                    "+ 250 ml" can't also open /water — no stopPropagation. */}
+                <View style={styles.heroControlRow}>
                   <AnimatedPressable
-                    onPress={() => router.push('/alarm/setup' as any)}
-                    style={{ marginTop: 16 }}
+                    onPress={removeWater}
+                    disabled={waterSaving || waterTotalMl === 0}
+                    haptic="light"
+                    pressOpacity={0.7}
+                    style={[
+                      styles.ghostCircle,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.hairline,
+                        opacity: waterTotalMl === 0 ? 0.4 : 1,
+                      },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Remove the most recent water log"
                   >
-                    <Panel style={[styles.widgetFullWidth, { backgroundColor: colors.surface, borderColor: colors.border, height: 100 }]}>
-                      <View style={styles.alarmLayout}>
-                        <View style={{ flex: 1, gap: 4 }}>
-                          <Label text="BARCODE ALARM ACTIVE" color={themeColors.textSecondary} />
-                          <Text style={[styles.alarmTimeText, { color: themeColors.text }]}>
-                            {formatAlarmTime(alarmConfig.hour, alarmConfig.minute)}
-                          </Text>
-                          <Text style={[styles.statusText, { color: themeColors.textSecondary, fontSize: 11 }]}>
-                            {alarmConfig.soundName || 'Default Sound'} • Scan barcode to dismiss
-                          </Text>
-                        </View>
-                        <View style={styles.alarmIconContainer}>
-                          <AnimatedRingingBell colors={colors} />
-                        </View>
-                      </View>
-                    </Panel>
+                    <Feather name="minus" size={22} color={colors.textHi} />
                   </AnimatedPressable>
-                </Animated.View>
-              )}
-            </>
+
+                  <AnimatedPressable
+                    onPress={() => addWater(250)}
+                    disabled={waterSaving}
+                    haptic="medium"
+                    pressOpacity={0.85}
+                    style={[styles.waterPill, { backgroundColor: colors.water }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Log 250 millilitres of water"
+                  >
+                    {waterSaving ? (
+                      <ActivityIndicator size="small" color={colors.onAccent} />
+                    ) : (
+                      <>
+                        <Feather name="plus" size={17} color={colors.onAccent} />
+                        <Text style={[Type.controlLabel, { color: colors.onAccent }]}>250 ml</Text>
+                      </>
+                    )}
+                  </AnimatedPressable>
+                </View>
+
+                <HourlyDots hourlyMap={waterHourlyMap} currentHour={now.getHours()} colors={colors} />
+
+                {/* Closes the hero as a section — space + one hairline, the
+                    only border the whole block carries. Not a card edge. */}
+                <View style={[styles.heroClose, { borderTopColor: colors.hairline }]} />
+              </>
+            )}
+          </EntranceView>
+
+          {/* ── Secondary two-up ─────────────────────────────────────────── */}
+          {!dashboardLoading && (
+            <EntranceView index={2} reduceMotion={reduceMotion} style={styles.twoUp}>
+              <StatCard
+                bracket="[ SPEND ]"
+                onPress={() => router.push('/purchases')}
+                colors={colors}
+                accessibilityLabel={`Spend. ${todaySpend} rupees of ${DAILY_SPEND_BUDGET}. Open expenses.`}
+                illustration={<Wallet size={30} color={colors.water} />}
+              >
+                <Text style={[Type.numberSm, { color: colors.textHi }]} numberOfLines={1}>
+                  ₹{todaySpend.toLocaleString('en-IN')}
+                </Text>
+                <Text style={[Type.subline, { color: colors.textMid }]} numberOfLines={1}>
+                  of ₹{DAILY_SPEND_BUDGET}
+                  {spendCount > 0 ? ` · ${spendCount} today` : ''}
+                </Text>
+                <View style={styles.sparkWrap}>
+                  <Sparkline series={spendSeries} colors={colors} />
+                </View>
+              </StatCard>
+
+              <StatCard
+                bracket="[ CHECK-IN ]"
+                onPress={() => router.push('/attendance')}
+                colors={colors}
+                accessibilityLabel={
+                  hasCheckedIn
+                    ? `Check-in at ${checkInStr}. ${offlineCount > 0 ? `${offlineCount} pending upload` : 'Synced'}. Open check-in.`
+                    : 'No check-in yet today. Tap to check in.'
+                }
+                illustration={
+                  hasCheckedIn ? (
+                    <Plant size={30} color={colors.water} />
+                  ) : (
+                    <Sun size={30} color={colors.water} />
+                  )
+                }
+              >
+                {hasCheckedIn ? (
+                  <>
+                    <Text style={[Type.numberSm, { color: colors.textHi }]} numberOfLines={1}>
+                      {checkInStr}
+                    </Text>
+                    <Text
+                      style={[
+                        Type.subline,
+                        { color: offlineCount > 0 ? colors.alert : colors.textMid },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {offlineCount > 0 ? `${offlineCount} pending` : 'Synced today'}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={[Type.subline, styles.emptyStateText, { color: colors.textMid }]}>
+                    Tap to check in
+                  </Text>
+                )}
+              </StatCard>
+            </EntranceView>
           )}
 
-        </ScrollView>
+          {/* ── Alarm (only when armed) ──────────────────────────────────── */}
+          {!dashboardLoading && alarmConfig?.enabled && (
+            <EntranceView index={3} reduceMotion={reduceMotion}>
+              <AnimatedPressable
+                onPress={() => router.push('/alarm/setup' as any)}
+                haptic="light"
+                pressOpacity={0.85}
+                style={[styles.alarmRow, { borderTopColor: colors.hairline }]}
+                accessibilityRole="button"
+                accessibilityLabel={`Alarm at ${formatAlarmTime(alarmConfig.hour, alarmConfig.minute)}. Scan a barcode to dismiss. Open alarm settings.`}
+              >
+                <View style={styles.alarmText}>
+                  <Text style={[Type.bracketLabel, { color: colors.textMid }]}>[ ALARM ]</Text>
+                  <Text style={[Type.numberSm, styles.alarmTime, { color: colors.textHi }]}>
+                    {formatAlarmTime(alarmConfig.hour, alarmConfig.minute)}
+                  </Text>
+                  <Text style={[Type.subline, { color: colors.textMid }]} numberOfLines={1}>
+                    {alarmConfig.soundName || 'Default sound'} · scan to dismiss
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={colors.textLow} />
+              </AnimatedPressable>
+            </EntranceView>
+          )}
+        </Animated.ScrollView>
       </SafeAreaView>
     </View>
   );
 }
 
+// ─── Entrance ─────────────────────────────────────────────────────────────────
+
+/**
+ * Fade + translateY(10 → 0), 350ms ease-out, 70ms stagger between elements —
+ * applied via Reanimated's `withDelay`. An earlier version of this component
+ * computed the per-index delay and then discarded it (`void delay;`) with a
+ * comment claiming a timeout mechanism that was never actually written —
+ * every element animated in simultaneously, not staggered, despite being
+ * shipped and reported as staggered. Fixed here for real.
+ */
+function EntranceView({
+  index,
+  reduceMotion,
+  style,
+  children,
+}: {
+  index: number;
+  reduceMotion: boolean;
+  style?: any;
+  children: React.ReactNode;
+}) {
+  const opacity = useSharedValue(reduceMotion ? 1 : 0);
+  const translateY = useSharedValue(reduceMotion ? 0 : 10);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    const delay = index * 70;
+    const config = { duration: 350, easing: Easing.out(Easing.cubic) };
+    opacity.value = withDelay(delay, withTiming(1, config));
+    translateY.value = withDelay(delay, withTiming(0, config));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  return <Animated.View style={[style, animatedStyle]}>{children}</Animated.View>;
+}
+
+// ─── Formatters ───────────────────────────────────────────────────────────────
+
+const formatAlarmTime = (h: number, m: number) => {
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 || 12;
+  const minStr = m < 10 ? '0' + m : m;
+  return `${hour12}:${minStr} ${ampm}`;
+};
+
+/** "Sun 23 Aug" */
+const formatDayStamp = (d: Date) =>
+  d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', '');
+
+const formatClock = (d: Date) =>
+  `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+/** "14h left" until midnight. */
+const formatRemaining = (d: Date) => {
+  const mins = 24 * 60 - (d.getHours() * 60 + d.getMinutes());
+  const h = Math.floor(mins / 60);
+  return `${h}h`;
+};
+
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
+  root: { flex: 1 },
   safeArea: {
     flex: 1,
     alignSelf: 'center',
     maxWidth: MaxContentWidth,
     width: '100%',
   },
-  scroll: {
-    flex: 1,
-  },
+  scroll: { flex: 1 },
   content: {
-    paddingHorizontal: 24,
-    paddingTop: Spacing.four,
-    gap: 16,
+    paddingHorizontal: Spacing.four + Spacing.one,
+    paddingTop: Spacing.six * 0.7,
   },
 
-  // ── Header ──────────────────────────────────────────────────────────────────
-  header: {
+  // ── Greeting ────────────────────────────────────────────────────────────────
+  greetingRow: { marginBottom: Spacing.six },
+  greetingText: { gap: Spacing.one },
+  headlineRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  avatar: {
+    width: HitTarget,
+    height: HitTarget,
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: { width: '100%', height: '100%' },
+  avatarInitials: { letterSpacing: 0 },
+  statusRow: { marginTop: Spacing.one },
+
+  // ── Hydration hero — type-forward, no card ───────────────────────────────────
+  heroSection: {
+    marginBottom: Spacing.six,
+  },
+  heroHeadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  heroTopRow: {
+    flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingVertical: Spacing.two,
-    marginBottom: Spacing.two,
+    justifyContent: 'space-between',
+    marginTop: Spacing.two,
   },
-  greeting: {
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    marginBottom: 4,
+  heroNumberCol: { flex: 1 },
+  heroNumberRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
   },
-  appName: {
-    fontSize: 40,
-    fontWeight: '900',
-    letterSpacing: -1.5,
-    lineHeight: 46,
+  numberInput: {
+    padding: 0,
+    margin: 0,
+    includeFontPadding: false,
+    height: 92,
+    textAlignVertical: 'center',
   },
-  dateBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginBottom: 4,
-  },
-  dateStr: {
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  heroUnitText: { marginLeft: Spacing.two, marginBottom: 12 },
+
+  vesselWrap: {
+    width: VESSEL_WIDTH,
+    height: VESSEL_HEIGHT,
+    marginLeft: Spacing.four,
   },
 
-  // ── Apple iOS Widget Grid ──────────────────────────────────────────────────
-  widgetGridRow: {
+  heroControlRow: {
     flexDirection: 'row',
-    gap: 16,
-    width: '100%',
+    alignItems: 'center',
+    gap: Spacing.three,
+    marginTop: Spacing.four,
   },
-  widgetSquare: {
+  heroClose: {
+    marginTop: Spacing.five,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  ghostCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  waterPill: {
+    height: 56,
+    paddingHorizontal: Spacing.four + Spacing.one,
+    borderRadius: Radius.pill,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+  },
+
+  // ── Hourly AM/PM dots ────────────────────────────────────────────────────
+  hourlySection: { marginTop: Spacing.five, gap: Spacing.two },
+  hourRows: { gap: Spacing.two, marginTop: Spacing.one },
+  hourRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  hourRowLabel: { width: 22 },
+  hourDotsWrap: {
     flex: 1,
-    height: 162,
-    borderWidth: 1,
-    borderRadius: Radius.xl,
-    padding: 16,
-    justifyContent: 'space-between',
-    overflow: 'hidden',
-  },
-  widgetFullWidth: {
-    width: '100%',
-    height: 162,
-    borderWidth: 1,
-    borderRadius: Radius.xl,
-    padding: 16,
-    overflow: 'hidden',
-    justifyContent: 'center',
-  },
-  widgetHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    width: '100%',
-  },
-  widgetNumber: {
-    fontSize: 28,
-    fontWeight: '800',
-    letterSpacing: -1,
-  },
-  widgetNumberUnit: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 2,
-  },
-  statusText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  horizontalSplit: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 16,
-    width: '100%',
   },
+  hourDot: { width: 6, height: 6, borderRadius: 3 },
 
-  // ── Shared primitives ────────────────────────────────────────────────────────
-  label: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  strip: {
-    height: 5,
-    borderRadius: 2.5,
-    width: '100%',
-    overflow: 'hidden',
-  },
-  stripFill: {
-    height: '100%',
-    borderRadius: 2.5,
-  },
-
-  // ── Spend Power Core ────────────────────────────────────────────────────────
-  powerCoreContainer: {
-    marginTop: 2,
-  },
-  powerCoreRow: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  powerCoreSegment: {
+  // ── Secondary two-up ────────────────────────────────────────────────────────
+  twoUp: { flexDirection: 'row', gap: Spacing.three, marginBottom: Spacing.five },
+  statCard: {
     flex: 1,
-    height: 4,
-    borderRadius: 2,
+    minHeight: 148,
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Spacing.three + 2,
+    justifyContent: 'space-between',
   },
+  statBody: { gap: Spacing.half, marginTop: Spacing.three },
+  statIllo: { position: 'absolute', top: Spacing.three, right: Spacing.three, opacity: 0.9 },
+  sparkWrap: { marginTop: Spacing.two, alignSelf: 'flex-start' },
+  emptyStateText: { marginTop: Spacing.one },
 
-  // ── Water Inline Controls & Timeline Grid ───────────────────────────────────
-  widgetControlRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 2,
-  },
-  widgetControlBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  hourGridCompactLeft: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 5,
-    alignItems: 'center',
-    paddingVertical: 2,
-    width: '100%',
-  },
-  hourCellCompact: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 10,
-    height: 10,
-  },
-  pulseContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pulseRing: {
-    position: 'absolute',
-  },
-  solidDot: {},
-
-  // ── Viewfinder Scanner ──────────────────────────────────────────────────────
-  viewfinderContainer: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  viewfinderBrackets: {
-    width: 40,
-    height: 40,
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bracketTL: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: 8,
-    height: 8,
-    borderTopWidth: 2,
-    borderLeftWidth: 2,
-  },
-  bracketTR: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 8,
-    height: 8,
-    borderTopWidth: 2,
-    borderRightWidth: 2,
-  },
-  bracketBL: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    width: 8,
-    height: 8,
-    borderBottomWidth: 2,
-    borderLeftWidth: 2,
-  },
-  bracketBR: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 8,
-    height: 8,
-    borderBottomWidth: 2,
-    borderRightWidth: 2,
-  },
-  laserLine: {
-    position: 'absolute',
-    left: 2,
-    right: 2,
-    height: 1.5,
-    top: 2,
-    opacity: 0.8,
-  },
-
-  // ── Water Fluid Chamber ─────────────────────────────────────────────────────
-  chamberContainer: {
-    width: 60,
-    height: 110,
-    borderRadius: 30,
-    borderWidth: 1.5,
-    overflow: 'hidden',
-    position: 'relative',
-    justifyContent: 'flex-end',
-  },
-  chamberFill: {
-    width: '100%',
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopLeftRadius: 6,
-    borderTopRightRadius: 6,
-  },
-  alarmLayout: {
+  // ── Alarm ───────────────────────────────────────────────────────────────────
+  alarmRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    width: '100%',
+    gap: Spacing.three,
+    paddingTop: Spacing.four,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  alarmTimeText: {
-    fontSize: 32,
-    fontWeight: '800',
-    letterSpacing: -1,
-    lineHeight: 38,
-  },
-  alarmIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(99, 102, 241, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  alarmText: { flex: 1, gap: Spacing.half },
+  alarmTime: { marginTop: Spacing.half },
 });

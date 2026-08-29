@@ -27,6 +27,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 import * as WaterStorage from '@/utils/WaterStorage';
+import { FontFace } from '@/constants/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -387,11 +388,12 @@ const styles = StyleSheet.create({
   },
   trophyEmoji: {
     fontSize: 52,
+    fontFamily: FontFace.regular,
   },
   // Text
   headline: {
     fontSize: 38,
-    fontWeight: '900',
+    fontFamily: FontFace.bold,
     color: '#FFFFFF',
     letterSpacing: -1,
     textAlign: 'center',
@@ -399,7 +401,7 @@ const styles = StyleSheet.create({
   },
   subline: {
     fontSize: 15,
-    fontWeight: '500',
+    fontFamily: FontFace.medium,
     color: '#9BE7F3',
     textAlign: 'center',
     lineHeight: 22,
@@ -428,13 +430,13 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 22,
-    fontWeight: '900',
+    fontFamily: FontFace.bold,
     color: '#FFFFFF',
     letterSpacing: -0.5,
   },
   statLabel: {
     fontSize: 9,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     color: '#5AD7EC',
     letterSpacing: 0.8,
   },
@@ -456,7 +458,7 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
     color: '#9BE7F3',
     textAlign: 'center',
     letterSpacing: 0.3,
@@ -477,7 +479,7 @@ const styles = StyleSheet.create({
   },
   ctaBtnText: {
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     color: '#FFFFFF',
     letterSpacing: 0.3,
   },

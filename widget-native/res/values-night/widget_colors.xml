@@ -4,12 +4,12 @@
   isDark, so the widget matches the app's own dark theme exactly.
 -->
 <resources>
-    <color name="widget_text">#F0F0EB</color>
-    <color name="widget_text_secondary">#888888</color>
-    <color name="widget_primary">#60A5FA</color>
-    <color name="widget_track">#1460A5FA</color>
-    <!-- quick-log chip fill: primary @ 16% -->
-    <color name="widget_chip_fill">#2960A5FA</color>
+    <color name="widget_text">#EFF4F1</color>
+    <color name="widget_text_secondary">#9DB3AA</color>
+    <color name="widget_primary">#7FB8A4</color>
+    <color name="widget_track">#147FB8A4</color>
+    <!-- quick-log chip fill: primary @ 14% -->
+    <color name="widget_chip_fill">#247FB8A4</color>
     <!-- tap ripple: light @ 20%, since the widget sits on an arbitrary wallpaper -->
     <color name="widget_ripple">#33FFFFFF</color>
 </resources>

@@ -18,7 +18,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 
-import { Motion, Radius } from '@/constants/theme';
+import { FontFace, Motion, Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 const AnimatedPressableBase = Animated.createAnimatedComponent(Pressable);
@@ -158,7 +158,7 @@ export function Button({
           (title ? (
             <Text
               numberOfLines={1}
-              style={[styles.label, { color: foreground, fontSize: dims.fontSize }, textStyle]}
+              style={[styles.label, { color: foreground, fontFamily: FontFace.regular, fontSize: dims.fontSize }, textStyle]}
             >
               {title}
             </Text>
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   label: {
-    fontWeight: '600',
+    fontFamily: FontFace.semibold,
     letterSpacing: 0.2,
   },
 });

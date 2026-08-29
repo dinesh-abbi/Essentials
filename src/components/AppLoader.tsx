@@ -8,6 +8,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/use-theme';
+import { FontFace } from '@/constants/theme';
 
 /**
  * AppLoader — elegant, clean, and simple minimalist loading spinner.
@@ -79,7 +80,7 @@ const styles = StyleSheet.create({
   label: {
     marginTop: 16,
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: FontFace.semibold,
     letterSpacing: 0.5,
   },
 });

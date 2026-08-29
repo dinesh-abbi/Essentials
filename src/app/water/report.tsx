@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, FontFace, Radius, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
@@ -147,29 +147,29 @@ export default function WaterDailyReportScreen() {
                 >
                   <View style={styles.summaryRow}>
                     <View>
-                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textSecondary, letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 11, fontFamily: FontFace.bold, color: colors.textSecondary, letterSpacing: 0.5 }}>
                         TOTAL CONSUMED
                       </Text>
                       <Text style={[styles.totalVolume, { color: colors.primary }]}>
-                        {totalDrank} <Text style={{ fontSize: 16, fontWeight: '700' }}>ml</Text>
+                        {totalDrank} <Text style={{ fontSize: 16, fontFamily: FontFace.bold }}>ml</Text>
                       </Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textSecondary, letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 11, fontFamily: FontFace.bold, color: colors.textSecondary, letterSpacing: 0.5 }}>
                         DAILY GOAL
                       </Text>
                       <Text style={[styles.goalVolume, { color: colors.text }]}>
-                        {goal} <Text style={{ fontSize: 14, fontWeight: '700' }}>ml</Text>
+                        {goal} <Text style={{ fontSize: 14, fontFamily: FontFace.bold }}>ml</Text>
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.progressBarWrapper}>
                     <View style={styles.progressHeader}>
-                      <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '600' }}>
+                      <Text style={{ fontSize: 11, color: colors.textSecondary, fontFamily: FontFace.semibold }}>
                         Goal Met
                       </Text>
-                      <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '800' }}>
+                      <Text style={{ fontSize: 11, color: colors.primary, fontFamily: FontFace.bold }}>
                         {percentMet.toFixed(0)}%
                       </Text>
                     </View>
@@ -203,7 +203,7 @@ export default function WaterDailyReportScreen() {
                       <Text style={[styles.itemMlText, { color: colors.text }]}>
                         {item.amountMl} ml
                       </Text>
-                      <Text style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>
+                      <Text style={{ fontFamily: FontFace.regular, fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>
                         Logged at {timeStr}
                       </Text>
                     </View>
@@ -226,7 +226,7 @@ export default function WaterDailyReportScreen() {
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Feather name="info" size={24} color={colors.textSecondary} style={{ marginBottom: Spacing.one, opacity: 0.6 }} />
-                <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                <Text style={{ fontFamily: FontFace.regular, fontSize: 12, color: colors.textSecondary }}>
                   No hydration entries found for this day.
                 </Text>
               </View>
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: 1.5,
   },
   center: {
@@ -280,12 +280,12 @@ const styles = StyleSheet.create({
   },
   dateLabel: {
     fontSize: 22,
-    fontWeight: '900',
+    fontFamily: FontFace.bold,
     letterSpacing: -0.5,
   },
   subtitleLabel: {
     fontSize: 12,
-    fontWeight: '500',
+    fontFamily: FontFace.medium,
   },
   summaryCard: {
     borderWidth: 1,
@@ -300,13 +300,13 @@ const styles = StyleSheet.create({
   },
   totalVolume: {
     fontSize: 32,
-    fontWeight: '900',
+    fontFamily: FontFace.bold,
     letterSpacing: -1,
     marginTop: 4,
   },
   goalVolume: {
     fontSize: 24,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     marginTop: 4,
   },
   progressBarWrapper: {
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: 0.8,
     marginTop: 20,
     marginBottom: 8,
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
   },
   itemMlText: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
   },
   deleteBtn: {
     padding: 8,

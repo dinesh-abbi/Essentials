@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Fonts, Spacing } from '@/constants/theme';
+import { FontFace, Fonts, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/contexts/AuthContext';
 import * as AttendanceStorage from '@/utils/AttendanceStorage';
@@ -352,7 +352,7 @@ export default function AttendanceScreen() {
                     borderColor: 'rgba(255,255,255,0.2)'
                   },
                 ]}>
-                <ThemedText type="code" style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '700' }}>
+                <ThemedText type="code" style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontFamily: FontFace.bold }}>
                   {Platform.OS === 'ios' && availableLenses.length > 1
                     ? `L${selectedLens ? availableLenses.indexOf(selectedLens) + 1 : 1}`
                     : zoom === 0
@@ -415,12 +415,13 @@ const styles = StyleSheet.create({
   },
   permissionTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontFamily: FontFace.bold,
     marginBottom: Spacing.two,
   },
   permissionSubtitle: {
     textAlign: 'center',
     fontSize: 14,
+    fontFamily: FontFace.regular,
     marginBottom: Spacing.five,
   },
   primaryButton: {
@@ -456,12 +457,12 @@ const styles = StyleSheet.create({
   },
   bannerText: {
     color: '#FFF',
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
     fontSize: 12,
   },
   bannerButtonText: {
     color: '#FFF',
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     fontSize: 12,
     textDecorationLine: 'underline',
   },
@@ -519,7 +520,7 @@ const styles = StyleSheet.create({
   statusLabel: {
     color: '#FFF',
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFill,
@@ -532,7 +533,7 @@ const styles = StyleSheet.create({
   loadingText: {
     color: '#FFF',
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FontFace.semibold,
   },
 
   hudOverlay: {

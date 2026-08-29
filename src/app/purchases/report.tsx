@@ -17,7 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, FontFace, Radius, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
@@ -151,7 +151,7 @@ function CalendarPicker({ visible, onClose, selectedDate, onSelectDate, colors }
                     style={[
                       styles.calCellText,
                       { color: cell.isCurrentMonth ? colors.text : colors.textSecondary },
-                      isSelected && { color: '#FFF', fontWeight: '800' },
+                      isSelected && { color: '#FFF', fontFamily: FontFace.bold },
                     ]}
                   >
                     {cell.day}
@@ -237,7 +237,7 @@ function TimePicker({ visible, onClose, selectedDate, onSelectTime, colors }: an
               <TouchableOpacity onPress={incrementHours} style={styles.timeNavBtn}>
                 <Feather name="chevron-up" size={24} color={colors.primary} />
               </TouchableOpacity>
-              <Text style={{ fontSize: 32, fontWeight: '700', color: colors.text, marginVertical: 8 }}>
+              <Text style={{ fontSize: 32, fontFamily: FontFace.bold, color: colors.text, marginVertical: 8 }}>
                 {hours.toString().padStart(2, '0')}
               </Text>
               <TouchableOpacity onPress={decrementHours} style={styles.timeNavBtn}>
@@ -245,7 +245,7 @@ function TimePicker({ visible, onClose, selectedDate, onSelectTime, colors }: an
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 32, fontWeight: '700', color: colors.textSecondary, alignSelf: 'center', marginTop: -6 }}>
+            <Text style={{ fontSize: 32, fontFamily: FontFace.bold, color: colors.textSecondary, alignSelf: 'center', marginTop: -6 }}>
               :
             </Text>
 
@@ -253,7 +253,7 @@ function TimePicker({ visible, onClose, selectedDate, onSelectTime, colors }: an
               <TouchableOpacity onPress={incrementMinutes} style={styles.timeNavBtn}>
                 <Feather name="chevron-up" size={24} color={colors.primary} />
               </TouchableOpacity>
-              <Text style={{ fontSize: 32, fontWeight: '700', color: colors.text, marginVertical: 8 }}>
+              <Text style={{ fontSize: 32, fontFamily: FontFace.bold, color: colors.text, marginVertical: 8 }}>
                 {minutes.toString().padStart(2, '0')}
               </Text>
               <TouchableOpacity onPress={decrementMinutes} style={styles.timeNavBtn}>
@@ -270,7 +270,7 @@ function TimePicker({ visible, onClose, selectedDate, onSelectTime, colors }: an
                   period === 'AM' && { backgroundColor: colors.primary, borderColor: colors.primary }
                 ]}
               >
-                <Text style={{ color: period === 'AM' ? '#FFF' : colors.text, fontSize: 12, fontWeight: '700' }}>AM</Text>
+                <Text style={{ color: period === 'AM' ? '#FFF' : colors.text, fontSize: 12, fontFamily: FontFace.bold }}>AM</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setPeriod('PM')}
@@ -280,7 +280,7 @@ function TimePicker({ visible, onClose, selectedDate, onSelectTime, colors }: an
                   period === 'PM' && { backgroundColor: colors.primary, borderColor: colors.primary }
                 ]}
               >
-                <Text style={{ color: period === 'PM' ? '#FFF' : colors.text, fontSize: 12, fontWeight: '700' }}>PM</Text>
+                <Text style={{ color: period === 'PM' ? '#FFF' : colors.text, fontSize: 12, fontFamily: FontFace.bold }}>PM</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -377,7 +377,7 @@ function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isS
               style={[styles.datePickerBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
             >
               <Feather name="calendar" size={14} color={colors.primary} />
-              <Text style={{ color: colors.text, fontSize: 11, fontWeight: '600' }} numberOfLines={1}>
+              <Text style={{ color: colors.text, fontSize: 11, fontFamily: FontFace.semibold }} numberOfLines={1}>
                 {editDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
               </Text>
             </TouchableOpacity>
@@ -387,13 +387,13 @@ function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isS
               style={[styles.datePickerBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
             >
               <Feather name="clock" size={14} color={colors.primary} />
-              <Text style={{ color: colors.text, fontSize: 11, fontWeight: '600' }} numberOfLines={1}>
+              <Text style={{ color: colors.text, fontSize: 11, fontFamily: FontFace.semibold }} numberOfLines={1}>
                 {editDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
               </Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={{ fontSize: 10, fontWeight: '800', color: colors.textSecondary, marginTop: 4 }}>
+          <Text style={{ fontSize: 10, fontFamily: FontFace.bold, color: colors.textSecondary, marginTop: 4 }}>
             CATEGORY
           </Text>
           <ScrollView
@@ -421,7 +421,7 @@ function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isS
                   <Text
                     style={[
                       styles.catBtnText,
-                      { color: selected ? '#FFF' : colors.text, fontWeight: '700' },
+                      { color: selected ? '#FFF' : colors.text, fontFamily: FontFace.bold },
                     ]}
                   >
                     {cat.toUpperCase()}
@@ -436,7 +436,7 @@ function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isS
               onPress={onClose}
               style={[styles.actionBtn, { borderColor: colors.border }]}
             >
-              <Text style={{ color: colors.text, fontWeight: '700' }}>Cancel</Text>
+              <Text style={{ color: colors.text, fontFamily: FontFace.bold }}>Cancel</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -455,7 +455,7 @@ function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isS
               }}
               style={[styles.actionBtn, { borderColor: colors.alert }]}
             >
-              <Text style={{ color: colors.alert, fontWeight: '700' }}>Delete</Text>
+              <Text style={{ color: colors.alert, fontFamily: FontFace.bold }}>Delete</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -466,7 +466,7 @@ function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isS
               {isSaving ? (
                 <ActivityIndicator size="small" color="#FFF" />
               ) : (
-                <Text style={{ color: '#FFF', fontWeight: '700' }}>Save</Text>
+                <Text style={{ color: '#FFF', fontFamily: FontFace.bold }}>Save</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -614,7 +614,7 @@ export default function PurchasesDailyReportScreen() {
                 >
                   <View style={styles.summaryRow}>
                     <View>
-                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textSecondary, letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 11, fontFamily: FontFace.bold, color: colors.textSecondary, letterSpacing: 0.5 }}>
                         TOTAL SPENT
                       </Text>
                       <Text style={[styles.totalVolume, { color: colors.primary }]}>
@@ -622,7 +622,7 @@ export default function PurchasesDailyReportScreen() {
                       </Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textSecondary, letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 11, fontFamily: FontFace.bold, color: colors.textSecondary, letterSpacing: 0.5 }}>
                         TRANSACTIONS
                       </Text>
                       <Text style={[styles.goalVolume, { color: colors.text }]}>
@@ -635,10 +635,10 @@ export default function PurchasesDailyReportScreen() {
 
                   <View style={styles.summaryRow}>
                     <View>
-                      <Text style={{ fontSize: 10, color: colors.textSecondary, fontWeight: '600' }}>
+                      <Text style={{ fontSize: 10, color: colors.textSecondary, fontFamily: FontFace.semibold }}>
                         Average transaction
                       </Text>
-                      <Text style={{ fontSize: 14, color: colors.text, fontWeight: '700', marginTop: 2 }}>
+                      <Text style={{ fontSize: 14, color: colors.text, fontFamily: FontFace.bold, marginTop: 2 }}>
                         ₹{avgCost.toFixed(2)}
                       </Text>
                     </View>
@@ -677,19 +677,19 @@ export default function PurchasesDailyReportScreen() {
                           {item.name}
                         </Text>
                         <View style={[styles.miniBadge, { borderColor: colors.border }]}>
-                          <Text style={{ fontSize: 8, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase' }}>
+                          <Text style={{ fontSize: 8, fontFamily: FontFace.bold, color: colors.textSecondary, textTransform: 'uppercase' }}>
                             {item.category}
                           </Text>
                         </View>
                       </View>
-                      <Text style={{ fontSize: 10, color: colors.textSecondary }}>
+                      <Text style={{ fontFamily: FontFace.regular, fontSize: 10, color: colors.textSecondary }}>
                         Logged at {timeStr}
                       </Text>
                     </View>
                   </View>
 
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <Text style={{ color: colors.text, fontSize: 15, fontWeight: '800' }}>
+                    <Text style={{ color: colors.text, fontSize: 15, fontFamily: FontFace.bold }}>
                       ₹{item.cost.toFixed(2)}
                     </Text>
                     <Feather name="chevron-right" size={14} color={colors.textSecondary} />
@@ -700,7 +700,7 @@ export default function PurchasesDailyReportScreen() {
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Feather name="info" size={24} color={colors.textSecondary} style={{ marginBottom: Spacing.one, opacity: 0.6 }} />
-                <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                <Text style={{ fontFamily: FontFace.regular, fontSize: 12, color: colors.textSecondary }}>
                   No expenditures found for this day.
                 </Text>
               </View>
@@ -749,7 +749,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: 1.5,
   },
   center: {
@@ -767,12 +767,12 @@ const styles = StyleSheet.create({
   },
   dateLabel: {
     fontSize: 22,
-    fontWeight: '900',
+    fontFamily: FontFace.bold,
     letterSpacing: -0.5,
   },
   subtitleLabel: {
     fontSize: 12,
-    fontWeight: '500',
+    fontFamily: FontFace.medium,
   },
   summaryCard: {
     borderWidth: 1,
@@ -787,18 +787,18 @@ const styles = StyleSheet.create({
   },
   totalVolume: {
     fontSize: 32,
-    fontWeight: '900',
+    fontFamily: FontFace.bold,
     letterSpacing: -1,
     marginTop: 4,
   },
   goalVolume: {
     fontSize: 24,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     marginTop: 4,
   },
   sectionTitle: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: 0.8,
     marginTop: 20,
     marginBottom: 8,
@@ -824,7 +824,7 @@ const styles = StyleSheet.create({
   },
   itemMlText: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -862,7 +862,7 @@ const styles = StyleSheet.create({
   },
   calMonthText: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
   },
   calWeekdays: {
     flexDirection: 'row',
@@ -873,7 +873,7 @@ const styles = StyleSheet.create({
     width: 36,
     textAlign: 'center',
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
   },
   calGrid: {
     flexDirection: 'row',
@@ -892,7 +892,7 @@ const styles = StyleSheet.create({
   },
   calCellText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: FontFace.semibold,
   },
   calCloseBtn: {
     borderWidth: 1,
@@ -903,7 +903,7 @@ const styles = StyleSheet.create({
   },
   calCloseBtnText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
   },
   timeNavBtn: {
     padding: 4,
@@ -925,7 +925,7 @@ const styles = StyleSheet.create({
   },
   editTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: -0.5,
     marginBottom: 4,
   },
@@ -949,6 +949,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 8,
     fontSize: 13,
+    fontFamily: FontFace.regular,
   },
   costInput: {
     width: 90,
@@ -976,7 +977,7 @@ const styles = StyleSheet.create({
   },
   catBtnText: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: 0.5,
   },
   formRow: {

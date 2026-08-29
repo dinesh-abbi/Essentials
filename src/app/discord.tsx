@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, FontFace, Radius, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: 1.5,
   },
   content: {
@@ -333,13 +333,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 26,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: -0.5,
   },
   subtitle: {
     textAlign: 'center',
     paddingHorizontal: 16,
     fontSize: 13,
+    fontFamily: FontFace.regular,
     lineHeight: 19,
   },
   statusBanner: {
@@ -357,7 +358,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
   },
   maskedUrl: {
     fontSize: 11,
@@ -372,7 +373,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
   },
   inputField: {
     borderWidth: 1,
@@ -380,6 +381,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 13,
+    fontFamily: FontFace.regular,
     minHeight: 60,
     textAlignVertical: 'top',
   },
@@ -399,7 +401,7 @@ const styles = StyleSheet.create({
   saveBtnText: {
     color: '#FFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
   },
   cancelBtn: {
     flexDirection: 'row',
@@ -412,7 +414,7 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: FontFace.semibold,
   },
   buttonStack: {
     gap: 10,
@@ -437,11 +439,11 @@ const styles = StyleSheet.create({
   actionText: {
     color: '#FFF',
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
   },
   actionTextSecondary: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
   },
   helpHeaderRow: {
     flexDirection: 'row',
@@ -472,14 +474,15 @@ const styles = StyleSheet.create({
   stepBadgeText: {
     color: '#FFF',
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
   },
   stepTitle: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
   },
   stepDetail: {
     fontSize: 12,
+    fontFamily: FontFace.regular,
     lineHeight: 18,
     marginTop: 2,
   },

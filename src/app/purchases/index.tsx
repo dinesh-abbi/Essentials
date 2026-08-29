@@ -27,7 +27,7 @@ import Animated, {
   FadeInDown,
 } from 'react-native-reanimated';
 
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, FontFace, Radius, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
@@ -166,7 +166,7 @@ function CalendarPicker({ visible, onClose, selectedDate, onSelectDate, colors }
                     style={[
                       styles.calCellText,
                       { color: cell.isCurrentMonth ? colors.text : colors.textSecondary },
-                      isSelected && { color: '#FFF', fontWeight: '800' },
+                      isSelected && { color: '#FFF', fontFamily: FontFace.bold },
                     ]}
                   >
                     {cell.day}
@@ -254,7 +254,7 @@ function TimePicker({ visible, onClose, selectedDate, onSelectTime, colors }: an
               <TouchableOpacity onPress={incrementHours} style={styles.timeNavBtn}>
                 <Feather name="chevron-up" size={24} color={colors.primary} />
               </TouchableOpacity>
-              <Text style={{ fontSize: 32, fontWeight: '700', color: colors.text, marginVertical: 8 }}>
+              <Text style={{ fontSize: 32, fontFamily: FontFace.bold, color: colors.text, marginVertical: 8 }}>
                 {hours.toString().padStart(2, '0')}
               </Text>
               <TouchableOpacity onPress={decrementHours} style={styles.timeNavBtn}>
@@ -262,7 +262,7 @@ function TimePicker({ visible, onClose, selectedDate, onSelectTime, colors }: an
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 32, fontWeight: '700', color: colors.textSecondary, alignSelf: 'center', marginTop: -6 }}>
+            <Text style={{ fontSize: 32, fontFamily: FontFace.bold, color: colors.textSecondary, alignSelf: 'center', marginTop: -6 }}>
               :
             </Text>
 
@@ -271,7 +271,7 @@ function TimePicker({ visible, onClose, selectedDate, onSelectTime, colors }: an
               <TouchableOpacity onPress={incrementMinutes} style={styles.timeNavBtn}>
                 <Feather name="chevron-up" size={24} color={colors.primary} />
               </TouchableOpacity>
-              <Text style={{ fontSize: 32, fontWeight: '700', color: colors.text, marginVertical: 8 }}>
+              <Text style={{ fontSize: 32, fontFamily: FontFace.bold, color: colors.text, marginVertical: 8 }}>
                 {minutes.toString().padStart(2, '0')}
               </Text>
               <TouchableOpacity onPress={decrementMinutes} style={styles.timeNavBtn}>
@@ -289,7 +289,7 @@ function TimePicker({ visible, onClose, selectedDate, onSelectTime, colors }: an
                   period === 'AM' && { backgroundColor: colors.primary, borderColor: colors.primary }
                 ]}
               >
-                <Text style={{ color: period === 'AM' ? '#FFF' : colors.text, fontSize: 12, fontWeight: '700' }}>AM</Text>
+                <Text style={{ color: period === 'AM' ? '#FFF' : colors.text, fontSize: 12, fontFamily: FontFace.bold }}>AM</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setPeriod('PM')}
@@ -299,7 +299,7 @@ function TimePicker({ visible, onClose, selectedDate, onSelectTime, colors }: an
                   period === 'PM' && { backgroundColor: colors.primary, borderColor: colors.primary }
                 ]}
               >
-                <Text style={{ color: period === 'PM' ? '#FFF' : colors.text, fontSize: 12, fontWeight: '700' }}>PM</Text>
+                <Text style={{ color: period === 'PM' ? '#FFF' : colors.text, fontSize: 12, fontFamily: FontFace.bold }}>PM</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -378,26 +378,25 @@ function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isS
             onChangeText={setEditName}
           />
 
-          <View style={styles.formRow}>
+          <View style={[styles.costInputWrap, { borderColor: colors.border, backgroundColor: colors.background }]}>
+            <Text style={[styles.currencyPrefix, { color: colors.primary }]}>₹</Text>
             <TextInput
-              style={[
-                styles.textInput,
-                styles.costInput,
-                { color: colors.text, borderColor: colors.border, backgroundColor: colors.background },
-              ]}
-              placeholder="Cost"
+              style={[styles.costInputSpacious, { color: colors.text }]}
+              placeholder="0.00"
               placeholderTextColor={colors.textSecondary}
               value={editCost}
               onChangeText={setEditCost}
               keyboardType="decimal-pad"
             />
+          </View>
 
+          <View style={styles.dateTimeRow}>
             <TouchableOpacity
               onPress={() => setShowDatePicker(true)}
               style={[styles.datePickerBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
             >
               <Feather name="calendar" size={14} color={colors.primary} />
-              <Text style={{ color: colors.text, fontSize: 11, fontWeight: '600' }} numberOfLines={1}>
+              <Text style={{ color: colors.text, fontSize: 12, fontFamily: FontFace.semibold }} numberOfLines={1}>
                 {editDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
               </Text>
             </TouchableOpacity>
@@ -407,22 +406,17 @@ function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isS
               style={[styles.datePickerBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
             >
               <Feather name="clock" size={14} color={colors.primary} />
-              <Text style={{ color: colors.text, fontSize: 11, fontWeight: '600' }} numberOfLines={1}>
+              <Text style={{ color: colors.text, fontSize: 12, fontFamily: FontFace.semibold }} numberOfLines={1}>
                 {editDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
               </Text>
             </TouchableOpacity>
           </View>
 
           {/* Category Selector */}
-          <Text style={{ fontSize: 10, fontWeight: '800', color: colors.textSecondary, marginTop: 4 }}>
+          <Text style={{ fontSize: 10, fontFamily: FontFace.bold, color: colors.textSecondary, marginTop: 4 }}>
             CATEGORY
           </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryContainer}
-            style={{ maxHeight: 50, marginBottom: 15 }}
-          >
+          <View style={styles.categoryWrapGrid}>
             {CATEGORIES.map((cat) => {
               const selected = editCategory === cat;
               return (
@@ -434,30 +428,29 @@ function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isS
                     {
                       borderColor: selected ? colors.primary : colors.border,
                       backgroundColor: selected ? colors.primary : 'transparent',
-                      paddingHorizontal: 12,
-                      marginRight: 6,
                     },
                   ]}
+                  activeOpacity={0.7}
                 >
                   <Text
                     style={[
                       styles.catBtnText,
-                      { color: selected ? '#FFF' : colors.text, fontWeight: '700' },
+                      { color: selected ? '#FFF' : colors.text, fontFamily: selected ? FontFace.bold : FontFace.semibold },
                     ]}
                   >
-                    {cat.toUpperCase()}
+                    {cat}
                   </Text>
                 </TouchableOpacity>
               );
             })}
-          </ScrollView>
+          </View>
 
           <View style={styles.editActions}>
             <TouchableOpacity
               onPress={onClose}
               style={[styles.actionBtn, { borderColor: colors.border }]}
             >
-              <Text style={{ color: colors.text, fontWeight: '700' }}>Cancel</Text>
+              <Text style={{ color: colors.text, fontFamily: FontFace.bold }}>Cancel</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -476,7 +469,7 @@ function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isS
               }}
               style={[styles.actionBtn, { borderColor: colors.alert }]}
             >
-              <Text style={{ color: colors.alert, fontWeight: '700' }}>Delete</Text>
+              <Text style={{ color: colors.alert, fontFamily: FontFace.bold }}>Delete</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -487,7 +480,7 @@ function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isS
               {isSaving ? (
                 <ActivityIndicator size="small" color="#FFF" />
               ) : (
-                <Text style={{ color: '#FFF', fontWeight: '700' }}>Save</Text>
+                <Text style={{ color: '#FFF', fontFamily: FontFace.bold }}>Save</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -547,7 +540,7 @@ function WeeklySpendBar({
 
   return (
     <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={styles.barCol}>
-      <Text style={[styles.barValText, { color: isSelected ? colors.primary : colors.textSecondary, fontWeight: isSelected ? '900' : '700' }]}>
+      <Text style={[styles.barValText, { color: isSelected ? colors.primary : colors.textSecondary, fontFamily: FontFace.bold }]}>
         {amount > 0 ? `₹${amount.toFixed(0)}` : '0'}
       </Text>
       <View style={[styles.barTrack, { backgroundColor: colors.backgroundSelected, borderColor: isSelected ? colors.primary : 'transparent', borderWidth: isSelected ? 1.5 : 0 }]}>
@@ -559,7 +552,7 @@ function WeeklySpendBar({
           ]}
         />
       </View>
-      <Text style={[styles.barLabel, { color: isSelected ? colors.primary : colors.text, fontWeight: isSelected ? '900' : '700' }]}>
+      <Text style={[styles.barLabel, { color: isSelected ? colors.primary : colors.text, fontFamily: FontFace.bold }]}>
         {dayName}
       </Text>
     </TouchableOpacity>
@@ -978,7 +971,7 @@ function SpendTrackerContent() {
               onPress={handleClearAll}
               style={[styles.clearBtn, { borderColor: colors.alert }]}
             >
-              <ThemedText type="code" style={{ color: colors.alert, fontSize: 10, fontWeight: '700' }}>
+              <ThemedText type="code" style={{ color: colors.alert, fontSize: 10, fontFamily: FontFace.bold }}>
                 WIPE_ALL
               </ThemedText>
             </AnimatedPressable>
@@ -1017,7 +1010,7 @@ function SpendTrackerContent() {
                   {/* Daily Total Summary Card */}
                   <View style={[styles.totalBar, { borderColor: colors.border, backgroundColor: colors.backgroundElement }]}>
                     <View>
-                      <ThemedText type="code" style={{ fontSize: 10, fontWeight: '700' }} themeColor="textSecondary">
+                      <ThemedText type="code" style={{ fontSize: 10, fontFamily: FontFace.bold }} themeColor="textSecondary">
                         TODAY'S SPEND
                       </ThemedText>
                       <ThemedText type="subtitle" style={[styles.totalCost, { color: colors.primary }]}>
@@ -1025,7 +1018,7 @@ function SpendTrackerContent() {
                       </ThemedText>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <ThemedText type="code" style={{ fontSize: 10, fontWeight: '700' }} themeColor="textSecondary">
+                      <ThemedText type="code" style={{ fontSize: 10, fontFamily: FontFace.bold }} themeColor="textSecondary">
                         ALL-TIME SPEND
                       </ThemedText>
                       <ThemedText type="subtitle" style={[styles.totalCost, { color: colors.text }]}>
@@ -1036,64 +1029,59 @@ function SpendTrackerContent() {
 
                   {/* Input Form Panel */}
                   <View style={[styles.formPanel, { borderColor: colors.border, backgroundColor: colors.backgroundElement }]}>
-                    <ThemedText type="code" style={{ fontSize: 10, fontWeight: '700', marginBottom: Spacing.one }} themeColor="textSecondary">
+                    <ThemedText type="code" style={{ fontSize: 10, fontFamily: FontFace.bold, marginBottom: Spacing.one }} themeColor="textSecondary">
                       RECORD EXPENSE
                     </ThemedText>
 
                     <TextInput
                       style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                      placeholder="Item name (e.g. Eggs, Milk...)"
+                      placeholder="Item name (e.g. Eggs, Coffee, Bills...)"
                       placeholderTextColor={colors.textSecondary}
                       value={name}
                       onChangeText={setName}
                       autoCorrect={false}
                     />
 
-                    <View style={styles.formRow}>
+                    <View style={[styles.costInputWrap, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                      <Text style={[styles.currencyPrefix, { color: colors.primary }]}>₹</Text>
                       <TextInput
-                        style={[
-                          styles.textInput,
-                          styles.costInput,
-                          { color: colors.text, borderColor: colors.border, backgroundColor: colors.background },
-                        ]}
-                        placeholder="Cost (₹)"
+                        style={[styles.costInputSpacious, { color: colors.text }]}
+                        placeholder="0.00"
                         placeholderTextColor={colors.textSecondary}
                         value={cost}
                         onChangeText={setCost}
                         keyboardType="decimal-pad"
                         autoCorrect={false}
                       />
+                    </View>
 
-                      {/* Custom Date Field */}
+                    <View style={styles.dateTimeRow}>
                       <TouchableOpacity
                         onPress={() => setShowDatePicker(true)}
                         style={[styles.datePickerBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
                       >
                         <Feather name="calendar" size={14} color={colors.primary} />
-                        <Text style={{ color: colors.text, fontSize: 11, fontWeight: '600' }} numberOfLines={1}>
+                        <Text style={{ color: colors.text, fontSize: 12, fontFamily: FontFace.semibold }} numberOfLines={1}>
                           {selectedDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
                         </Text>
                       </TouchableOpacity>
 
-                      {/* Custom Time Field */}
                       <TouchableOpacity
                         onPress={() => setShowTimePicker(true)}
                         style={[styles.datePickerBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
                       >
                         <Feather name="clock" size={14} color={colors.primary} />
-                        <Text style={{ color: colors.text, fontSize: 11, fontWeight: '600' }} numberOfLines={1}>
+                        <Text style={{ color: colors.text, fontSize: 12, fontFamily: FontFace.semibold }} numberOfLines={1}>
                           {selectedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                         </Text>
                       </TouchableOpacity>
                     </View>
 
-                    {/* Category Toggles */}
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.categoryContainer}
-                      style={{ maxHeight: 50, marginBottom: 15 }}
-                    >
+                    {/* Category Toggles (Wrap grid with zero gesture collision) */}
+                    <ThemedText type="code" style={{ fontSize: 10, fontFamily: FontFace.bold, marginTop: 4 }} themeColor="textSecondary">
+                      CATEGORY
+                    </ThemedText>
+                    <View style={styles.categoryWrapGrid}>
                       {CATEGORIES.map((cat) => {
                         const selected = category === cat;
                         return (
@@ -1104,25 +1092,23 @@ function SpendTrackerContent() {
                               styles.catBtn,
                               {
                                 borderColor: selected ? colors.primary : colors.border,
-                                backgroundColor: selected ? colors.primary : 'transparent',
-                                paddingHorizontal: 12,
-                                marginRight: 6,
+                                backgroundColor: selected ? colors.primary : (scheme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
                               },
                             ]}
+                            activeOpacity={0.7}
                           >
-                            <ThemedText
-                              type="code"
+                            <Text
                               style={[
                                 styles.catBtnText,
-                                { color: selected ? '#FFF' : colors.text, fontWeight: '700' },
+                                { color: selected ? '#FFF' : colors.text, fontFamily: selected ? FontFace.bold : FontFace.semibold },
                               ]}
                             >
-                              {cat.toUpperCase()}
-                            </ThemedText>
+                              {cat}
+                            </Text>
                           </TouchableOpacity>
                         );
                       })}
-                    </ScrollView>
+                    </View>
 
                     <AnimatedPressable
                       onPress={handleAddPurchase}
@@ -1190,12 +1176,12 @@ function SpendTrackerContent() {
                       <View style={styles.itemNameRow}>
                         <ThemedText type="smallBold">{item.name}</ThemedText>
                         <View style={[styles.miniBadge, { borderColor: colors.border }]}>
-                          <ThemedText type="code" style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>
+                          <ThemedText type="code" style={{ fontSize: 9, fontFamily: FontFace.bold, color: colors.textSecondary }}>
                             {item.category.toUpperCase()}
                           </ThemedText>
                         </View>
                       </View>
-                      <ThemedText type="code" style={{ fontSize: 10 }} themeColor="textSecondary">
+                      <ThemedText type="code" style={{ fontFamily: FontFace.regular, fontSize: 10 }} themeColor="textSecondary">
                         {formattedDate}
                       </ThemedText>
                     </View>
@@ -1228,7 +1214,7 @@ function SpendTrackerContent() {
                 ) : (
                   <View style={styles.emptyContainer}>
                     <Feather name="shopping-bag" size={32} color={colors.textSecondary} style={{ marginBottom: Spacing.two, opacity: 0.8 }} />
-                    <ThemedText type="code" themeColor="textSecondary" style={{ textAlign: 'center', fontSize: 12 }}>
+                    <ThemedText type="code" themeColor="textSecondary" style={{ textAlign: 'center', fontFamily: FontFace.regular, fontSize: 12 }}>
                       No records logged
                     </ThemedText>
                     <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center', marginTop: Spacing.one }}>
@@ -1370,7 +1356,7 @@ function SpendTrackerContent() {
                       <Text style={[styles.totalSpentText, { color: colors.primary }]}>
                         ₹{monthlyTotal.toFixed(2)}
                       </Text>
-                      <Text style={{ color: colors.textSecondary, fontSize: 10, fontWeight: '700', marginLeft: 8 }}>
+                      <Text style={{ color: colors.textSecondary, fontSize: 10, fontFamily: FontFace.bold, marginLeft: 8 }}>
                         SPENT IN TOTAL
                       </Text>
                     </View>
@@ -1399,7 +1385,7 @@ function SpendTrackerContent() {
 
                   {categoryAllocation.length === 0 ? (
                     <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-                      <Text style={{ fontSize: 12, color: colors.textSecondary }}>No expenditures logged in this month.</Text>
+                      <Text style={{ fontFamily: FontFace.regular, fontSize: 12, color: colors.textSecondary }}>No expenditures logged in this month.</Text>
                     </View>
                   ) : (
                     <View style={styles.categoriesList}>
@@ -1514,7 +1500,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: 1.5,
   },
   clearBtn: {
@@ -1545,7 +1531,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -1564,7 +1550,7 @@ const styles = StyleSheet.create({
   },
   totalCost: {
     fontSize: 20,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
   },
   formPanel: {
     borderWidth: 1,
@@ -1572,19 +1558,36 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
   },
-  formRow: {
+  costInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    height: 48,
+  },
+  currencyPrefix: {
+    fontSize: 18,
+    fontFamily: FontFace.bold,
+    marginRight: 8,
+  },
+  costInputSpacious: {
+    flex: 1,
+    fontSize: 17,
+    fontFamily: FontFace.bold,
+    paddingVertical: 0,
+  },
+  dateTimeRow: {
     flexDirection: 'row',
     gap: 10,
   },
   textInput: {
     borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    fontSize: 13,
-  },
-  costInput: {
-    width: 90,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
+    fontSize: 14,
+    fontFamily: FontFace.medium,
   },
   datePickerBtn: {
     flex: 1,
@@ -1593,35 +1596,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
   },
-  categoryContainer: {
+  categoryWrapGrid: {
     flexDirection: 'row',
-    paddingVertical: 4,
+    flexWrap: 'wrap',
+    gap: 6,
+    marginVertical: 4,
   },
   catBtn: {
     borderWidth: 1,
-    borderRadius: 20,
-    paddingVertical: 8,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     justifyContent: 'center',
     alignItems: 'center',
   },
   catBtnText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    fontSize: 11,
+    fontFamily: FontFace.regular,
+    letterSpacing: 0.3,
   },
   submitBtn: {
     borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 12,
+    borderRadius: 10,
+    paddingVertical: 14,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 4,
   },
   sectionTitle: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: 0.8,
     marginTop: 24,
     marginBottom: 8,
@@ -1652,7 +1660,7 @@ const styles = StyleSheet.create({
   },
   itemPrice: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
   },
   trashBtn: {
     padding: 6,
@@ -1687,7 +1695,7 @@ const styles = StyleSheet.create({
   },
   calMonthText: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
   },
   calWeekdays: {
     flexDirection: 'row',
@@ -1698,7 +1706,7 @@ const styles = StyleSheet.create({
     width: 36,
     textAlign: 'center',
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
   },
   calGrid: {
     flexDirection: 'row',
@@ -1717,7 +1725,7 @@ const styles = StyleSheet.create({
   },
   calCellText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: FontFace.semibold,
   },
   calCloseBtn: {
     borderWidth: 1,
@@ -1728,7 +1736,7 @@ const styles = StyleSheet.create({
   },
   calCloseBtnText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: FontFace.bold,
   },
   timeNavBtn: {
     padding: 4,
@@ -1750,7 +1758,7 @@ const styles = StyleSheet.create({
   },
   editTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: -0.5,
     marginBottom: 4,
   },
@@ -1784,7 +1792,7 @@ const styles = StyleSheet.create({
   },
   monthLabel: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
   },
   chartCard: {
     borderRadius: Radius.md,
@@ -1797,12 +1805,12 @@ const styles = StyleSheet.create({
   },
   chartTitle: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: 0.8,
   },
   chartSubtitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
   },
   barsContainer: {
     flexDirection: 'row',
@@ -1818,6 +1826,7 @@ const styles = StyleSheet.create({
   },
   barValText: {
     fontSize: 9,
+    fontFamily: FontFace.regular,
   },
   barTrack: {
     width: 14,
@@ -1832,6 +1841,7 @@ const styles = StyleSheet.create({
   },
   barLabel: {
     fontSize: 10,
+    fontFamily: FontFace.regular,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -1848,12 +1858,12 @@ const styles = StyleSheet.create({
   },
   statVal: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     marginTop: 4,
   },
   statLabel: {
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: FontFace.semibold,
   },
   breakdownCard: {
     borderRadius: Radius.md,
@@ -1874,7 +1884,7 @@ const styles = StyleSheet.create({
   },
   summaryTitle: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: 0.8,
   },
   totalRow: {
@@ -1884,7 +1894,7 @@ const styles = StyleSheet.create({
   },
   totalSpentText: {
     fontSize: 28,
-    fontWeight: '900',
+    fontFamily: FontFace.bold,
     letterSpacing: -1,
   },
   breakdownCardHeader: {
@@ -1894,7 +1904,7 @@ const styles = StyleSheet.create({
   },
   cardSectionTitle: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: FontFace.bold,
     letterSpacing: 0.8,
   },
   categoriesList: {
@@ -1909,10 +1919,11 @@ const styles = StyleSheet.create({
   },
   catName: {
     fontSize: 12,
+    fontFamily: FontFace.regular,
   },
   catAmount: {
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: FontFace.semibold,
   },
   progressBarTrack: {
     height: 6,
@@ -1932,7 +1943,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 20,
-    fontWeight: '900',
+    fontFamily: FontFace.bold,
     letterSpacing: -0.5,
   },
 });

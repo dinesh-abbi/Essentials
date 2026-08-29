@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { FontFace, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
 
@@ -245,12 +245,13 @@ const styles = StyleSheet.create({
   },
   permissionTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontFamily: FontFace.bold,
     marginBottom: Spacing.two,
   },
   permissionSubtitle: {
     textAlign: 'center',
     fontSize: 14,
+    fontFamily: FontFace.regular,
     marginBottom: Spacing.five,
   },
   primaryButton: {
@@ -335,6 +336,7 @@ const styles = StyleSheet.create({
   inputLabel: {
     color: '#FFF',
     fontSize: 14,
+    fontFamily: FontFace.regular,
     marginBottom: Spacing.three,
   },
   inputRow: {
@@ -349,6 +351,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: Spacing.three,
     fontSize: 16,
+    fontFamily: FontFace.regular,
     backgroundColor: 'rgba(255,255,255,0.9)',
   },
   submitBtn: {
