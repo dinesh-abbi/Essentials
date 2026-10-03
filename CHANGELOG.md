@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.2.0] - 2026-10-03
+### Catalyst merged into Essentials
+- **Train** tab (today's session, load stepper with last-used weights, finish & log, streak), **Week plan** (shift a day, Monday reset, AI split import from PDF/photo/text, default-split reset), anatomy plates.
+- **Fuel** tab: 28-day meal cycle field, eaten/swapped/skipped logging, cycle realign, restock list that writes real Groceries purchases, AI meal scan.
+- **Coach** (Gemini REST, no SDK): context-aware chat, per-model daily budgets, session read-out.
+- Training / meal / restock reminders on a separate `routine#001` channel with deterministic notification ids, switchable in Profile.
+- Body metrics on the profile doc; optional whole-app biometric lock.
+- See `docs/CATALYST_MERGE.md` for the feature-by-feature mapping and what was intentionally dropped.
+
+### Local-first data
+- Every write now updates the AsyncStorage cache and enqueues a SyncManager action, then returns; a background flusher (debounced, on foreground, back-off retries) pushes to Firestore. Reads are cache-first with throttled background revalidation (`utils/localFirst.ts`, `userDocs.cacheFirst`) and change events (`SyncManager.subscribe`, `hooks/use-data-refresh.ts`).
+- Fixed: the offline queue was never flushed (nothing called `syncOfflineData`), and a queued `water_clear` deleted the entire `waterLogs` collection.
+
+### Native
+- Barcode alarm + gallery QR native code recovered from the v1.1.2 APK into tracked `native-android/`, re-applied by the new `withEssentialsNative.js` config plugin. `android/` is now fully generated (the stale tracked `android/app/build.gradle` and `gradle.properties` were untracked).
+- Firebase config falls back to `google-services.json`; `android.googleServicesFile` set.
+
+### UI
+- Four-tab nav; Home gains a Training/Fuel "today's plan" row; Profile rebuilt as instrument rows; shared draggable `Sheet`, `ScreenHeader`, `EntranceView`, `AnimatedNumber` primitives.
+
 ## [1.1.2] - 2026-08-29
 ### UI & UX Modernization
 - **Reworked Hydration Hero**: Genuine dual-wave animated surface with independently-phased waves, floating bubbles that vanish at the liquid line, and a spring-driven fill on every log/remove action.

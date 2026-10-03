@@ -1,12 +1,6 @@
-import {
-  addDoc,
-  collection,
-  doc,
-  setDoc,
-} from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { auth, db, waitForAuth } from '@/utils/firebase';
+import { auth, waitForAuth } from '@/utils/firebase';
 import * as SyncManager from './SyncManager';
 
 const generateId = () => `upi_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -29,14 +23,6 @@ async function getCurrentUserId(): Promise<string> {
   if (auth.currentUser?.uid) return auth.currentUser.uid;
   const user = await waitForAuth();
   return user.uid;
-}
-
-/**
- * Returns a reference to the user's upi_transactions subcollection.
- */
-async function upiCollection() {
-  const uid = await getCurrentUserId();
-  return collection(db, 'users', uid, 'upi_transactions');
 }
 
 /**
@@ -95,29 +81,8 @@ export async function saveUpiTransaction(
   const id = generateId();
   const newLog: UpiLog = { id, upiId: upiId.trim(), amount, status, timestamp };
 
-  // Optimistically sync to local cache immediately
+  // Local first: cache now, push to Firestore in the background.
   await updateUpiCache([newLog]);
-
-  const isOnline = await SyncManager.isOnline();
-  if (isOnline) {
-    try {
-      const coll = await upiCollection();
-      const docRef = doc(coll, id);
-      await setDoc(docRef, {
-        upiId: upiId.trim(),
-        amount,
-        status,
-        timestamp,
-      });
-
-      return newLog;
-    } catch (error) {
-      console.warn('Failed to save UPI transaction directly to Firestore, queueing offline', error);
-    }
-  }
-
-  // Save offline fallback action (reusing purchase_save logic pattern or a dedicated upi_save in SyncManager)
-  // For simplicity, we just queue an action that could be handled by SyncManager later
   await SyncManager.queueAction({
     id: `action_upi_${id}`,
     type: 'upi_save',

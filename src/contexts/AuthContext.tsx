@@ -8,7 +8,7 @@ import {
   signOut as firebaseSignOut,
   updateProfile,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -31,7 +31,7 @@ if (!isExpoGo) {
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 
-import { auth, db } from '@/utils/firebase';
+import { auth, db, GOOGLE_WEB_CLIENT_ID } from '@/utils/firebase';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface AuthContextValue {
@@ -66,7 +66,7 @@ const AuthContext = createContext<AuthContextValue>({
 // ─── Configure Google Sign-In (run once at module load) ───────────────────────
 if (!isExpoGo && GoogleSignin) {
   GoogleSignin.configure({
-    webClientId: process.env.EXPO_PUBLIC_FIREBASE_GOOGLE_WEB_CLIENT_ID,
+    webClientId: GOOGLE_WEB_CLIENT_ID,
     offlineAccess: false,
   });
 }
@@ -230,19 +230,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await setCachedWebhook(uid, url);
     setDiscordWebhookUrl(url);
 
-    // Try to update Firestore
-    try {
-      const userRef = doc(db, 'users', uid);
-      await updateDoc(userRef, { discordWebhookUrl: url });
-    } catch (err) {
-      console.warn('Failed to update webhook URL in Firestore', err);
-      const isOnline = await SyncManager.isOnline();
-      if (!isOnline) {
-        // Safe to return when offline since local cache is updated and will be read next time
-        return;
-      }
-      throw err;
-    }
+    // Pushed to Firestore in the background (local-first, see SyncManager).
+    await SyncManager.queueAction({
+      id: `action_webhook_${Date.now()}`,
+      type: 'doc_set',
+      payload: { path: [], data: { discordWebhookUrl: url }, merge: true },
+    });
   }, []);
 
   return (

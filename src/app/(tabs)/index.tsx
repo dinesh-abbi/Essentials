@@ -45,8 +45,12 @@ import * as PurchasesStorage from '@/utils/PurchasesStorage';
 import * as WaterStorage from '@/utils/WaterStorage';
 import * as WidgetSync from '@/utils/WidgetSync';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDataRefresh } from '@/hooks/use-data-refresh';
 import * as BarcodeAlarmStorage from '@/utils/BarcodeAlarmStorage';
 import { useTabBarScrollHandler, showTabBar } from '@/utils/tabBarVisibility';
+import * as FuelStorage from '@/utils/FuelStorage';
+import * as TrainingStorage from '@/utils/TrainingStorage';
+import { localDateKey } from '@/utils/userDocs';
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -474,6 +478,9 @@ export default function HomeScreen() {
   const [waterGoal, setWaterGoal] = useState(WaterStorage.DEFAULT_DAILY_GOAL);
   const [alarmConfig, setAlarmConfig] = useState<BarcodeAlarmStorage.BarcodeAlarmConfig | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [reloadTick, setReloadTick] = useState(0);
+  const [training, setTraining] = useState<{ focus: string; done: number; total: number; logged: boolean } | null>(null);
+  const [fuel, setFuel] = useState<{ day: number; eaten: number; restock: boolean } | null>(null);
 
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -484,7 +491,8 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       async function load() {
-        setDashboardLoading(true);
+        // Reads are cache-first now, so revisits and background refreshes
+        // update in place — the skeleton only shows on the very first paint.
         try {
           const queue = await AttendanceStorage.getOfflineQueue();
           setOfflineCount(queue.length);
@@ -526,6 +534,26 @@ export default function HomeScreen() {
           const alarm = await BarcodeAlarmStorage.getAlarmConfig();
           setAlarmConfig(alarm);
 
+          // Training + Fuel — local caches only, so Home never waits on them.
+          const [split, offset, dayState, cycleStart] = await Promise.all([
+            TrainingStorage.getCachedSplit(),
+            TrainingStorage.getScheduleOffset(),
+            TrainingStorage.getDayState(),
+            FuelStorage.getCycleStart(),
+          ]);
+          const today = TrainingStorage.dayForSlot(split.days, TrainingStorage.splitSlotFor(new Date(), offset));
+          setTraining({
+            focus: today.focus,
+            done: today.exercises.filter((e) => dayState.completed[e.id]).length,
+            total: today.exercises.length,
+            logged: !!dayState.finishedAt,
+          });
+          const pos = FuelStorage.positionFor(cycleStart);
+          setFuel({ day: pos.day, eaten: 0, restock: FuelStorage.RESTOCK_DAYS.includes(pos.day) });
+          FuelStorage.getMealLogs()
+            .then((logs) => setFuel({ day: pos.day, eaten: FuelStorage.eatenCount(logs[localDateKey()]), restock: FuelStorage.RESTOCK_DAYS.includes(pos.day) }))
+            .catch(() => {});
+
           setNow(new Date());
           WidgetSync.sync();
         } catch (e) {
@@ -535,8 +563,9 @@ export default function HomeScreen() {
         }
       }
       load();
-    }, [])
+    }, [reloadTick])
   );
+  useDataRefresh(['water', 'purchases', 'docs'], () => setReloadTick((n) => n + 1));
 
   const addWater = async (amount: number) => {
     setWaterSaving(true);
@@ -807,9 +836,78 @@ export default function HomeScreen() {
             </EntranceView>
           )}
 
+          {/* ── Today's plan — training + fuel ───────────────────────────────
+              Not a second row of cards: two columns sitting directly on `bg`
+              under one hairline, so the page keeps one tall hero, one
+              two-up, and then quieter rows (the "no uniform card heights"
+              rule in AGENTS.md). */}
+          {!dashboardLoading && training && fuel && (
+            <EntranceView index={3} reduceMotion={reduceMotion} style={[styles.planRow, { borderTopColor: colors.hairline }]}>
+              <AnimatedPressable
+                onPress={() => router.navigate('/train' as any)}
+                haptic="light"
+                pressOpacity={0.85}
+                style={styles.planCol}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  training.total === 0
+                    ? `Training: ${training.focus}. Open training.`
+                    : `Training: ${training.focus}, ${training.done} of ${training.total} done. Open training.`
+                }
+              >
+                <Text style={[Type.bracketLabel, { color: colors.textMid }]}>[ TRAINING ]</Text>
+                <Text style={[styles.planTitle, { color: colors.textHi }]} numberOfLines={2}>
+                  {training.focus}
+                </Text>
+                <Text style={[Type.subline, { color: training.logged ? colors.water : colors.textMid }]} numberOfLines={1}>
+                  {training.total === 0
+                    ? 'Recovery day'
+                    : training.logged
+                      ? 'Session logged'
+                      : `${training.done} of ${training.total} done`}
+                </Text>
+                {training.total > 0 && (
+                  <View style={styles.planRail}>
+                    {Array.from({ length: training.total }, (_, i) => (
+                      <View
+                        key={i}
+                        style={[styles.planSeg, { backgroundColor: i < training.done ? colors.water : colors.surface2 }]}
+                      />
+                    ))}
+                  </View>
+                )}
+              </AnimatedPressable>
+
+              <View style={[styles.planDivider, { backgroundColor: colors.hairline }]} />
+
+              <AnimatedPressable
+                onPress={() => router.navigate((fuel.restock ? '/fuel?sheet=restock' : '/fuel') as any)}
+                haptic="light"
+                pressOpacity={0.85}
+                style={styles.planCol}
+                accessibilityRole="button"
+                accessibilityLabel={`Fuel: day ${fuel.day} of 28, ${fuel.eaten} of 4 meals logged. Open fuel.`}
+              >
+                <Text style={[Type.bracketLabel, { color: colors.textMid }]}>[ FUEL ]</Text>
+                <Text style={[styles.planTitle, { color: colors.textHi }]}>
+                  Day {fuel.day}
+                  <Text style={[Type.subline, { color: colors.textMid }]}> / 28</Text>
+                </Text>
+                <Text style={[Type.subline, { color: fuel.restock ? colors.water : colors.textMid }]} numberOfLines={1}>
+                  {fuel.restock ? 'Restock day' : `${fuel.eaten} of 4 meals`}
+                </Text>
+                <View style={styles.planRail}>
+                  {[0, 1, 2, 3].map((i) => (
+                    <View key={i} style={[styles.planSeg, { backgroundColor: i < fuel.eaten ? colors.water : colors.surface2 }]} />
+                  ))}
+                </View>
+              </AnimatedPressable>
+            </EntranceView>
+          )}
+
           {/* ── Alarm (only when armed) ──────────────────────────────────── */}
           {!dashboardLoading && alarmConfig?.enabled && (
-            <EntranceView index={3} reduceMotion={reduceMotion}>
+            <EntranceView index={4} reduceMotion={reduceMotion}>
               <AnimatedPressable
                 onPress={() => router.push('/alarm/setup' as any)}
                 haptic="light"
@@ -1026,6 +1124,19 @@ const styles = StyleSheet.create({
   statIllo: { position: 'absolute', top: Spacing.three, right: Spacing.three, opacity: 0.9 },
   sparkWrap: { marginTop: Spacing.two, alignSelf: 'flex-start' },
   emptyStateText: { marginTop: Spacing.one },
+
+  // ── Today's plan (training + fuel) ───────────────────────────────────────────
+  planRow: {
+    flexDirection: 'row',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: Spacing.four,
+    marginBottom: Spacing.five,
+  },
+  planCol: { flex: 1, gap: Spacing.one },
+  planDivider: { width: StyleSheet.hairlineWidth, marginHorizontal: Spacing.four },
+  planTitle: { ...Type.title, marginTop: Spacing.one },
+  planRail: { flexDirection: 'row', gap: 3, marginTop: Spacing.two },
+  planSeg: { flex: 1, height: 4, borderRadius: 2 },
 
   // ── Alarm ───────────────────────────────────────────────────────────────────
   alarmRow: {

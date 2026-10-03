@@ -3,203 +3,141 @@ import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useState, useCallback, useRef } from 'react';
 import {
+  ActivityIndicator,
   Alert,
-  Modal,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
   useColorScheme,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
 import { BlurTargetView } from 'expo-blur';
 
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
+import { RoutineSettings } from '@/components/profile/RoutineSettings';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import { BottomTabInset, Colors, FontFace, MaxContentWidth, Motion, Radius, Spacing, Type } from '@/constants/theme';
+import { EntranceView } from '@/components/ui/entrance-view';
+import { Sheet } from '@/components/ui/sheet';
+import { BottomTabInset, Colors, HitTarget, MaxContentWidth, Radius, Spacing, Type } from '@/constants/theme';
+import { useDataRefresh } from '@/hooks/use-data-refresh';
 import * as BarcodeAlarmStorage from '@/utils/BarcodeAlarmStorage';
 import { registerBlurTarget } from '@/utils/blurTarget';
+import * as SyncManager from '@/utils/SyncManager';
 import { showTabBar, useTabBarScrollHandler } from '@/utils/tabBarVisibility';
 import { checkForUpdate } from '@/utils/updates';
 
+type Palette = typeof Colors.dark;
+
 const DISCORD_STEPS = [
-  {
-    number: '1',
-    title: 'Open Discord & Pick a Server',
-    detail: 'Open the Discord app (or discord.com) and navigate to your private server or channel.',
-  },
-  {
-    number: '2',
-    title: 'Open Channel Settings',
-    detail: 'Right-click or long-press the target text channel → select "Edit Channel".',
-  },
-  {
-    number: '3',
-    title: 'Go to Integrations → Webhooks',
-    detail: 'Tap "Integrations", then "Webhooks".',
-  },
-  {
-    number: '4',
-    title: 'Create a New Webhook',
-    detail: 'Tap "New Webhook", name it "Essentials", then tap "Copy Webhook URL".',
-  },
-  {
-    number: '5',
-    title: 'Paste Below & Save',
-    detail: 'Paste the URL into the field below and tap "Save".',
-  },
+  'Open Discord and go to the private channel that should receive check-ins.',
+  'Long-press the channel → Edit Channel → Integrations → Webhooks.',
+  'New Webhook → name it “Essentials” → Copy Webhook URL.',
+  'Paste it below and save.',
 ];
 
 const formatAlarmTime = (h: number, m: number) => {
   const ampm = h >= 12 ? 'PM' : 'AM';
   const hour12 = h % 12 || 12;
-  const minStr = m < 10 ? '0' + m : m;
-  return `${hour12}:${minStr} ${ampm}`;
+  return `${hour12}:${m < 10 ? '0' + m : m} ${ampm}`;
 };
 
+/**
+ * Profile, rebuilt in the house language: the person's name as the
+ * headline, then a column of instrument rows — one bracket label, one
+ * value, one affordance each — instead of a grid of coloured tiles. Real
+ * state only: the sync row counts writes actually waiting in the queue.
+ */
 export default function ProfileScreen() {
   const { user, signOut, updateDisplayName, discordWebhookUrl, updateDiscordWebhook } = useAuth();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = Colors[scheme];
-  const isDark = scheme === 'dark';
+  const colors = Colors[scheme] as Palette;
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const reduceMotion = useReducedMotion();
   const currentVersion = Application.nativeApplicationVersion || Constants.expoConfig?.version || '1.0.0';
 
   const blurTargetRef = useRef<View>(null);
+  const tabBarScrollHandler = useTabBarScrollHandler();
+
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [newName, setNewName] = useState('');
+
+  const [discordOpen, setDiscordOpen] = useState(false);
+  const [newWebhookUrl, setNewWebhookUrl] = useState('');
+  const [savingWebhook, setSavingWebhook] = useState(false);
+
+  const [alarmConfig, setAlarmConfig] = useState<BarcodeAlarmStorage.BarcodeAlarmConfig | null>(null);
+  const [availableUpdate, setAvailableUpdate] = useState<string | null>(null);
+  const [pending, setPending] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+
+  const loadPending = useCallback(() => {
+    SyncManager.pendingCount().then(setPending);
+  }, []);
+  useDataRefresh(['all', 'water', 'purchases', 'upi', 'docs'], loadPending);
+
   useFocusEffect(
     useCallback(() => {
       registerBlurTarget(blurTargetRef);
       showTabBar();
-    }, [])
-  );
-
-  const tabBarScrollHandler = useTabBarScrollHandler();
-
-  // Name edit state
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [newName, setNewName] = useState('');
-
-  // Discord modal state
-  const [discordModalVisible, setDiscordModalVisible] = useState(false);
-  const [newWebhookUrl, setNewWebhookUrl] = useState('');
-  const [savingWebhook, setSavingWebhook] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
-
-  // Barcode alarm state
-  const [alarmConfig, setAlarmConfig] = useState<BarcodeAlarmStorage.BarcodeAlarmConfig | null>(null);
-  const [availableUpdate, setAvailableUpdate] = useState<string | null>(null);
-
-  useFocusEffect(
-    useCallback(() => {
-      async function load() {
-        const config = await BarcodeAlarmStorage.getAlarmConfig();
-        setAlarmConfig(config);
-      }
-      load();
-    }, [])
-  );
-
-  useFocusEffect(
-    useCallback(() => {
       let cancelled = false;
-      checkForUpdate().then((release) => {
-        if (!cancelled) setAvailableUpdate(release?.version ?? null);
-      });
+      BarcodeAlarmStorage.getAlarmConfig().then((c) => !cancelled && setAlarmConfig(c));
+      checkForUpdate().then((release) => !cancelled && setAvailableUpdate(release?.version ?? null));
+      SyncManager.pendingCount().then((n) => !cancelled && setPending(n));
       return () => {
         cancelled = true;
       };
-    }, [])
+    }, []),
   );
 
   async function handleToggleAlarm(value: boolean) {
-    if (!alarmConfig) return;
-
-    if (value && !alarmConfig.barcodePayload) {
-      Alert.alert(
-        'Barcode Required',
-        'You need to register a barcode before enabling the alarm.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Set Up Now', onPress: () => router.push('/alarm/setup' as any) },
-        ]
-      );
+    if (!alarmConfig) {
+      router.push('/alarm/setup' as any);
       return;
     }
-
+    if (value && !alarmConfig.barcodePayload) {
+      Alert.alert('Barcode required', 'Register a barcode before turning the alarm on.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Set up now', onPress: () => router.push('/alarm/setup' as any) },
+      ]);
+      return;
+    }
     const updated = { ...alarmConfig, enabled: value };
     setAlarmConfig(updated);
     try {
       await BarcodeAlarmStorage.saveAlarmConfig(updated);
-    } catch (e) {
-      Alert.alert('Error', 'Failed to update alarm status.');
+    } catch {
+      Alert.alert('Error', 'Failed to update the alarm.');
       setAlarmConfig(alarmConfig);
     }
   }
 
-  function maskWebhookUrl(url: string): string {
-    if (url.length <= 35) return url;
-    return url.substring(0, 30) + '...••••';
-  }
-
   async function handleSaveWebhook() {
     const trimmed = newWebhookUrl.trim();
-    if (!trimmed) {
-      Alert.alert('URL Required', 'Please enter your Discord Webhook URL.');
-      return;
-    }
     if (!trimmed.startsWith('https://discord.com/api/webhooks/')) {
-      Alert.alert('Invalid URL', 'The URL must start with https://discord.com/api/webhooks/');
+      Alert.alert('Check the URL', 'It should start with https://discord.com/api/webhooks/');
       return;
     }
     setSavingWebhook(true);
     try {
       await updateDiscordWebhook(trimmed);
-      setDiscordModalVisible(false);
-      Alert.alert('Saved', 'Discord Webhook URL updated successfully.');
+      setDiscordOpen(false);
     } catch (err: any) {
-      Alert.alert('Save Failed', err?.message ?? 'Could not update webhook URL.');
+      Alert.alert('Save failed', err?.message ?? 'Could not update the webhook URL.');
     } finally {
       setSavingWebhook(false);
     }
   }
 
-  const displayName = user?.displayName ?? user?.email?.split('@')[0] ?? 'User';
-  const email = user?.email ?? '—';
-  const provider = user?.providerData?.[0]?.providerId ?? 'password';
-  const providerLabel = provider === 'google.com' ? 'Google' : 'Email / Password';
-  const photoUrl = user?.photoURL ?? null;
-  const initials = displayName.slice(0, 2).toUpperCase();
-
-  async function handleSignOut() {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign Out',
-        style: 'destructive',
-        onPress: async () => {
-          await signOut();
-          router.replace('/login');
-        },
-      },
-    ]);
-  }
-
   async function handleSaveName() {
     const trimmed = newName.trim();
-    if (!trimmed) {
-      Alert.alert('Empty name', 'Please enter a valid display name.');
-      return;
-    }
+    if (!trimmed) return;
     try {
       await updateDisplayName(trimmed);
       setIsEditingName(false);
@@ -208,593 +146,350 @@ export default function ProfileScreen() {
     }
   }
 
+  function handleSignOut() {
+    Alert.alert(
+      'Sign out?',
+      pending > 0 ? `${pending} change(s) haven’t synced yet — they’ll upload next time you sign in on this phone.` : undefined,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign out',
+          style: 'destructive',
+          onPress: async () => {
+            await signOut();
+            router.replace('/login');
+          },
+        },
+      ],
+    );
+  }
+
+  async function syncNow() {
+    setSyncing(true);
+    await SyncManager.syncOfflineData();
+    setPending(await SyncManager.pendingCount());
+    setSyncing(false);
+  }
+
+  const displayName = user?.displayName ?? user?.email?.split('@')[0] ?? 'You';
+  const email = user?.email ?? '—';
+  const provider = user?.providerData?.[0]?.providerId ?? 'password';
+  const providerLabel = provider === 'google.com' ? 'Google' : 'email';
+  const photoUrl = user?.photoURL ?? null;
+  const initials = displayName.slice(0, 2).toUpperCase();
   const isLinked = !!discordWebhookUrl;
-  const enteringAnim = reduceMotion ? undefined : FadeInDown.duration(Motion.duration.screen);
+  const canEditName = provider === 'password';
 
   return (
-    <BlurTargetView ref={blurTargetRef} style={[styles.root, { backgroundColor: colors.background }]}>
+    <BlurTargetView ref={blurTargetRef} style={[styles.root, { backgroundColor: colors.bg }]}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <Animated.ScrollView
-          contentContainerStyle={[
-            styles.content,
-            { paddingBottom: BottomTabInset + insets.bottom + Spacing.five },
-          ]}
+          contentContainerStyle={[styles.content, { paddingBottom: BottomTabInset + insets.bottom + Spacing.five }]}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           onScroll={tabBarScrollHandler}
           scrollEventThrottle={16}
         >
-          {/* ── Header ─────────────────────────────────────────────────────── */}
-          <Animated.View entering={enteringAnim} style={styles.header}>
-            <Text style={[styles.screenLabel, { color: colors.textSecondary }]}>PROFILE</Text>
-            <Text style={[styles.screenTitle, { color: colors.text }]}>Account</Text>
-          </Animated.View>
-
-          {/* ── User Hero Card (Avatar, Name, Email, Edit) ─────────────────── */}
-          <Animated.View entering={enteringAnim}>
-            <View style={[styles.avatarCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-              <View style={styles.avatarRow}>
-                {photoUrl ? (
-                  <Image source={{ uri: photoUrl }} style={styles.avatar} contentFit="cover" />
-                ) : (
-                  <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.primary }]}>
-                    <Text style={styles.avatarInitials}>{initials}</Text>
-                  </View>
-                )}
-
-                <View style={styles.avatarInfo}>
-                  {isEditingName ? (
-                    <View style={styles.nameEditRow}>
-                      <TextInput
-                        value={newName}
-                        onChangeText={setNewName}
-                        style={[styles.nameInput, { color: colors.text, borderBottomColor: colors.primary }]}
-                        placeholder="Enter name"
-                        placeholderTextColor={colors.textSecondary}
-                        autoFocus
-                      />
-                      <TouchableOpacity onPress={handleSaveName} style={[styles.inlineBtn, { backgroundColor: colors.primary }]}>
-                        <Feather name="check" size={14} color="#FFF" />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => setIsEditingName(false)} style={[styles.inlineBtn, { backgroundColor: colors.backgroundSelected }]}>
-                        <Feather name="x" size={14} color={colors.textSecondary} />
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <View style={styles.nameRow}>
-                      <Text style={[styles.displayName, { color: colors.text }]} numberOfLines={1}>
-                        {displayName}
-                      </Text>
-                      {provider === 'password' && (
-                        <TouchableOpacity
-                          onPress={() => {
-                            setNewName(displayName);
-                            setIsEditingName(true);
-                          }}
-                          style={styles.editPencil}
-                          activeOpacity={0.7}
-                        >
-                          <Feather name="edit-2" size={13} color={colors.primary} />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  )}
-
-                  <Text style={[styles.emailText, { color: colors.textSecondary }]} numberOfLines={1}>
-                    {email}
-                  </Text>
-
-                  <View style={[styles.providerPill, { backgroundColor: colors.backgroundSelected }]}>
-                    <Text style={[styles.providerText, { color: colors.textSecondary }]}>
-                      via {providerLabel}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </Animated.View>
-
-          {/* ── 2x2 Bento Grid Layout ───────────────────────────────────────── */}
-          <Animated.View entering={enteringAnim} style={styles.bentoSection}>
-            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>APP & SERVICES</Text>
-
-            <View style={styles.bentoGrid}>
-              {/* Row 1: Discord & Barcode Alarm */}
-              <View style={styles.bentoRow}>
-                {/* 1. Discord Card */}
-                <AnimatedPressable
-                  onPress={() => {
-                    setNewWebhookUrl(discordWebhookUrl ?? '');
-                    setDiscordModalVisible(true);
-                  }}
-                  style={[
-                    styles.bentoCard,
-                    { backgroundColor: colors.backgroundElement, borderColor: isLinked ? '#5865F2' + '50' : colors.border },
-                  ]}
-                >
-                  <View style={styles.bentoCardHeader}>
-                    <View style={[styles.bentoIcon, { backgroundColor: '#5865F2' + '20' }]}>
-                      <Feather name="message-circle" size={16} color="#5865F2" />
-                    </View>
-                    <View style={[styles.statusIndicator, { backgroundColor: isLinked ? colors.success : colors.textSecondary }]} />
-                  </View>
-                  <View style={styles.bentoCardBody}>
-                    <Text style={[styles.bentoTitle, { color: colors.text }]}>Discord</Text>
-                    <Text style={[styles.bentoSubtitle, { color: isLinked ? colors.success : colors.textSecondary }]} numberOfLines={1}>
-                      {isLinked ? 'Connected ✓' : 'Not linked'}
-                    </Text>
-                  </View>
-                </AnimatedPressable>
-
-                {/* 2. Barcode Alarm Card */}
-                <AnimatedPressable
-                  onPress={() => router.push('/alarm/setup' as any)}
-                  style={[
-                    styles.bentoCard,
-                    { backgroundColor: colors.backgroundElement, borderColor: alarmConfig?.enabled ? colors.primary + '50' : colors.border },
-                  ]}
-                >
-                  <View style={styles.bentoCardHeader}>
-                    <View style={[styles.bentoIcon, { backgroundColor: colors.primary + '20' }]}>
-                      <Feather name="bell" size={16} color={colors.primary} />
-                    </View>
-                    <Switch
-                      value={alarmConfig?.enabled ?? false}
-                      onValueChange={handleToggleAlarm}
-                      trackColor={{ false: colors.backgroundSelected, true: colors.primary + '40' }}
-                      thumbColor={alarmConfig?.enabled ? colors.primary : colors.textSecondary}
-                      style={{ transform: [{ scale: 0.8 }] }}
+          {/* ── Identity ─────────────────────────────────────────────── */}
+          <EntranceView index={0} style={styles.identity}>
+            <Text style={[Type.bracketLabel, { color: colors.textMid }]}>
+              <Text style={{ color: colors.water }}>[ PROFILE ]</Text>
+              {`  ·  v${currentVersion}`}
+            </Text>
+            <View style={styles.identityRow}>
+              <View style={styles.identityText}>
+                {isEditingName ? (
+                  <View style={styles.nameEditRow}>
+                    <TextInput
+                      value={newName}
+                      onChangeText={setNewName}
+                      onSubmitEditing={handleSaveName}
+                      autoFocus
+                      returnKeyType="done"
+                      style={[Type.headline, styles.nameInput, { color: colors.textHi, borderBottomColor: colors.water }]}
                     />
+                    <RoundIcon icon="check" onPress={handleSaveName} colors={colors} filled label="Save name" />
+                    <RoundIcon icon="x" onPress={() => setIsEditingName(false)} colors={colors} label="Cancel" />
                   </View>
-                  <View style={styles.bentoCardBody}>
-                    <Text style={[styles.bentoTitle, { color: colors.text }]}>Alarm</Text>
-                    <Text style={[styles.bentoSubtitle, { color: alarmConfig?.enabled ? colors.primary : colors.textSecondary }]} numberOfLines={1}>
-                      {alarmConfig?.enabled ? formatAlarmTime(alarmConfig.hour, alarmConfig.minute) : 'Disabled'}
+                ) : (
+                  <AnimatedPressable
+                    onPress={() => {
+                      setNewName(displayName);
+                      setIsEditingName(true);
+                    }}
+                    disabled={!canEditName}
+                    pressOpacity={0.7}
+                    style={styles.nameRow}
+                    accessibilityRole={canEditName ? 'button' : 'text'}
+                    accessibilityLabel={canEditName ? `${displayName}. Edit name` : displayName}
+                  >
+                    <Text style={[Type.headline, styles.name, { color: colors.textHi }]} numberOfLines={1}>
+                      {displayName}
                     </Text>
-                  </View>
-                </AnimatedPressable>
+                    {canEditName && <Feather name="edit-2" size={15} color={colors.textMid} />}
+                  </AnimatedPressable>
+                )}
+                <Text style={[Type.subline, { color: colors.textMid }]} numberOfLines={1}>
+                  {email} · via {providerLabel}
+                </Text>
               </View>
-
-              {/* Row 2: App Version & Cloud Sync */}
-              <View style={styles.bentoRow}>
-                {/* 3. App Version / What's New */}
-                <AnimatedPressable
-                  onPress={() => router.push('/whats-new' as any)}
-                  style={[styles.bentoCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}
-                >
-                  <View style={styles.bentoCardHeader}>
-                    <View style={[styles.bentoIcon, { backgroundColor: colors.signalWeak }]}>
-                      <Feather name="info" size={16} color={colors.signal} />
-                    </View>
-                    {availableUpdate && (
-                      <View style={[styles.updateDotBadge, { backgroundColor: colors.signal }]}>
-                        <Text style={styles.updateDotText}>NEW</Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.bentoCardBody}>
-                    <Text style={[styles.bentoTitle, { color: colors.text }]}>Version</Text>
-                    <Text style={[styles.bentoSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
-                      v{currentVersion} • What's new
-                    </Text>
-                  </View>
-                </AnimatedPressable>
-
-                {/* 4. Cloud Sync Status */}
-                <AnimatedPressable
-                  onPress={() => {
-                    Alert.alert('Cloud Sync', 'Essentials uses Firebase Auth and Firestore cloud persistence with offline caching.');
-                  }}
-                  style={[styles.bentoCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}
-                >
-                  <View style={styles.bentoCardHeader}>
-                    <View style={[styles.bentoIcon, { backgroundColor: colors.success + '20' }]}>
-                      <Feather name="cloud" size={16} color={colors.success} />
-                    </View>
-                    <Feather name="check-circle" size={14} color={colors.success} />
-                  </View>
-                  <View style={styles.bentoCardBody}>
-                    <Text style={[styles.bentoTitle, { color: colors.text }]}>Cloud Sync</Text>
-                    <Text style={[styles.bentoSubtitle, { color: colors.success }]} numberOfLines={1}>
-                      Active & Synced
-                    </Text>
-                  </View>
-                </AnimatedPressable>
+              <View style={[styles.avatar, { borderColor: colors.hairline, backgroundColor: colors.surface }]}>
+                {photoUrl ? (
+                  <Image source={{ uri: photoUrl }} style={styles.avatarImg} contentFit="cover" />
+                ) : (
+                  <Text style={[Type.bracketLabel, styles.initials, { color: colors.textMid }]}>{initials}</Text>
+                )}
               </View>
             </View>
-          </Animated.View>
+          </EntranceView>
 
-          {/* ── Sign Out Button ──────────────────────────────────────────────── */}
-          <Animated.View entering={enteringAnim} style={{ marginTop: Spacing.two }}>
-            <Button
-              id="signout-button"
-              variant="destructive"
-              size="lg"
-              fullWidth
-              icon="log-out"
-              title="Sign Out"
-              onPress={handleSignOut}
+          {/* ── Services ─────────────────────────────────────────────── */}
+          <EntranceView index={1} style={[styles.rows, { borderTopColor: colors.hairline }]}>
+            <Row
+              bracket="[ CHECK-IN ]"
+              title="Discord webhook"
+              value={isLinked ? 'Connected' : 'Not linked'}
+              accent={isLinked}
+              colors={colors}
+              onPress={() => {
+                setNewWebhookUrl(discordWebhookUrl ?? '');
+                setDiscordOpen(true);
+              }}
             />
-          </Animated.View>
+            <Row
+              bracket="[ ALARM ]"
+              title={alarmConfig?.enabled ? `Barcode alarm · ${formatAlarmTime(alarmConfig.hour, alarmConfig.minute)}` : 'Barcode alarm'}
+              value={alarmConfig?.enabled ? 'On' : 'Off'}
+              accent={!!alarmConfig?.enabled}
+              colors={colors}
+              onPress={() => router.push('/alarm/setup' as any)}
+              trailing={
+                <Switch
+                  value={alarmConfig?.enabled ?? false}
+                  onValueChange={handleToggleAlarm}
+                  trackColor={{ false: colors.surface2, true: colors.signalLine }}
+                  thumbColor={alarmConfig?.enabled ? colors.water : colors.textMid}
+                  accessibilityLabel="Barcode alarm"
+                />
+              }
+            />
+            <Row
+              bracket="[ VERSION ]"
+              title={`v${currentVersion} · what’s new`}
+              value={availableUpdate ? `v${availableUpdate} ready` : 'Up to date'}
+              accent={!!availableUpdate}
+              colors={colors}
+              onPress={() => router.push((availableUpdate ? '/update' : '/whats-new') as any)}
+            />
+            <Row
+              bracket="[ SYNC ]"
+              title={pending === 0 ? 'Everything is in the cloud' : `${pending} change${pending === 1 ? '' : 's'} waiting to upload`}
+              value={pending === 0 ? 'Synced' : 'Sync now'}
+              accent={pending > 0}
+              colors={colors}
+              onPress={pending > 0 ? syncNow : undefined}
+              trailing={syncing ? <ActivityIndicator size="small" color={colors.water} /> : undefined}
+              last
+            />
+          </EntranceView>
+
+          {/* ── Training & fuel settings (Catalyst merge) ─────────────── */}
+          <EntranceView index={2} style={styles.block}>
+            <RoutineSettings />
+          </EntranceView>
+
+          <EntranceView index={3}>
+            <AnimatedPressable
+              onPress={handleSignOut}
+              haptic="light"
+              pressOpacity={0.7}
+              style={[styles.signOut, { borderColor: colors.hairline }]}
+              accessibilityRole="button"
+            >
+              <Feather name="log-out" size={16} color={colors.alert} />
+              <Text style={[Type.controlLabel, { color: colors.alert }]}>Sign out</Text>
+            </AnimatedPressable>
+          </EntranceView>
         </Animated.ScrollView>
 
-        {/* ── Discord Webhook Setup Modal ────────────────────────────────────── */}
-        <Modal
-          visible={discordModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setDiscordModalVisible(false)}
+        {/* ── Discord webhook sheet ──────────────────────────────────── */}
+        <Sheet
+          visible={discordOpen}
+          onClose={() => setDiscordOpen(false)}
+          dismissable={!savingWebhook}
+          bracket="[ CHECK-IN · DISCORD ]"
+          title={isLinked ? 'Update the webhook' : 'Connect a channel'}
+          heightRatio={0.72}
         >
-          <View style={styles.modalBackdrop}>
-            <View style={[styles.modalCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-              <View style={styles.modalHeader}>
-                <View style={[styles.bentoIcon, { backgroundColor: '#5865F2' + '20' }]}>
-                  <Feather name="message-circle" size={18} color="#5865F2" />
+          <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+            <Text style={[Type.body, { color: colors.textMid }]}>
+              Check-in photos are posted to this channel. The URL is stored on your account only.
+            </Text>
+            <TextInput
+              value={newWebhookUrl}
+              onChangeText={setNewWebhookUrl}
+              placeholder="https://discord.com/api/webhooks/…"
+              placeholderTextColor={colors.textLow}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={[Type.body, styles.urlInput, { color: colors.textHi, borderColor: colors.hairline, backgroundColor: colors.surface }]}
+            />
+            <View style={styles.steps}>
+              {DISCORD_STEPS.map((s, i) => (
+                <View key={i} style={styles.step}>
+                  <Text style={[Type.badge, styles.stepNum, { color: colors.water }]}>{String(i + 1).padStart(2, '0')}</Text>
+                  <Text style={[Type.subline, styles.stepText, { color: colors.textMid }]}>{s}</Text>
                 </View>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>Discord Integration</Text>
-                <TouchableOpacity onPress={() => setDiscordModalVisible(false)} style={styles.modalCloseBtn}>
-                  <Feather name="x" size={18} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
-                {isLinked && (
-                  <View style={[styles.currentWebhookBanner, { backgroundColor: colors.backgroundSelected }]}>
-                    <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>CURRENT WEBHOOK</Text>
-                    <Text style={[styles.metaValue, { color: colors.text }]} numberOfLines={1}>
-                      {maskWebhookUrl(discordWebhookUrl!)}
-                    </Text>
-                  </View>
-                )}
-
-                <Text style={[styles.metaLabel, { color: colors.textSecondary, marginTop: Spacing.three }]}>
-                  {isLinked ? 'UPDATE WEBHOOK URL' : 'ENTER DISCORD WEBHOOK URL'}
-                </Text>
-                <TextInput
-                  value={newWebhookUrl}
-                  onChangeText={setNewWebhookUrl}
-                  style={[
-                    styles.webhookInput,
-                    {
-                      color: colors.text,
-                      borderColor: colors.border,
-                      backgroundColor: isDark ? '#181824' : '#F4F4FA',
-                    },
-                  ]}
-                  placeholder="https://discord.com/api/webhooks/..."
-                  placeholderTextColor={colors.textSecondary}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-
-                {/* Instructions toggle */}
-                <TouchableOpacity onPress={() => setShowHelp(!showHelp)} style={styles.helpToggleRow} activeOpacity={0.7}>
-                  <Feather name={showHelp ? 'chevron-up' : 'help-circle'} size={14} color="#5865F2" />
-                  <Text style={[styles.helpToggleLabel, { color: '#5865F2' }]}>
-                    {showHelp ? 'Hide guide' : 'How to get a Webhook URL'}
-                  </Text>
-                </TouchableOpacity>
-
-                {showHelp && (
-                  <View style={styles.helpGuide}>
-                    {DISCORD_STEPS.map((step) => (
-                      <View key={step.number} style={styles.helpStepItem}>
-                        <View style={[styles.helpBadge, { backgroundColor: '#5865F2' }]}>
-                          <Text style={styles.helpBadgeText}>{step.number}</Text>
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.helpStepTitle, { color: colors.text }]}>{step.title}</Text>
-                          <Text style={[styles.helpStepDesc, { color: colors.textSecondary }]}>{step.detail}</Text>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </ScrollView>
-
-              <View style={styles.modalActionRow}>
-                <Button
-                  title="Cancel"
-                  variant="secondary"
-                  onPress={() => setDiscordModalVisible(false)}
-                  style={{ flex: 1 }}
-                />
-                <Button
-                  title={savingWebhook ? 'Saving…' : 'Save'}
-                  variant="primary"
-                  icon="check"
-                  disabled={savingWebhook}
-                  onPress={handleSaveWebhook}
-                  style={{ flex: 1.5 }}
-                />
-              </View>
+              ))}
             </View>
-          </View>
-        </Modal>
+            <AnimatedPressable
+              onPress={handleSaveWebhook}
+              disabled={savingWebhook}
+              haptic="medium"
+              style={[styles.savePill, { backgroundColor: colors.water }]}
+              accessibilityRole="button"
+            >
+              {savingWebhook ? (
+                <ActivityIndicator color={colors.onAccent} />
+              ) : (
+                <Text style={[Type.controlLabel, { color: colors.onAccent }]}>Save</Text>
+              )}
+            </AnimatedPressable>
+          </ScrollView>
+        </Sheet>
       </SafeAreaView>
     </BlurTargetView>
   );
 }
 
+// ─── Pieces ───────────────────────────────────────────────────────────────────
+
+function Row({
+  bracket,
+  title,
+  value,
+  accent,
+  colors,
+  onPress,
+  trailing,
+  last,
+}: {
+  bracket: string;
+  title: string;
+  value: string;
+  accent: boolean;
+  colors: Palette;
+  onPress?: () => void;
+  trailing?: React.ReactNode;
+  last?: boolean;
+}) {
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      disabled={!onPress}
+      haptic="light"
+      pressScale={0.985}
+      style={[styles.row, !last && { borderBottomColor: colors.hairline, borderBottomWidth: StyleSheet.hairlineWidth }]}
+      accessibilityRole={onPress ? 'button' : 'text'}
+      accessibilityLabel={`${title}. ${value}`}
+    >
+      <View style={styles.rowText}>
+        <Text style={[Type.bracketLabel, { color: colors.textMid }]}>{bracket}</Text>
+        <Text style={[Type.body, { color: colors.textHi }]} numberOfLines={1}>
+          {title}
+        </Text>
+      </View>
+      {trailing ?? (
+        <View style={styles.rowValue}>
+          <Text style={[Type.subline, { color: accent ? colors.water : colors.textMid }]}>{value}</Text>
+          {onPress ? <Feather name="chevron-right" size={16} color={colors.textLow} /> : null}
+        </View>
+      )}
+    </AnimatedPressable>
+  );
+}
+
+function RoundIcon({
+  icon,
+  onPress,
+  colors,
+  filled,
+  label,
+}: {
+  icon: 'check' | 'x';
+  onPress: () => void;
+  colors: Palette;
+  filled?: boolean;
+  label: string;
+}) {
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      haptic="light"
+      style={[
+        styles.roundIcon,
+        filled ? { backgroundColor: colors.water } : { borderColor: colors.hairline, borderWidth: StyleSheet.hairlineWidth },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <Feather name={icon} size={16} color={filled ? colors.onAccent : colors.textHi} />
+    </AnimatedPressable>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  safeArea: {
-    flex: 1,
-    alignSelf: 'center',
-    width: '100%',
-    maxWidth: MaxContentWidth,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: Spacing.two,
-    gap: 16,
-  },
+  safeArea: { flex: 1, alignSelf: 'center', width: '100%', maxWidth: MaxContentWidth },
+  content: { paddingHorizontal: Spacing.four + Spacing.one, paddingTop: Spacing.three },
 
-  // ── Header ──────────────────────────────────────────────────────────────────
-  header: {
-    paddingVertical: Spacing.two,
-    gap: 2,
-  },
-  screenLabel: {
-    ...Type.label,
-    fontSize: 10,
-    fontFamily: FontFace.regular,
-    letterSpacing: 1.2,
-  },
-  screenTitle: {
-    ...Type.display,
-    fontSize: 34,
-    fontFamily: FontFace.regular,
-    lineHeight: 40,
-  },
-
-  // ── Avatar / User Hero Card ─────────────────────────────────────────────────
-  avatarCard: {
-    borderWidth: 1,
-    borderRadius: Radius.xl,
-    padding: 18,
-  },
-  avatarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
+  identity: { gap: Spacing.three, marginBottom: Spacing.five },
+  identityRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  identityText: { flex: 1, gap: Spacing.one },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  name: { flexShrink: 1 },
+  nameEditRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  nameInput: { flex: 1, borderBottomWidth: 1.5, paddingVertical: 0 },
   avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-  },
-  avatarFallback: {
-    justifyContent: 'center',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  avatarInitials: {
-    fontSize: 22,
-    fontFamily: FontFace.bold,
-    color: '#FFFFFF',
-  },
-  avatarInfo: {
-    flex: 1,
-    gap: 3,
-  },
-  nameRow: {
+  avatarImg: { width: '100%', height: '100%' },
+  initials: { letterSpacing: 0 },
+  roundIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+
+  rows: { borderTopWidth: StyleSheet.hairlineWidth, marginBottom: Spacing.five },
+  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, paddingVertical: Spacing.three, minHeight: HitTarget + 20 },
+  rowText: { flex: 1, gap: 2 },
+  rowValue: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+
+  block: { marginBottom: Spacing.five },
+
+  signOut: {
+    height: 52,
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  displayName: {
-    ...Type.title,
-    fontSize: 19,
-    fontFamily: FontFace.regular,
-  },
-  editPencil: {
-    padding: 4,
-  },
-  nameEditRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  nameInput: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: FontFace.semibold,
-    borderBottomWidth: 1.5,
-    paddingVertical: 2,
-  },
-  inlineBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emailText: {
-    ...Type.body,
-    fontSize: 13,
-    fontFamily: FontFace.regular,
-  },
-  providerPill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginTop: 2,
-  },
-  providerText: {
-    ...Type.label,
-    fontSize: 10,
-    fontFamily: FontFace.regular,
+    gap: Spacing.two,
   },
 
-  // ── Bento Grid ──────────────────────────────────────────────────────────────
-  bentoSection: {
-    gap: 10,
-  },
-  sectionTitle: {
-    ...Type.label,
-    fontSize: 10,
-    fontFamily: FontFace.regular,
-    letterSpacing: 1.2,
-    paddingLeft: 2,
-  },
-  bentoGrid: {
-    gap: 12,
-  },
-  bentoRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  bentoCard: {
-    flex: 1,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    padding: 14,
-    minHeight: 108,
-    justifyContent: 'space-between',
-  },
-  bentoCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  bentoIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statusIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  updateDotBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  updateDotText: {
-    fontSize: 9,
-    fontFamily: FontFace.bold,
-    color: '#FFF',
-  },
-  bentoCardBody: {
-    gap: 2,
-    marginTop: 8,
-  },
-  bentoTitle: {
-    ...Type.title,
-    fontSize: 15,
-    fontFamily: FontFace.regular,
-  },
-  bentoSubtitle: {
-    ...Type.body,
-    fontSize: 11,
-    fontFamily: FontFace.regular,
-  },
-
-  // ── Modal Styles ────────────────────────────────────────────────────────────
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 420,
-    borderRadius: Radius.xl,
-    borderWidth: 1,
-    padding: 20,
-    gap: 12,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  modalTitle: {
-    ...Type.title,
-    fontSize: 17,
-    fontFamily: FontFace.regular,
-    flex: 1,
-    marginLeft: 10,
-  },
-  modalCloseBtn: {
-    padding: 6,
-  },
-  currentWebhookBanner: {
-    padding: 10,
+  sheetBody: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.five, gap: Spacing.three },
+  urlInput: {
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: Radius.md,
-    gap: 2,
-    marginTop: 6,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
   },
-  metaLabel: {
-    ...Type.label,
-    fontSize: 10,
-    fontFamily: FontFace.regular,
-  },
-  metaValue: {
-    ...Type.body,
-    fontSize: 12,
-    fontFamily: FontFace.regular,
-  },
-  webhookInput: {
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    fontFamily: FontFace.regular,
-    marginTop: 6,
-  },
-  helpToggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 12,
-    paddingVertical: 4,
-  },
-  helpToggleLabel: {
-    fontSize: 12,
-    fontFamily: FontFace.bold,
-  },
-  helpGuide: {
-    marginTop: 8,
-    gap: 10,
-  },
-  helpStepItem: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'flex-start',
-  },
-  helpBadge: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 1,
-  },
-  helpBadgeText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontFamily: FontFace.bold,
-  },
-  helpStepTitle: {
-    fontSize: 12,
-    fontFamily: FontFace.bold,
-  },
-  helpStepDesc: {
-    fontSize: 11,
-    fontFamily: FontFace.regular,
-    lineHeight: 15,
-  },
-  modalActionRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 12,
-  },
+  steps: { gap: Spacing.two },
+  step: { flexDirection: 'row', gap: Spacing.two },
+  stepNum: { width: 22 },
+  stepText: { flex: 1 },
+  savePill: { height: 52, borderRadius: Radius.pill, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.two },
 });

@@ -18,8 +18,9 @@ import { tabBarTranslateY, tabBarHideDistance } from '@/utils/tabBarVisibility';
 const { width: windowWidth } = Dimensions.get('window');
 
 // ── Compact bar sizing ────────────────────────────────────────────────────────
-// Only two visible tabs (Home + Profile) → the bar is a tight floating pill.
-const MAX_BAR_WIDTH = 220;
+// Four visible tabs (Home · Train · Fuel · Profile) → the pill grows by a
+// fixed slot per tab so it stays tight rather than stretching edge-to-edge.
+const TAB_SLOT = 64;
 export const TAB_BAR_HEIGHT = TabBar.height;
 const PADDING = 5;
 const FLOAT_OFFSET = TabBar.floatOffset;
@@ -35,7 +36,7 @@ const HIDDEN_ROUTES = new Set(['explore']);
  * behind it. Inactive icons are `textMid` — `textLow` only reaches 2.7:1 as a
  * graphic here, under the 3:1 floor, so it can't be used on this surface.
  *
- * Icon-only: with two tabs and unambiguous glyphs a text label would be
+ * Icon-only: with four tabs and unambiguous glyphs a text label would be
  * redundant chrome; `accessibilityLabel` still carries the name for screen
  * readers.
  */
@@ -54,8 +55,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
     (r: any) => r.name === state.routes[state.index].name
   );
 
-  const containerWidth = Math.min(windowWidth - Spacing.four * 2, MAX_BAR_WIDTH);
   const totalTabs = visibleRoutes.length;
+  const containerWidth = Math.min(windowWidth - Spacing.four * 2, TAB_SLOT * totalTabs + PADDING * 2);
   const tabWidth = (containerWidth - PADDING * 2) / totalTabs;
 
   const indicatorOffset = useSharedValue(activeIndex !== -1 ? activeIndex * tabWidth + PADDING : 0);
@@ -174,6 +175,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 function getIconName(routeName: string): any {
   switch (routeName) {
     case 'index':   return 'home';
+    case 'train':   return 'activity';
+    case 'fuel':    return 'coffee';
     case 'profile': return 'user';
     default:        return 'home';
   }
@@ -187,6 +190,20 @@ export default function AppTabs() {
         options={{
           headerShown: false,
           title: 'Home',
+        }}
+      />
+      <Tabs.Screen
+        name="train"
+        options={{
+          headerShown: false,
+          title: 'Train',
+        }}
+      />
+      <Tabs.Screen
+        name="fuel"
+        options={{
+          headerShown: false,
+          title: 'Fuel',
         }}
       />
       <Tabs.Screen

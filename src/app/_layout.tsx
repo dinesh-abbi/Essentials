@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider, Stack, useRouter, useSegments } from 'expo-router';
 import { AppState, NativeModules, useColorScheme } from 'react-native';
 import { useFonts } from 'expo-font';
@@ -21,12 +21,19 @@ import { auth, waitForAuth } from '@/utils/firebase';
 import { cleanOldApks, handlePendingInstallIfActive } from '@/utils/updates';
 import OTAUpdateChecker from '@/components/OTAUpdateChecker';
 import AppLoader from '@/components/AppLoader';
+import { AppLock } from '@/components/AppLock';
+import { isAppLockEnabled } from '@/utils/Preferences';
+import * as SyncManager from '@/utils/SyncManager';
 import { Motion } from '@/constants/theme';
 
 // Hold the native splash until the type ramp's faces are in memory. Swapping
 // in a JS loader instead would paint one surface, then the real one — a visible
 // flash of differently-metricked text on every cold start.
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// How long the app may sit in the background before the (opt-in) app lock
+// asks for biometrics again — short trips to another app shouldn't re-lock.
+const LOCK_GRACE_MS = 5 * 60 * 1000;
 
 // ── Inner layout that can access AuthContext ───────────────────────────────────
 function AppStack() {
@@ -52,6 +59,31 @@ function AppStack() {
       router.replace('/(tabs)');
     }
   }, [user, loading, segments]);
+
+  // ── Opt-in app lock (merged from Catalyst) ──────────────────────────────────
+  // Locks on cold start and after LOCK_GRACE_MS in the background. Never
+  // covers the alarm screen: a ringing alarm must stay dismissable.
+  const [locked, setLocked] = useState(false);
+  const backgroundedAt = useRef<number | null>(null);
+  useEffect(() => {
+    // Signed out → nothing to lock (showLock below also requires a user).
+    if (!user) return;
+    // Local-first writes: flush anything queued (including from last session)
+    // and keep flushing in the background while the app is used.
+    SyncManager.startBackgroundSync();
+    isAppLockEnabled().then((on) => setLocked(on));
+    const sub = AppState.addEventListener('change', async (next) => {
+      if (next === 'background') {
+        backgroundedAt.current = Date.now();
+      } else if (next === 'active') {
+        const away = backgroundedAt.current ? Date.now() - backgroundedAt.current : 0;
+        backgroundedAt.current = null;
+        if (away > LOCK_GRACE_MS && (await isAppLockEnabled())) setLocked(true);
+      }
+    });
+    return () => sub.remove();
+  }, [user]);
+  const showLock = locked && !!user && (segments[0] as string) !== 'alarm';
 
   // ── Alarm Launch check & Notification Auto-Clear on startup and resume ──────
   useEffect(() => {
@@ -152,6 +184,7 @@ function AppStack() {
   }
 
   return (
+    <>
     <Stack screenOptions={{ animationDuration: Motion.duration.screen }}>
       {/* Login screen — shown only when not authenticated */}
       <Stack.Screen
@@ -211,7 +244,23 @@ function AppStack() {
         name="update"
         options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }}
       />
+
+      {/* Training · Fuel · Coach (merged from Catalyst) */}
+      <Stack.Screen
+        name="train/week"
+        options={{ headerShown: false, animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="train/brief"
+        options={{ headerShown: false, animation: 'fade' }}
+      />
+      <Stack.Screen
+        name="coach"
+        options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }}
+      />
     </Stack>
+    {showLock && <AppLock onUnlock={() => setLocked(false)} />}
+    </>
   );
 }
 

@@ -2,6 +2,10 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 
+import * as FuelStorage from '@/utils/FuelStorage';
+import { getReminderPrefs } from '@/utils/Preferences';
+import * as TrainingStorage from '@/utils/TrainingStorage';
+
 let Notifications: any = null;
 let IntentLauncher: any = null;
 
@@ -34,7 +38,8 @@ if (!Notifications) {
     getAllScheduledNotificationsAsync: async () => [],
     dismissAllNotificationsAsync: async () => {},
     AndroidImportance: { MAX: 5 },
-    SchedulableTriggerInputTypes: { DAILY: 'daily', TIME_INTERVAL: 'timeInterval' },
+    cancelScheduledNotificationAsync: async () => {},
+    SchedulableTriggerInputTypes: { DAILY: 'daily', WEEKLY: 'weekly', TIME_INTERVAL: 'timeInterval' },
     DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
   };
 }
@@ -46,6 +51,23 @@ export { Notifications };
 // distinct, recognizable sound separate from other apps on the device.
 const APP_CHANNEL_ID = 'hydration#003';
 const REMINDER_CATEGORY_ID = 'WATER_REMINDER_CATEGORY';
+
+// Training / meal / restock nudges (merged in from Catalyst) get their own
+// channel and sound, so a hydration ping and a "time to train" ping are
+// distinguishable from the shade without looking. Android caches channel
+// settings forever — bump the suffix to change the sound or importance.
+const ROUTINE_CHANNEL_ID = 'routine#001';
+const ROUTINE_SIGNATURE_KEY = '@essentials_routine_reminder_signature';
+
+// Every scheduled notification carries a deterministic identifier, so one
+// group can be rescheduled without wiping the other (the water scheduler
+// used to cancel *everything* before re-adding its 15 reminders).
+const waterId = (hour: number) => `water-${String(hour).padStart(2, '0')}`;
+const ALL_ROUTINE_IDS = [
+  ...[1, 2, 3, 4, 5, 6, 7].flatMap((d) => [`train-wake-${d}`, `train-go-${d}`]),
+  ...FuelStorage.MEALS.map((m) => `meal-${m.type}`),
+  'restock',
+];
 
 // ── Expected number of hourly reminder notifications (8 AM to 10 PM = 15 hours) ──
 const REMINDER_HOURS = Array.from({ length: 15 }, (_, i) => 8 + i); // [8, 9, ..., 22]
@@ -83,6 +105,14 @@ export async function configureNotifications() {
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#3B82F6',
       sound: 'water_remainder.mp3', // Matches app.json sounds array asset filename
+    });
+    await Notifications.setNotificationChannelAsync(ROUTINE_CHANNEL_ID, {
+      name: 'Training & Fuel',
+      description: 'Training-day wake-ups, meal times and restock reminders',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 120, 80, 120],
+      lightColor: '#7FB8A4',
+      sound: 'training_alert.wav',
     });
   }
 
@@ -277,13 +307,17 @@ export async function scheduleHourlyWaterReminder() {
   const isConfigured = await configureNotifications();
   if (!isConfigured) return;
 
-  // Clear existing schedules first to avoid duplicates
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  // Clear this group's existing schedules first to avoid duplicates — and
+  // only this group's, so the training/meal reminders survive.
+  await Promise.all(
+    REMINDER_HOURS.map((h) => Notifications.cancelScheduledNotificationAsync(waterId(h)).catch(() => {}))
+  );
 
   // Schedule daily notifications for each active hour (8 AM to 10 PM)
   for (const hour of REMINDER_HOURS) {
     try {
       await Notifications.scheduleNotificationAsync({
+        identifier: waterId(hour),
         content: {
           title: 'Time to Hydrate! 💧',
           body: 'Have you drank some water recently? Select an action below.',
@@ -362,24 +396,158 @@ export async function triggerWaterGoalNotification(): Promise<void> {
  */
 export async function ensureNotificationsScheduled(): Promise<void> {
   try {
-    // Verify we have all 15 hourly reminders
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    
-    // Check if any scheduled notifications use an old channel ID on Android
-    const hasOldChannel = Platform.OS === 'android' && scheduled.some((n: any) => n.trigger?.channelId !== APP_CHANNEL_ID);
-    
-    if (scheduled.length < EXPECTED_REMINDER_COUNT || hasOldChannel) {
-      console.log(
-        `[Notifications] Scheduled count (${scheduled.length}/${EXPECTED_REMINDER_COUNT}) or channel mismatch (old channel: ${hasOldChannel}) — re-scheduling all`
+    const ids = new Set<string>(scheduled.map((n: any) => n.identifier));
+
+    // Old builds scheduled with random identifiers / an older channel —
+    // anything unrecognised means a full, clean rebuild.
+    const known = new Set<string>([...REMINDER_HOURS.map(waterId), ...ALL_ROUTINE_IDS]);
+    const hasStranger = scheduled.some((n: any) => !known.has(n.identifier));
+    const hasOldChannel =
+      Platform.OS === 'android' &&
+      scheduled.some(
+        (n: any) => n.trigger?.channelId && ![APP_CHANNEL_ID, ROUTINE_CHANNEL_ID].includes(n.trigger.channelId)
       );
+    const waterMissing = REMINDER_HOURS.some((h) => !ids.has(waterId(h)));
+
+    if (hasStranger || hasOldChannel) {
+      console.log('[Notifications] Unrecognised schedules found — rebuilding all reminders');
+      await Notifications.cancelAllScheduledNotificationsAsync();
       await scheduleHourlyWaterReminder();
-    } else {
-      console.log(`[Notifications] All ${scheduled.length} reminders verified ✓`);
+      await rescheduleRoutineReminders(true);
+      return;
     }
+
+    if (waterMissing) {
+      console.log('[Notifications] Water reminders incomplete — re-scheduling');
+      await scheduleHourlyWaterReminder();
+    }
+
+    // Routine reminders carry the split/offset in their text, so they are
+    // rebuilt whenever that input changes (new week, new split, prefs…).
+    await rescheduleRoutineReminders();
   } catch (error) {
     console.error('[Notifications] Failed to verify/restore schedules:', error);
     // Attempt to re-schedule as a safety net
     await scheduleHourlyWaterReminder();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Training · Meals · Restock (from Catalyst)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Expo's WEEKLY trigger counts Sunday = 1 … Saturday = 7; ISO counts Monday = 1. */
+const expoWeekday = (isoDay: number) => (isoDay % 7) + 1;
+
+/**
+ * (Re)builds the training, meal and restock reminders from the current split,
+ * this week's schedule offset, the fuel cycle and the user's switches.
+ * Skips all work when nothing that feeds the schedule has changed, so it is
+ * cheap to call on every app open and after every relevant edit; pass
+ * `force` to rebuild regardless.
+ */
+export async function rescheduleRoutineReminders(force = false): Promise<void> {
+  try {
+    const [prefs, split, offset] = await Promise.all([
+      getReminderPrefs(),
+      TrainingStorage.getCachedSplit(),
+      TrainingStorage.getScheduleOffset(),
+    ]);
+    const cycleStart = prefs.restock ? await FuelStorage.getCycleStart() : '';
+
+    const signature = JSON.stringify({
+      prefs,
+      offset,
+      cycleStart,
+      split: split.days.map((d) => [d.dayNumber, d.focus, d.isRecovery, d.exercises.length]),
+    });
+    if (!force) {
+      const previous = await AsyncStorage.getItem(ROUTINE_SIGNATURE_KEY).catch(() => null);
+      if (previous === signature) return;
+    }
+
+    const ok = await configureNotifications();
+    if (!ok) return;
+
+    await Promise.all(
+      ALL_ROUTINE_IDS.map((id) => Notifications.cancelScheduledNotificationAsync(id).catch(() => {}))
+    );
+
+    const schedule = async (identifier: string, content: any, trigger: any) => {
+      try {
+        await Notifications.scheduleNotificationAsync({
+          identifier,
+          content: { ...content, sound: Platform.OS === 'android' ? undefined : 'training_alert.wav' },
+          trigger: { ...trigger, channelId: ROUTINE_CHANNEL_ID },
+        });
+      } catch (e) {
+        console.warn(`[Notifications] Failed to schedule ${identifier}`, e);
+      }
+    };
+
+    if (prefs.training) {
+      for (let iso = 1; iso <= 7; iso++) {
+        // Weekly triggers repeat every week, but the offset only lives until
+        // Monday — the signature check above rebuilds these once it expires.
+        const slot = (((iso - 1 + offset) % 7) + 7) % 7 + 1;
+        const day = TrainingStorage.dayForSlot(split.days, slot);
+        if (day.isRecovery || day.exercises.length === 0) continue;
+        const weekday = expoWeekday(iso);
+        await schedule(
+          `train-wake-${iso}`,
+          {
+            title: `Morning. ${day.focus} today.`,
+            body: 'Water first, then get moving.',
+            data: { route: '/train/brief?kind=wake' },
+          },
+          { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday, hour: 6, minute: 0 }
+        );
+        await schedule(
+          `train-go-${iso}`,
+          {
+            title: 'Time to train',
+            body: `${day.focus} · ${day.exercises.length} movements. Start when you’re in.`,
+            data: { route: '/train/brief?kind=go' },
+          },
+          { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday, hour: 7, minute: 0 }
+        );
+      }
+    }
+
+    if (prefs.meals) {
+      for (const meal of FuelStorage.MEALS) {
+        await schedule(
+          `meal-${meal.type}`,
+          {
+            title: `${meal.label} time`,
+            body: 'Your plan for today is in Fuel. Log it once you’ve eaten.',
+            data: { route: '/fuel' },
+          },
+          { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: meal.hour, minute: meal.minute }
+        );
+      }
+    }
+
+    if (prefs.restock && cycleStart) {
+      // Restock days (cycle days 1, 8, 15, 22) are exactly 7 days apart, so
+      // they always fall on the cycle-start weekday — one weekly trigger.
+      const [y, m, d] = cycleStart.split('-').map(Number);
+      const startIso = ((new Date(y, m - 1, d).getDay() + 6) % 7) + 1;
+      await schedule(
+        'restock',
+        {
+          title: 'Restock day',
+          body: 'This week’s list is ready. Ticked items log straight to Spend.',
+          data: { route: '/fuel?sheet=restock' },
+        },
+        { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday: expoWeekday(startIso), hour: 7, minute: 30 }
+      );
+    }
+
+    await AsyncStorage.setItem(ROUTINE_SIGNATURE_KEY, signature).catch(() => {});
+  } catch (error) {
+    console.error('[Notifications] Failed to schedule routine reminders:', error);
   }
 }
 

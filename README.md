@@ -1,183 +1,129 @@
 # Essentials
 
-A production-grade personal utility app for Android, built with [Expo](https://expo.dev) (SDK 56) and React Native. Manages the three pillars of daily productivity — **Hydration**, **Attendance**, and **Expenses** — in a single, beautifully designed app.
+A personal Android app for the daily basics — **hydration, training, food, spend, check-in and a barcode alarm** — with an AI coach that knows your day. Built with Expo SDK 56 / React Native 0.85, Firebase, and a deliberately quiet "technical, but kind" design.
+
+As of **v1.2.0** the separate **Catalyst** fitness app lives inside Essentials (Train, Fuel, Coach). The Catalyst repo is retired; see [`docs/CATALYST_MERGE.md`](docs/CATALYST_MERGE.md) for what moved where.
 
 ---
 
-## Features
+## What's in it
 
-### 💧 Hydration Tracker
-- Log water intake in quick increments (250ml, 500ml, 1000ml)
-- Animated water-fill progress indicator
-- Hourly tracking timeline (8 AM – 10 PM)
-- Daily, Weekly (bar chart), and Monthly (heat-map calendar) views
-- Persistent hydration reminders via scheduled notifications with one-tap quick-log action
+| Area | Where | What it does |
+|---|---|---|
+| **Home** | `src/app/(tabs)/index.tsx` | Hydration hero (animated vessel, hourly dots), Spend + Check-in cards, today's Training/Fuel progress, armed alarm |
+| **Train** | `src/app/(tabs)/train.tsx`, `src/app/train/*` | Today's session from the weekly split, load stepper with last-used weights, finish & log, streak, week plan, shift a day, AI split import, anatomy plates |
+| **Fuel** | `src/app/(tabs)/fuel.tsx` | 28-day meal plan as a cycle field, eaten / swapped / skipped logging, restock list (logs real Groceries purchases), AI meal scan |
+| **Coach** | `src/app/coach.tsx` | Gemini chat with today's context, per-model daily budget |
+| **Hydration** | `src/app/water/*` | Daily/weekly/monthly views, goal, celebration, home-screen widget |
+| **Spend** | `src/app/purchases/*`, `src/app/upi/*` | Expenses, reports, biometric gate, UPI QR pay |
+| **Check-in** | `src/app/attendance.tsx` | Camera check-in posted to your own Discord webhook |
+| **Barcode alarm** | `src/app/alarm/*` + `native-android/` | An alarm you can only stop by scanning a barcode across the room |
+| **Profile** | `src/app/(tabs)/profile.tsx` | Services, sync status, body metrics, reminder switches, app lock |
 
-### 📸 Attendance (Check-In)
-- Camera-based attendance capture
-- Automated Discord webhook posting with timestamp and photo
-- IST-localised timestamps on all submissions
-
-### 💸 Expenses
-- Log and categorise daily purchases
-- Firestore-backed persistence per user account
-
-### 🔔 Smart Notifications
-- Exact-alarm hydration reminders every hour (8 AM – 10 PM)
-- Custom notification sound (`water_remainder.mp3`)
-- Self-healing scheduler — reschedules if fewer than expected reminders are found
-
-### 🔐 Authentication
-- Google Sign-In (native, via `@react-native-google-signin`)
-- Email / Password sign-in and registration
-- Firebase Auth with persistent session
-
-### 🔄 OTA Updates (GitHub Releases)
-- Self-hosted, completely free update distribution
-- Checks `github.com/dinesh-abbi/Essentials/releases/latest` on every app launch
-- Downloads and installs APK in-app without leaving to the browser
-- Progress bar during download
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Framework | Expo SDK 56 / React Native 0.85 |
-| Navigation | Expo Router v4 (file-based) |
-| Auth | Firebase Auth + Google Sign-In |
-| Database | Firebase Firestore |
-| Animations | React Native Reanimated 4 |
-| Notifications | expo-notifications |
-| OTA Updates | GitHub Releases + expo-file-system |
-
----
-
-## Project Structure
-
-```
-src/
-├── app/
-│   ├── (tabs)/          # Bottom tab screens (Home, Explore, Profile)
-│   ├── water/           # Hydration screens (Daily, Weekly, Monthly)
-│   ├── attendance.tsx   # Camera check-in screen
-│   ├── purchases.tsx    # Expense logger
-│   ├── discord.tsx      # Discord webhook setup
-│   └── _layout.tsx      # Root layout + auth guard
-├── components/
-│   ├── AppLoader.tsx    # Branded loading spinner
-│   ├── OTAUpdateChecker.tsx  # GitHub Releases update modal
-│   └── ui/             # Reusable UI primitives
-├── contexts/
-│   └── AuthContext.tsx  # Firebase auth state + Firestore profile
-├── utils/
-│   ├── firebase.ts     # Firebase app initialisation
-│   ├── WaterStorage.ts # Hydration data helpers (Firestore)
-│   └── notifications.ts # Notification scheduling
-└── constants/
-    └── theme.ts        # Design tokens (colours, spacing, radii)
-```
+**Data is local-first.** Every change is saved on the phone instantly and pushed to Firestore in the background; reads come from the on-device cache and refresh quietly. Works offline; Profile shows how many changes are waiting to upload.
 
 ---
 
 ## Setup
 
 ### Prerequisites
-- Node.js 20+
-- JDK 17 (required for Android builds — Java 25 is NOT supported)
-- Android SDK + a physical device or emulator
-- GitHub CLI (`gh`) authenticated as `dinesh-abbi`
+- Node.js 20+ (24 works)
+- JDK 17 (`winget install Microsoft.OpenJDK.17`) — newer JDKs break the Android build
+- Android SDK with platform 36, build-tools 36.0.0, NDK 27.1.12297006, CMake 3.22.1
+- GitHub CLI (`gh`) logged in as `dinesh-abbi` (for releases)
 
-### 1. Clone & install
+### Install
 
 ```bash
-git clone https://github.com/dinesh-abbi/Essentials.git
+git clone git@github.com:dinesh-abbi/Essentials.git
 cd Essentials
-yarn install
+npm ci
+cp .env.example .env    # then fill it in — see below
 ```
 
-### 2. Environment variables
-
-Create a `.env` file in the project root (never commit this):
+### Environment (`.env`, never committed)
 
 ```env
-# Firebase — project: essentials-77c5f
-EXPO_PUBLIC_FIREBASE_API_KEY=...
-EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=...
-EXPO_PUBLIC_FIREBASE_PROJECT_ID=...
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=...
-EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
-EXPO_PUBLIC_FIREBASE_APP_ID=...
-EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=...
+# Firebase web config (project essentials-77c5f). Any key left empty falls back
+# to google-services.json, so the app still points at the right project.
+EXPO_PUBLIC_FIREBASE_API_KEY=
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=essentials-77c5f.firebaseapp.com
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=essentials-77c5f
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=essentials-77c5f.firebasestorage.app
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=228016196
+EXPO_PUBLIC_FIREBASE_APP_ID=
+EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=
+EXPO_PUBLIC_FIREBASE_GOOGLE_WEB_CLIENT_ID=
 
-# Google Sign-In Web Client ID (from google-services.json)
-EXPO_PUBLIC_FIREBASE_GOOGLE_WEB_CLIENT_ID=...
+# The coach (chat, meal scan, split import). Get a key at https://aistudio.google.com/apikey
+EXPO_PUBLIC_GEMINI_API_KEY=
 ```
 
-> **Note:** Discord webhook URLs are **user-provided** via the in-app setup screen. Do not add them to `.env`.
+`EXPO_PUBLIC_*` values are inlined into the JS bundle at build time — rebuild after changing them. Discord webhooks are per-user and set in the app, never here.
 
-### 3. Run (development)
+### Run in development
 
 ```bash
-npx expo start
+npx expo start          # Metro
+npm run android         # build + install a dev client on a connected device
 ```
 
 ---
 
-## Building & Releasing
+## Building a release APK
 
-### Local Release Build
+`android/` is **generated** — never edit it by hand. Everything native lives in tracked sources and config plugins:
 
-```bash
-cd android && ./gradlew assembleRelease
-```
-
-APK output: `android/app/build/outputs/apk/release/app-release.apk`
-
-### Publish OTA Update (GitHub Releases)
-
-> **Before every release:**
-> 1. Bump `"version"` in `app.json` (e.g. `"1.0.1"`)
-> 2. Bump `"android.versionCode"` in `app.json` (e.g. `3` → `4`)
-> 3. Commit the version bump
-
-```bash
-npm run publish
-```
-
-This will:
-- Build the release APK via Gradle
-- Create a GitHub Release tagged `v{version}`
-- Upload the APK as a release asset
-
-Users will see an in-app update prompt the next time they open the app.
-
----
-
-## Release Checklist
-
-- [ ] Bump `version` in `app.json`
-- [ ] Bump `android.versionCode` in `app.json` (must always increment)
-- [ ] Commit version bump: `git commit -m "chore: bump version to vX.Y.Z"`
-- [ ] Run `npm run publish`
-- [ ] Verify at `https://github.com/dinesh-abbi/Essentials/releases`
-- [ ] Sideload on test device and confirm update modal appears
-
----
-
-## Notification Channels
-
-All notifications use the `water_reminder` channel with custom sound `water_remainder.mp3`.
-
-| Trigger | Time | Action |
+| Tracked source | Plugin | Becomes |
 |---|---|---|
-| Hydration reminder | Every hour, 8 AM – 10 PM | Tap → Home, or "Yes" → logs 250ml |
+| `widget-native/` | `withWaterWidget.js` | home-screen hydration widget |
+| `native-android/` | `withEssentialsNative.js` | barcode alarm service/receiver/activity, QR-from-image module, lock-screen MainActivity |
+| `app.json` → queries | `withAndroidQueries.js` | UPI app visibility |
+
+```bash
+npx expo prebuild --platform android --clean
+cd android
+./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+# → android/app/build/outputs/apk/release/app-release.apk
+```
+
+On Windows use `gradlew.bat`, and create `android/local.properties` with `sdk.dir=C:/Users/<you>/AppData/Local/Android/Sdk` if `ANDROID_HOME` isn't set.
+
+### Publishing an update (OTA via GitHub Releases)
+
+The app checks `github.com/dinesh-abbi/Essentials/releases/latest` on launch and installs the attached APK.
+
+1. Bump `version` in `app.json` **and** `package.json`; increment `android.versionCode` (must always go up).
+2. Write `changelogs/vX.Y.Z.md` (`node scripts/prepare-changelog.js` drafts one) and add a summary to `CHANGELOG.md`. The release body *is* this file — the in-app reader parses its `###` sections.
+3. Build the APK (above), commit, tag `vX.Y.Z`, push.
+4. `gh release create vX.Y.Z <apk> --title "Essentials vX.Y.Z" --notes-file changelogs/vX.Y.Z.md`
+
+(`npm run publish` / `./build.sh` automate 1–4 on Linux/macOS.)
+
+Release APKs are signed with the template debug keystore that previous releases used, so updates install over the existing app. Don't switch keys without a migration plan — Android refuses an update signed with a different key.
 
 ---
 
-## Secrets & Security
+## Firestore layout (`users/{uid}`)
 
-- `.env` is in `.gitignore` and must **never** be committed
-- Firebase credentials are restricted to the `com.catalyst.essentials` package in the Firebase console
-- Discord webhook URLs are stored per-user in Firestore (`users/{uid}.discordWebhookUrl`) — not in the codebase
+| Path | Written by |
+|---|---|
+| `users/{uid}` (doc) | profile: `discordWebhookUrl`, `waterGoal`, `body` |
+| `waterLogs/{id}` | hydration |
+| `purchases/{id}` | spend (incl. ticked groceries) |
+| `upi_transactions/{id}` | UPI pay |
+| `workoutLogs/{id}` | finished training sessions |
+| `training/split` | imported custom split |
+| `mealLogs/{YYYY-MM-DD}` | meal statuses per day |
+| `fuel/cycle`, `fuel/bought` | meal-cycle anchor, restock ticks |
+
+---
+
+## Docs
+
+- [`AGENTS.md`](AGENTS.md) — architecture, native gotchas, release workflow (read before changing code)
+- [`RULES.md`](RULES.md) — engineering + design rules
+- [`CLAUDE.md`](CLAUDE.md) — entry point for Claude Code
+- [`BARCODE_ALARM.md`](BARCODE_ALARM.md) — alarm design
+- [`docs/CATALYST_MERGE.md`](docs/CATALYST_MERGE.md) — the Catalyst → Essentials merge
+- [`CHANGELOG.md`](CHANGELOG.md), [`changelogs/`](changelogs)

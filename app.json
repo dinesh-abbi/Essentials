@@ -2,7 +2,7 @@
   "expo": {
     "name": "Essentials",
     "slug": "Essentials",
-    "version": "1.1.2",
+    "version": "1.2.0",
     "owner": "dineshabbi",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -27,7 +27,8 @@
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.REQUEST_INSTALL_PACKAGES"
       ],
-      "versionCode": 27
+      "versionCode": 28,
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
@@ -36,6 +37,7 @@
     "plugins": [
       "./withAndroidQueries",
       "./withWaterWidget",
+      "./withEssentialsNative",
       "expo-router",
       [
         "expo-splash-screen",
@@ -59,8 +61,16 @@
           "icon": "./assets/images/notification-icon.png",
           "color": "#3B82F6",
           "sounds": [
-            "./assets/notification/water_remainder.mp3"
+            "./assets/notification/water_remainder.mp3",
+            "./assets/notification/training_alert.wav"
           ]
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Essentials to read photos you choose — meal scans and training-plan imports.",
+          "cameraPermission": "Allow Essentials to use the camera for check-ins, barcode scans and meal scans."
         }
       ],
       "expo-image",

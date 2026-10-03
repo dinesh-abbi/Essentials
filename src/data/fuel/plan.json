@@ -1,0 +1,272 @@
+{
+    "grocery": {
+        "monthly": [
+            {
+                "item": "SuperYou Fermented Yeast Protein (1kg)",
+                "cost": 2249
+            },
+            {
+                "item": "Rice (5kg)",
+                "cost": 350
+            },
+            {
+                "item": "Wheat Flour / Atta (5kg)",
+                "cost": 250
+            },
+            {
+                "item": "Rolled Oats (1kg)",
+                "cost": 200
+            },
+            {
+                "item": "Assorted Dals (2kg)",
+                "cost": 300
+            },
+            {
+                "item": "Rajma & Chole (1kg)",
+                "cost": 150
+            },
+            {
+                "item": "Soya Chunks (500g)",
+                "cost": 100
+            },
+            {
+                "item": "Cooking Oil (1L)",
+                "cost": 200
+            },
+            {
+                "item": "Ghee (500ml)",
+                "cost": 350
+            },
+            {
+                "item": "Spices/Salt",
+                "cost": 200
+            }
+        ],
+        "weekly": [
+            {
+                "item": "Paneer (500g)",
+                "cost": 200
+            },
+            {
+                "item": "Chicken Breast (500g)",
+                "cost": 150
+            },
+            {
+                "item": "Eggs (30)",
+                "cost": 180
+            },
+            {
+                "item": "Vegetables",
+                "cost": 500
+            },
+            {
+                "item": "Fruits",
+                "cost": 300
+            }
+        ],
+        "daily": [
+            {
+                "item": "Milk/Curd (500ml)",
+                "cost": 35
+            }
+        ]
+    },
+    "meal_plan": [
+        {
+            "day": 1,
+            "breakfast": "Moong Dal Chilla with Mint Chutney",
+            "lunch": "Rajma with Rice",
+            "dinner": "Dal Palak with Rotis",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 2,
+            "breakfast": "Oats Upma + 2 Boiled Eggs",
+            "lunch": "Soya Chunks Curry with Rice",
+            "dinner": "Mixed Veg + Chicken",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 3,
+            "breakfast": "Paneer Bhurji with Roti",
+            "lunch": "Chole with Rice",
+            "dinner": "Lauki Chana Dal with Rotis",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 4,
+            "breakfast": "Idli with Chutney",
+            "lunch": "Soya Curry with Rice",
+            "dinner": "Dal Palak with Rotis",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 5,
+            "breakfast": "Poha + 2 Eggs",
+            "lunch": "Rajma with Rice",
+            "dinner": "Cabbage Pea + Chicken",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 6,
+            "breakfast": "Paneer Bhurji",
+            "lunch": "Masoor Dal with Rice",
+            "dinner": "Paneer Sabzi with Rotis",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 7,
+            "breakfast": "Moong Dal Chilla",
+            "lunch": "Veg Pulao with Curd",
+            "dinner": "Mix Dal with Rotis",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 8,
+            "breakfast": "Moong Dal Chilla",
+            "lunch": "Rajma with Rice",
+            "dinner": "Dal Palak",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 9,
+            "breakfast": "Oats Upma + Eggs",
+            "lunch": "Soya Curry",
+            "dinner": "Mixed Veg + Chicken",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 10,
+            "breakfast": "Paneer Bhurji",
+            "lunch": "Chole",
+            "dinner": "Lauki Dal",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 11,
+            "breakfast": "Idli",
+            "lunch": "Soya Curry",
+            "dinner": "Dal Palak",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 12,
+            "breakfast": "Poha + Eggs",
+            "lunch": "Rajma",
+            "dinner": "Cabbage + Chicken",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 13,
+            "breakfast": "Paneer Bhurji",
+            "lunch": "Masoor Dal",
+            "dinner": "Paneer Sabzi",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 14,
+            "breakfast": "Moong Dal Chilla",
+            "lunch": "Veg Pulao",
+            "dinner": "Mix Dal",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 15,
+            "breakfast": "Moong Dal Chilla",
+            "lunch": "Rajma",
+            "dinner": "Dal Palak",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 16,
+            "breakfast": "Oats Upma + Eggs",
+            "lunch": "Soya Curry",
+            "dinner": "Mixed Veg + Chicken",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 17,
+            "breakfast": "Paneer Bhurji",
+            "lunch": "Chole",
+            "dinner": "Lauki Dal",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 18,
+            "breakfast": "Idli",
+            "lunch": "Soya Curry",
+            "dinner": "Dal Palak",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 19,
+            "breakfast": "Poha + Eggs",
+            "lunch": "Rajma",
+            "dinner": "Cabbage + Chicken",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 20,
+            "breakfast": "Paneer Bhurji",
+            "lunch": "Masoor Dal",
+            "dinner": "Paneer Sabzi",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 21,
+            "breakfast": "Moong Dal Chilla",
+            "lunch": "Veg Pulao",
+            "dinner": "Mix Dal",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 22,
+            "breakfast": "Moong Dal Chilla",
+            "lunch": "Rajma",
+            "dinner": "Dal Palak",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 23,
+            "breakfast": "Oats Upma + Eggs",
+            "lunch": "Soya Curry",
+            "dinner": "Mixed Veg + Chicken",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 24,
+            "breakfast": "Paneer Bhurji",
+            "lunch": "Chole",
+            "dinner": "Lauki Dal",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 25,
+            "breakfast": "Idli",
+            "lunch": "Soya Curry",
+            "dinner": "Dal Palak",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 26,
+            "breakfast": "Poha + Eggs",
+            "lunch": "Rajma",
+            "dinner": "Cabbage + Chicken",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 27,
+            "breakfast": "Paneer Bhurji",
+            "lunch": "Masoor Dal",
+            "dinner": "Paneer Sabzi",
+            "snack": "Protein Shake"
+        },
+        {
+            "day": 28,
+            "breakfast": "Moong Dal Chilla",
+            "lunch": "Veg Pulao",
+            "dinner": "Mix Dal",
+            "snack": "Protein Shake"
+        }
+    ]
+}
