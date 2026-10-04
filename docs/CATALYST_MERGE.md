@@ -14,7 +14,7 @@ duplicated features were folded into the Essentials versions.
 |---|---|---|
 | Today tab (`(tabs)/index.tsx`) — exercise cards, weights, finish workout | **Train** tab `src/app/(tabs)/train.tsx` | Rows expand to cue + load stepper; last-used weights pre-fill; finished sessions → `users/{uid}/workoutLogs` (was top-level `workout_logs`) |
 | Weekly split (`(tabs)/weekly.tsx`), "activate this workout" shift | `src/app/train/week.tsx` | Offset per week, resets Monday (same as before) |
-| AI split import (`WorkoutAiParser`) | `Coach.parseSplit` + import sheet in week plan | Validates 7 days, unique ids, allowed anatomy keys; preview before saving to `training/split` (was `custom_exercises` docs) |
+| AI split import (`WorkoutAiParser`) | removed in v1.3.0 | — |
 | Gym morning/evening prompt (`GymPrompt`) | Check-in strip on Train | "Not today"/"Missed it" shifts the week by −1 |
 | Tempo reminder | Dismissible tempo note on Train | |
 | Anatomy modal + 8 plates | `components/training/AnatomySheet.tsx`, `assets/anatomy/` | |
@@ -25,8 +25,8 @@ duplicated features were folded into the Essentials versions.
 | Meal status eaten/missed/alternative | eaten / skipped / swapped | Swap note kept |
 | Grocery list modal (`purchase_logs` + `users.expenses[]`) | Restock sheet | Ticks write real **Spend** purchases (category Groceries) and untick deletes them — Catalyst kept a second, separate ledger |
 | Meal/grocery reminders | `meal-*` / `restock` notifications | Switchable in Profile |
-| AI meal scan | `components/fuel/MealScanSheet.tsx` | JSON-mode Gemini call, typed result |
-| Catalyst AI chat (`/chat`) + model selector + per-model RPD in Firestore `ai_usage` | **Coach** `src/app/coach.tsx`, `utils/Coach.ts` | REST, no SDK; context-aware (today's session, meals, water, body); usage counted locally per device |
+| AI meal scan | removed in v1.3.0 | — |
+| Catalyst AI chat (`/chat`) + model selector + per-model RPD in Firestore `ai_usage` | removed in v1.3.0 | — |
 | Profile body metrics | `RoutineSettings` → `users/{uid}.body` | BMI + kg-to-target |
 | Biometric "shield" (whole app) | `components/AppLock.tsx` | Opt-in, 5-min grace, never over the alarm |
 
@@ -51,13 +51,13 @@ v1.2.0 starts Training/Fuel history fresh in `essentials-77c5f`. If old
 history matters, it can be exported from the Catalyst project and imported
 into `users/{uid}/workoutLogs` / `mealLogs` with a one-off script.
 
-## Gemini key
+## AI features (removed in v1.3.0)
 
-The key in Catalyst's `.env` was committed to the public Catalyst repo
-(removed in a later commit but still in history) and Google has disabled it as
-leaked. Create a new key, put it in `.env` as `EXPO_PUBLIC_GEMINI_API_KEY`,
-and consider deleting the old one in Google AI Studio. Until then the coach
-shows a "not configured / key rejected" state; everything else works.
+v1.2.0 carried Catalyst's Gemini features over (chat coach, meal photo scan,
+AI split import). v1.3.0 removed all three at the user's request, along with
+`utils/Coach.ts`, `data/coach/models.json` and the
+`EXPO_PUBLIC_GEMINI_API_KEY` setting. The rows marked "removed" below are
+kept for history.
 
 ## Recovered native code
 

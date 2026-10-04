@@ -1,103 +1,164 @@
 /**
- * Essentials — Design System · "Technical, but kind"
+ * Essentials — Design System · "Glance" (v1.3)
  *
- * One point of view: technical precision, softened by one human touch. A deep
- * muted-green instrument face, huge confident type, generous negative space,
- * hairline detail, small bracket labels (`[ TODAY ]`) standing in for card
- * titles. The boldness budget is spent entirely on TYPE and NEGATIVE SPACE —
- * everything else (color, shadow, motion) stays quiet on purpose. A second
- * accent, a gradient, a shadow-heavy card, or a second illustration per screen
- * is the instinct that made earlier passes look like a token swap rather than
- * a design; this file has exactly one accent and no gradients or shadows.
+ * The app is read in two-second glances, so every screen should be
+ * understood from SHAPES and COLOURS before a single word is read. It blends
+ * three signatures people already know how to read:
  *
- * ── The colour rule ─────────────────────────────────────────────────────────
- * ONE accent — `water`, muted sage-teal, deliberately not vibrant. It is the
- * hydration fill, active states, the bracket labels, and the illustration
- * stroke. Nothing else in the app is allowed a second colour identity.
- * Surfaces barely lift off `bg` (`surface` is only slightly lighter) —
- * separation comes from SPACE and a `hairline`, never from heavy elevation.
+ *  • Apple — activity rings for "how far along", bento widget tiles on Home,
+ *    vivid ring colours on a true-dark base, springy physical motion.
+ *  • Samsung One UI — a big, airy title area at the top of each tab (content
+ *    sits lower, in thumb reach), grouped rounded cards, settings rows that
+ *    lead with a coloured squircle icon.
+ *  • Nothing — dot-matrix numerals and labels (Doto), dot grids and dotted
+ *    progress instead of plain bars, a monochrome base with one red "live" dot.
  *
- * This is a single dark instrument face: `Colors.light` and `Colors.dark`
- * intentionally hold the SAME green values, so a device set to light mode
- * still gets this design rather than an unrelated pale palette. (Flagged to
- * the user during planning; this is the agreed default — a real light theme
- * was not part of this brief.)
+ * Rules:
+ *  1. Every area of life owns a HUE (`Hue` below) — water is cyan, training is
+ *     coral, food is lime, money is sunshine, check-in is lavender, the alarm
+ *     is pink. A hue means the same thing everywhere, tab bar included.
+ *  2. Show, don't tell — a ring, a filling drop, a row of plates, a lit dot per
+ *     day. Numbers are big; words are few.
+ *  3. Pressable things look pressable: chunky tiles/buttons with a darker lip
+ *     that sinks on tap.
+ *  4. Motion is friendly (springs, a mascot that reacts, a pop on completion),
+ *     always gated on `useReducedMotion()`.
+ *  5. Type: Nunito for words, Doto (dot-matrix) for numerals and tiny labels.
  *
- * ── Backward compatibility ─────────────────────────────────────────────────
- * Legacy keys (primary / accent / success / backgroundElement / aqua /
- * signal* / …) are retained as aliases onto the roles above, so the screens
- * that have not been rebuilt in this pass re-theme automatically instead of
- * breaking. `alert` has no equivalent in the brief's 8-token list — kept at
- * its previous value since it is only a genuine-error color on 15 call sites
- * in purchases/alarm/profile, not part of this redesign's surface.
+ * `Colors.light` and `Colors.dark` intentionally hold the same values (single
+ * dark theme). Legacy keys (primary / accent / signal* / card / …) remain as
+ * aliases so older screens keep working with the new palette.
  */
 
 import '@/global.css';
 
 import type { TextStyle } from 'react-native';
 
+// ─── Colour helpers ───────────────────────────────────────────────────────────
 
-const GREEN = {
-  // ── The eight tokens, verbatim ────────────────────────────────────────
-  bg: '#14231F',
-  surface: '#1C2E28',
-  surface2: '#24382F',
-  hairline: '#354A40',
-  water: '#7FB8A4',
-  waterStrong: '#A8D5C4',
-  textHi: '#EFF4F1',
-  textMid: '#9DB3AA',
-  // textLow is graphics/hints-only at 3.24:1 on `bg`. On `surface` it drops
-  // to 2.84:1 — under the 3:1 floor for non-text — so it must never sit on a
-  // card; use `textMid` there instead. Never use it as small TEXT anywhere.
-  textLow: '#5E7469',
-  onAccent: '#14231F',
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
 
-  // Not in the brief's list — genuine error/warning states only, unrelated to
-  // the one-accent rule (alert is never decorative, only "something is wrong").
-  alert: '#F4785F',
-  alertWeak: 'rgba(244,120,95,0.14)',
-  warnTone: '#E8B84B',
+/** `hex` at `alpha` as an rgba() string. */
+export function withAlpha(hex: string, alpha: number): string {
+  const [r, g, b] = hexToRgb(hex);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+/** Solid blend of `a` over `b` (t = share of `a`). Used for tinted tiles. */
+export function mix(a: string, b: string, t: number): string {
+  const ca = hexToRgb(a);
+  const cb = hexToRgb(b);
+  const c = ca.map((v, i) => Math.round(v * t + cb[i] * (1 - t)));
+  return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
+// ─── Palette ──────────────────────────────────────────────────────────────────
+
+const BASE = {
+  bg: '#0B0B0F',
+  surface: '#18181E',
+  surface2: '#25252D',
+  hairline: '#33333D',
+  textHi: '#FFFFFF',
+  textMid: '#A6A6B3',
+  // Graphics / hints only — never small text.
+  textLow: '#5F5F6B',
+  onAccent: '#0B0B0F',
+
+  // The primary hue (water) doubles as the app's generic accent in older screens.
+  water: '#38D3FF',
+  waterStrong: '#A5EEFF',
+
+  // Nothing-style "live" red: alerts, recording dots, destructive actions.
+  alert: '#FF3B30',
+  alertWeak: 'rgba(255,59,48,0.16)',
+  warnTone: '#FFC233',
+} as const;
+
+export type HueName = 'water' | 'train' | 'fuel' | 'spend' | 'checkin' | 'alarm' | 'profile';
+
+export interface HueSet {
+  /** The hue itself — fills, icons, rings. */
+  main: string;
+  /** Darker edge for the chunky "3D" lip under buttons and tiles. */
+  deep: string;
+  /** Solid tinted tile background (hue blended into `surface`). */
+  tile: string;
+  /** Edge under a tinted tile. */
+  tileEdge: string;
+  /** Transparent wash for chips and tracks. */
+  soft: string;
+  /** Text / icon colour that sits on `main`. */
+  on: string;
+}
+
+function hue(main: string, deep: string): HueSet {
+  return {
+    main,
+    deep,
+    tile: mix(main, BASE.surface, 0.14),
+    tileEdge: mix(main, BASE.bg, 0.3),
+    soft: withAlpha(main, 0.18),
+    on: BASE.onAccent,
+  };
+}
+
+/** One hue per area of the app. Same meaning everywhere. */
+export const Hue: Record<HueName, HueSet> = {
+  water: hue('#38D3FF', '#1C93BA'),
+  train: hue('#FF6B4A', '#C4452A'),
+  fuel: hue('#A6E840', '#6FA61C'),
+  spend: hue('#FFC233', '#C28A0E'),
+  checkin: hue('#A98BFF', '#7354D4'),
+  alarm: hue('#FF5FA2', '#C43A77'),
+  profile: hue('#6E9BFF', '#4467CC'),
+};
+
+/** Neutral chunky surface (non-hued tiles). */
+export const NeutralTile = {
+  tile: BASE.surface,
+  tileEdge: mix(BASE.surface, '#000000', 0.62),
 } as const;
 
 function build() {
   return {
-    ...GREEN,
+    ...BASE,
 
-    // ── Legacy aliases (do not use in new code) ───────────────────────────
-    text: GREEN.textHi,
-    textSecondary: GREEN.textMid,
-    textFaint: GREEN.textMid,   // textLow can't clear 4.5:1 as small text
-    background: GREEN.bg,
-    backgroundElement: GREEN.surface,
-    backgroundSelected: GREEN.surface2,
-    surfaceRaised: GREEN.surface,
-    surfaceSunken: GREEN.surface2,
-    border: GREEN.hairline,
-    primary: GREEN.water,
-    signal: GREEN.water,
-    signalInk: GREEN.onAccent,
-    signalWeak: 'rgba(127,184,164,0.14)',
-    signalLine: 'rgba(127,184,164,0.34)',
-    accent: GREEN.water,
-    aqua: GREEN.water,
-    success: GREEN.water,
-    warn: GREEN.warnTone,
+    // ── Legacy aliases ────────────────────────────────────────────────────
+    text: BASE.textHi,
+    textSecondary: BASE.textMid,
+    textFaint: BASE.textMid,
+    background: BASE.bg,
+    backgroundElement: BASE.surface,
+    backgroundSelected: BASE.surface2,
+    surfaceRaised: BASE.surface,
+    surfaceSunken: BASE.surface2,
+    border: BASE.hairline,
+    primary: BASE.water,
+    signal: BASE.water,
+    signalInk: BASE.onAccent,
+    signalWeak: withAlpha(BASE.water, 0.16),
+    signalLine: withAlpha(BASE.water, 0.45),
+    accent: BASE.water,
+    aqua: BASE.water,
+    success: Hue.fuel.main,
+    warn: BASE.warnTone,
 
-    // Legacy names from the previous (teal) pass still read by app-tabs.tsx
-    // and the hero's own styling until those call sites are swept.
-    card: GREEN.surface,
-    cardBorder: GREEN.hairline,
-    track: GREEN.surface2,
-    trackSoft: GREEN.surface2,
-    heroBase: GREEN.bg,
-    heroLine: GREEN.hairline,
-    heroTextHi: GREEN.textHi,
-    heroTextMid: GREEN.textMid,
-    accentLime: GREEN.water,     // no second accent in this system
-    onAqua: GREEN.onAccent,
-    onLime: GREEN.onAccent,
-    textLowText: GREEN.textMid,  // the small-text-safe version of textLow
+    card: BASE.surface,
+    cardBorder: BASE.hairline,
+    track: BASE.surface2,
+    trackSoft: BASE.surface2,
+    heroBase: BASE.bg,
+    heroLine: BASE.hairline,
+    heroTextHi: BASE.textHi,
+    heroTextMid: BASE.textMid,
+    accentLime: Hue.fuel.main,
+    onAqua: BASE.onAccent,
+    onLime: BASE.onAccent,
+    textLowText: BASE.textMid,
   } as const;
 }
 
@@ -109,71 +170,41 @@ export const Colors = {
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
 /**
- * No elevation system in this design — depth comes from the bg → surface step
- * plus `hairline`, never shadow. Retained only because a handful of
- * not-yet-rebuilt screens still import these names; both resolve to "no lift".
+ * Depth comes from the chunky bottom lip (see ChunkyButton / Tile), not from
+ * drop shadows — shadows vanish on a dark base. Kept for old imports.
  */
+const NO_SHADOW = { shadowColor: '#000000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 };
 export const Elevation = {
-  low: {
-    light: { shadowColor: '#000000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
-    dark: { shadowColor: '#000000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
-  },
-  high: {
-    light: { shadowColor: '#000000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
-    dark: { shadowColor: '#000000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
-  },
+  low: { light: NO_SHADOW, dark: NO_SHADOW },
+  high: { light: NO_SHADOW, dark: NO_SHADOW },
 } as const;
-
-// Legacy alias — kept for existing imports.
-export const Shadows = { light: Elevation.low.light, dark: Elevation.low.dark };
+export const Shadows = { light: NO_SHADOW, dark: NO_SHADOW };
+export const Lift = { hero: NO_SHADOW, card: NO_SHADOW, nav: NO_SHADOW } as const;
 
 /**
- * Legacy alias for screens still importing card "lift" from the previous
- * pass. In this design nothing is lifted — all three resolve to zero, so a
- * not-yet-rebuilt screen degrades to a flat hairline card instead of keeping
- * a shadow that would fight the new discipline.
- */
-export const Lift = {
-  hero: { shadowColor: '#000000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
-  card: { shadowColor: '#000000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
-  nav: { shadowColor: '#000000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
-} as const;
-
-/**
- * Two families. Space Grotesk carries the personality — technical-grotesque,
- * slightly squared, built for confident data-forward headlines. Onest is
- * quiet UI text that recedes so the display face stands out.
+ * Nunito — rounded, friendly, very legible at heavy weights. Its digits are
+ * fixed-width by default (all 600 units), so counting numbers never jitter.
  *
- * Both verified (by parsing the shipped .ttf) to carry the `tnum` OpenType
- * feature, so `fontVariant: ['tabular-nums']` genuinely produces fixed-width
- * digits — the 84px hero number cannot jitter the layout when it changes.
- *
- * IMPORTANT (Android): the weight lives in the family NAME. Pairing these
- * with `fontWeight` makes Android synthesise a fake bold over an already-bold
- * face, so every style below sets `fontFamily` and never `fontWeight`.
+ * IMPORTANT (Android): the weight lives in the family NAME. Never pair these
+ * with `fontWeight` — Android would synthesise a fake bold on top.
  */
 export const FontFace = {
-  body: 'Onest_400Regular',           // body, sub-lines, hints
-  bodyMedium: 'Onest_500Medium',      // bracket labels, small emphasis
-  display: 'SpaceGrotesk_500Medium',  // the hero number, secondary numbers
-  displayBold: 'SpaceGrotesk_700Bold',// screen headline
+  body: 'Nunito_600SemiBold',
+  bodyMedium: 'Nunito_700Bold',
+  display: 'Nunito_800ExtraBold',
+  displayBold: 'Nunito_900Black',
 
-  // ── Legacy aliases (do not use in new code) ─────────────────────────────
-  // A prior pass ran a codemod that routed every text style app-wide through
-  // FontFace.regular/medium/semibold/bold — ~19 screens outside this brief's
-  // scope reference those names directly. Aliasing them here means every
-  // screen keeps using a real loaded face after this swap: body copy stays on
-  // Onest, and anything that was "the numeric/heading weight" (semibold/bold)
-  // now renders in Space Grotesk — a real, visible, INTENTIONAL side effect
-  // of sharing one token file, not an accident. Flagged in the write-up.
-  regular: 'Onest_400Regular',
-  medium: 'Onest_500Medium',
-  semibold: 'SpaceGrotesk_500Medium',
-  bold: 'SpaceGrotesk_700Bold',
+  // Legacy aliases used across older screens.
+  regular: 'Nunito_600SemiBold',
+  medium: 'Nunito_700Bold',
+  semibold: 'Nunito_800ExtraBold',
+  bold: 'Nunito_900Black',
+
+  /** Dot-matrix numerals / micro-labels (Nothing). Monospaced; no ₹ glyph. */
+  dot: 'Doto_800ExtraBold',
+  dotBlack: 'Doto_900Black',
 } as const;
 
-// Legacy shape — `Fonts.mono` is consumed by themed-text / ChangelogView.
-// There is no mono face in this system; numerals are tabular instead.
 export const Fonts = {
   sans: FontFace.body,
   serif: 'serif',
@@ -184,63 +215,62 @@ export const Fonts = {
 const TABULAR: TextStyle = { fontVariant: ['tabular-nums'] };
 
 /**
- * Type scale. Deliberately brutal: an 84px hero next to 13px body text, with
- * almost nothing in between. `bracketLabel` is the technical signature —
- * used as the card "title" in place of a plain label, e.g. "[ HYDRATION ]".
- * Sentence case for real sentences; UPPERCASE only on bracket labels.
+ * Type ramp. Big, heavy numbers; short bold labels; friendly body copy.
+ * `bracketLabel` is kept as the name of the small uppercase label style for
+ * older screens — it no longer implies literal [ brackets ].
  */
 export const Type: Record<
   | 'hero' | 'heroUnit' | 'headline' | 'greeting' | 'bracketLabel' | 'numberSm'
   | 'subline' | 'body' | 'controlLabel'
-  // Retained at their previous metrics (re-fonted) for not-yet-rebuilt screens.
-  | 'display' | 'title' | 'label' | 'readout' | 'cardLabel' | 'badge' | 'number',
+  | 'display' | 'title' | 'label' | 'readout' | 'cardLabel' | 'badge' | 'number'
+  | 'dotHero' | 'dotNumber' | 'dotSmall' | 'dotLabel' | 'largeTitle',
   TextStyle
 > = {
-  // ── The redesign ramp ──────────────────────────────────────────────────
-  hero: { fontFamily: FontFace.display, fontSize: 84, lineHeight: 88, letterSpacing: -3, ...TABULAR },
-  heroUnit: { fontFamily: FontFace.body, fontSize: 20, lineHeight: 24 },
-  headline: { fontFamily: FontFace.displayBold, fontSize: 30, lineHeight: 36, letterSpacing: -0.6 },
-  greeting: { fontFamily: FontFace.body, fontSize: 13, lineHeight: 18 },
-  bracketLabel: { fontFamily: FontFace.bodyMedium, fontSize: 11, letterSpacing: 2, lineHeight: 15, textTransform: 'uppercase' },
-  numberSm: { fontFamily: FontFace.display, fontSize: 40, lineHeight: 44, letterSpacing: -1, ...TABULAR },
+  hero: { fontFamily: FontFace.displayBold, fontSize: 56, lineHeight: 62, letterSpacing: -1.5, ...TABULAR },
+  heroUnit: { fontFamily: FontFace.bodyMedium, fontSize: 18, lineHeight: 22 },
+  headline: { fontFamily: FontFace.displayBold, fontSize: 28, lineHeight: 34, letterSpacing: -0.4 },
+  greeting: { fontFamily: FontFace.bodyMedium, fontSize: 14, lineHeight: 19 },
+  bracketLabel: { fontFamily: FontFace.display, fontSize: 12, letterSpacing: 0.8, lineHeight: 16, textTransform: 'uppercase' },
+  numberSm: { fontFamily: FontFace.displayBold, fontSize: 32, lineHeight: 38, letterSpacing: -0.6, ...TABULAR },
   subline: { fontFamily: FontFace.body, fontSize: 13, lineHeight: 18 },
-  body: { fontFamily: FontFace.body, fontSize: 14, lineHeight: 20 },
-  // A real button label: sentence case, no forced letter-spacing/uppercase.
-  // The hero's "+ 250 ml" previously borrowed `bracketLabel` (11px, uppercase,
-  // +2 tracking) for its CTA text — the brief reserves uppercase for bracket
-  // labels only ("Sentence case for real sentences"), so the action text was
-  // both mis-cased and too small to read as the card's primary action.
-  controlLabel: { fontFamily: FontFace.bodyMedium, fontSize: 15, lineHeight: 20 },
+  body: { fontFamily: FontFace.body, fontSize: 15, lineHeight: 21 },
+  controlLabel: { fontFamily: FontFace.display, fontSize: 16, lineHeight: 21 },
 
-  // ── Retained for not-yet-rebuilt screens ───────────────────────────────
-  display: { fontFamily: FontFace.displayBold, fontSize: 28, lineHeight: 34, letterSpacing: -0.6 },
-  title: { fontFamily: FontFace.displayBold, fontSize: 19, lineHeight: 25, letterSpacing: -0.3 },
-  label: { fontFamily: FontFace.bodyMedium, fontSize: 11, letterSpacing: 1.2, lineHeight: 15, textTransform: 'uppercase' },
-  readout: { fontFamily: FontFace.display, letterSpacing: -0.4, ...TABULAR },
-  cardLabel: { fontFamily: FontFace.bodyMedium, fontSize: 13, lineHeight: 18 },
+  display: { fontFamily: FontFace.displayBold, fontSize: 28, lineHeight: 34, letterSpacing: -0.4 },
+  title: { fontFamily: FontFace.displayBold, fontSize: 20, lineHeight: 26, letterSpacing: -0.2 },
+  label: { fontFamily: FontFace.display, fontSize: 12, letterSpacing: 0.8, lineHeight: 16, textTransform: 'uppercase' },
+  readout: { fontFamily: FontFace.displayBold, letterSpacing: -0.3, ...TABULAR },
+  cardLabel: { fontFamily: FontFace.bodyMedium, fontSize: 14, lineHeight: 19 },
   badge: { fontFamily: FontFace.display, fontSize: 12, lineHeight: 16, ...TABULAR },
-  number: { fontFamily: FontFace.display, fontSize: 52, lineHeight: 58, letterSpacing: -2, ...TABULAR },
+  number: { fontFamily: FontFace.displayBold, fontSize: 48, lineHeight: 54, letterSpacing: -1, ...TABULAR },
+
+  // ── Signature styles ──────────────────────────────────────────────────
+  /** One UI-style tab title: big, airy, sits low in the header area. */
+  largeTitle: { fontFamily: FontFace.displayBold, fontSize: 38, lineHeight: 44, letterSpacing: -0.8 },
+  /** Dot-matrix numerals (Nothing). */
+  dotHero: { fontFamily: FontFace.dotBlack, fontSize: 60, lineHeight: 66, letterSpacing: -1 },
+  dotNumber: { fontFamily: FontFace.dotBlack, fontSize: 34, lineHeight: 40, letterSpacing: -0.5 },
+  dotSmall: { fontFamily: FontFace.dotBlack, fontSize: 20, lineHeight: 24 },
+  /** Dot-matrix micro label — uppercase, tracked. */
+  dotLabel: { fontFamily: FontFace.dotBlack, fontSize: 13, lineHeight: 16, letterSpacing: 1.2, textTransform: 'uppercase' },
 };
 
 /**
- * Motion — precise, not bouncy. This aesthetic is a technical instrument, so
- * entrances are smooth ease-out, never a spring overshoot.
- *   fast   → press / toggle / state flip
- *   count  → a number catching up to a tap (must feel attached to the thumb)
- *   entrance → the mount stagger (fade + translateY 10→0)
- *   fill   → the hydration bar charging on entrance / after a log
+ * Motion — friendly and physical. Springs may overshoot a little (a tap is a
+ * physical act); entrances rise and settle. Everything is skipped under
+ * Reduce Motion.
  */
 export const Motion = {
   duration: {
-    fast: 140, count: 420, entrance: 350, fill: 500, screen: 300,
-    base: 350, // legacy alias — 3 not-yet-rebuilt call sites read `.base`
+    fast: 140, count: 520, entrance: 420, fill: 700, screen: 300,
+    base: 350,
   },
-  stagger: 50,
-  entranceOffset: 10,
-  // Retained: `spring`/`softSpring` still back the −/+ press-scale (a tap is
-  // a physical action, not a layout entrance) and app-tabs' sliding lozenge.
-  spring: { damping: 20, stiffness: 220, mass: 1 },
-  softSpring: { damping: 16, stiffness: 140, mass: 0.9 },
+  stagger: 60,
+  entranceOffset: 18,
+  spring: { damping: 18, stiffness: 240, mass: 1 },
+  softSpring: { damping: 14, stiffness: 140, mass: 0.9 },
+  /** For pops, the mascot and completed states. */
+  bouncy: { damping: 9, stiffness: 180, mass: 0.8 },
 } as const;
 
 export const Spacing = {
@@ -254,19 +284,22 @@ export const Spacing = {
 } as const;
 
 export const Radius = {
-  sm: 8,
-  md: 14,
-  lg: 20,
-  xl: 24,
+  sm: 10,
+  md: 16,
+  lg: 22,
+  xl: 28,
   pill: 999,
 } as const;
+
+/** Height of the chunky lip under pressable tiles and buttons. */
+export const Lip = 5;
 
 /** Minimum interactive size. Android/WCAG both want 44 dp. */
 export const HitTarget = 44;
 
 export const TabBar = {
-  height: 56,
-  floatOffset: 24,
+  height: 64,
+  floatOffset: 16,
 } as const;
 
 export const BottomTabInset = TabBar.height + TabBar.floatOffset + 8;

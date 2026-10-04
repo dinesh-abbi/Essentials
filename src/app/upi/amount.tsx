@@ -1,371 +1,226 @@
-import { Feather } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  AppState,
-  AppStateStatus,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  TextInput,
-  View,
-  ScrollView,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, AppState, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { FontFace, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { CATEGORIES, categoryMeta } from '@/components/spend/categories';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import { saveUpiTransaction } from '@/utils/UpiStorage';
+import { ChunkyButton, IconBlob, Tile } from '@/components/ui/chunky';
+import { ScreenHeader } from '@/components/ui/screen-header';
+import { Colors, FontFace, Hue, Radius, Spacing, Type, withAlpha } from '@/constants/theme';
 import { savePurchase } from '@/utils/PurchasesStorage';
+import { saveUpiTransaction } from '@/utils/UpiStorage';
 import * as WidgetSync from '@/utils/WidgetSync';
 
+const C = Colors.dark;
+const PAY_CATEGORIES = CATEGORIES.filter((c) => c !== 'Income');
+
+const vpaUri = (upiId: string, amount: string, note: string) => {
+  const payee = upiId.includes('@') ? upiId.split('@')[0] : upiId;
+  return `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payee)}&am=${amount}&cu=INR&tn=${encodeURIComponent(note || 'Payment')}`;
+};
+
+/**
+ * Pay a UPI ID: who you're paying, a giant amount, what it was for (picture
+ * categories), then hand off to the UPI app. When you come back we ask if it
+ * went through and log it to Spend.
+ */
 export default function UpiAmountScreen() {
   const router = useRouter();
-  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   const upiId = params.upiId as string;
   const qrData = params.qrData as string;
 
   const [amount, setAmount] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState<'Groceries' | 'Dairy' | 'Veggies' | 'Snacks' | 'Transport' | 'Bills' | 'Health' | 'Food' | 'Shopping' | 'Misc'>('Misc');
+  const [category, setCategory] = useState('Misc');
   const appState = useRef(AppState.currentState);
-  const waitingForPaymentReturn = useRef(false);
+  const waiting = useRef(false);
 
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', nextAppState => {
-      if (
-        appState.current.match(/inactive|background/) &&
-        nextAppState === 'active'
-      ) {
-        // App has come to the foreground!
-        if (waitingForPaymentReturn.current) {
-          waitingForPaymentReturn.current = false;
-          promptPaymentSuccess();
-        }
-      }
-      appState.current = nextAppState;
-    });
 
-    return () => {
-      subscription.remove();
-    };
-  }, [amount, upiId]);
-
-  const promptPaymentSuccess = () => {
+  const askResult = () =>
     Alert.alert(
-      'Payment Status',
-      'Did the payment go through successfully?',
+      'Did it go through?',
+      'Tell us if the payment succeeded so it can be added to Spend.',
       [
+        { text: 'No', style: 'cancel', onPress: () => setProcessing(false) },
         {
-          text: 'No',
-          style: 'cancel',
-          onPress: () => setIsProcessing(false),
-        },
-        {
-          text: 'Yes',
+          text: 'Yes, paid',
           onPress: async () => {
             try {
-              const numericAmount = parseFloat(amount);
-              await saveUpiTransaction(upiId, numericAmount);
-              await savePurchase(
-                description.trim() || `UPI to ${upiId}`,
-                numericAmount,
-                category
-              );
+              const value = parseFloat(amount);
+              await saveUpiTransaction(upiId, value);
+              await savePurchase(description.trim() || `UPI to ${upiId}`, value, category);
               await WidgetSync.sync();
-              Alert.alert('Success', 'Transaction logged successfully!');
+              Alert.alert('Logged', 'Added to your spending.');
               router.replace('/(tabs)');
             } catch (error) {
               console.error(error);
-              Alert.alert('Error', 'Failed to log transaction.');
-              setIsProcessing(false);
+              Alert.alert('Error', 'Failed to log the payment.');
+              setProcessing(false);
             }
           },
         },
       ],
-      { cancelable: false }
+      { cancelable: false },
     );
-  };
 
-  const handlePay = async () => {
-    const numericAmount = parseFloat(amount);
-    if (isNaN(numericAmount) || numericAmount <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid payment amount.');
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (appState.current.match(/inactive|background/) && next === 'active' && waiting.current) {
+        waiting.current = false;
+        askResult();
+      }
+      appState.current = next;
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [amount, upiId, description, category]);
+
+  const pay = async () => {
+    const value = parseFloat(amount);
+    if (isNaN(value) || value <= 0) {
+      Alert.alert('Add an amount', 'Enter how much to pay.');
       return;
     }
-
-    setIsProcessing(true);
-    // UPI spec: exactly two decimal places, VPA must not be double URL-encoded
-    const formattedAmount = numericAmount.toFixed(2);
-    
-    let upiUri = '';
+    setProcessing(true);
+    // UPI spec: exactly two decimals; the VPA must not be double-encoded.
+    const formatted = value.toFixed(2);
+    let uri = vpaUri(upiId, formatted, description);
     if (qrData) {
-      // If we scanned a QR code, preserve all merchant context parameters (e.g. mc, tr, orgid, sign)
       try {
-        const qIndex = qrData.indexOf('?');
-        if (qIndex !== -1) {
-          const baseUrl = qrData.substring(0, qIndex);
-          const queryString = qrData.substring(qIndex + 1);
-          
-          // Re-construct the query params list manually or using URLSearchParams to avoid losing merchant info
-          const searchParams = new URLSearchParams(queryString);
-          searchParams.set('am', formattedAmount);
-          if (description) {
-            searchParams.set('tn', description);
-          } else {
-            searchParams.set('tn', 'Payment');
-          }
-          searchParams.set('cu', 'INR'); // ensure currency is set
-          
-          // Generate raw URI string without double-encoding the pa parameter
-          const decodedParams: string[] = [];
-          searchParams.forEach((val, key) => {
-            if (key === 'pa') {
-              // VPA must remain literal (e.g., name@bank, not name%40bank)
-              decodedParams.push(`pa=${val}`);
-            } else {
-              decodedParams.push(`${key}=${encodeURIComponent(val)}`);
-            }
-          });
-          upiUri = `${baseUrl}?${decodedParams.join('&')}`;
-        } else {
-          const payeeName = upiId.includes('@') ? upiId.split('@')[0] : upiId;
-          upiUri = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${formattedAmount}&cu=INR&tn=${encodeURIComponent(description || 'Payment')}`;
+        const q = qrData.indexOf('?');
+        if (q !== -1) {
+          // Keep every merchant parameter (mc, tr, orgid, sign…) from the QR.
+          const sp = new URLSearchParams(qrData.substring(q + 1));
+          sp.set('am', formatted);
+          sp.set('tn', description || 'Payment');
+          sp.set('cu', 'INR');
+          const parts: string[] = [];
+          sp.forEach((val, key) => parts.push(key === 'pa' ? `pa=${val}` : `${key}=${encodeURIComponent(val)}`));
+          uri = `${qrData.substring(0, q)}?${parts.join('&')}`;
         }
       } catch (e) {
         console.error('Error constructing URI from qrData:', e);
-        const payeeName = upiId.includes('@') ? upiId.split('@')[0] : upiId;
-        upiUri = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${formattedAmount}&cu=INR&tn=${encodeURIComponent(description || 'Payment')}`;
       }
-    } else {
-      // Manual entry, fallback to direct peer-to-peer VPA scheme
-      const payeeName = upiId.includes('@') ? upiId.split('@')[0] : upiId;
-      upiUri = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${formattedAmount}&cu=INR&tn=${encodeURIComponent(description || 'Payment')}`;
     }
-
     try {
-      waitingForPaymentReturn.current = true;
-      await Linking.openURL(upiUri);
+      waiting.current = true;
+      await Linking.openURL(uri);
     } catch (error) {
-      console.error('Failed to open UPI URL directly:', error);
-      Alert.alert('No UPI App Found', 'Could not find a supported UPI app to complete the payment.');
-      setIsProcessing(false);
-      waitingForPaymentReturn.current = false;
+      console.error('Failed to open UPI URL:', error);
+      Alert.alert('No UPI app', 'Couldn’t find a UPI app to finish the payment.');
+      setProcessing(false);
+      waiting.current = false;
     }
   };
 
+  const sun = Hue.spend;
+
   return (
-    <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <AnimatedPressable
-          onPress={() => router.back()}
-          style={[styles.backBtn, { backgroundColor: theme.backgroundElement }]}>
-          <Feather name="arrow-left" size={24} color={theme.text} />
-        </AnimatedPressable>
-        <ThemedText style={styles.headerTitle}>Pay via UPI</ThemedText>
-        <View style={{ width: 44 }} />
-      </View>
+    <View style={[styles.root, { backgroundColor: C.bg }]}>
+      <SafeAreaView style={styles.fill} edges={['top']}>
+        <View style={styles.pad}>
+          <ScreenHeader bracket="Pay with UPI" />
+        </View>
+        <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.four }]} keyboardShouldPersistTaps="handled">
+            <Tile hue="spend" style={styles.payee}>
+              <IconBlob name="account-circle" hue="spend" size={48} />
+              <View style={styles.flex}>
+                <Text style={[Type.dotLabel, { color: C.textMid }]}>Paying to</Text>
+                <Text style={[Type.title, { color: C.textHi }]} numberOfLines={1} adjustsFontSizeToFit>
+                  {upiId}
+                </Text>
+              </View>
+              {qrData ? <MaterialCommunityIcons name="qrcode" size={26} color={sun.main} /> : null}
+            </Tile>
 
-      <KeyboardAvoidingView style={styles.content} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ThemedView style={styles.card}>
-          <ThemedText themeColor="textSecondary" style={styles.label}>Paying to</ThemedText>
-          <ThemedText style={styles.upiIdText} numberOfLines={1} adjustsFontSizeToFit>{upiId}</ThemedText>
+            <View style={[styles.amount, { backgroundColor: C.surface }]}>
+              <Text style={[styles.rupee, { color: sun.main }]}>₹</Text>
+              <TextInput
+                style={[Type.dotHero, styles.amountInput, { color: C.textHi }]}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                placeholderTextColor={C.textLow}
+                value={amount}
+                onChangeText={setAmount}
+                autoFocus
+                editable={!processing}
+                accessibilityLabel="Amount in rupees"
+              />
+            </View>
 
-          <View style={styles.amountContainer}>
-            <ThemedText style={[styles.currencySymbol, { color: theme.text }]}>₹</ThemedText>
             <TextInput
-              style={[styles.amountInput, { color: theme.text }]}
-              keyboardType="decimal-pad"
-              placeholder="0.00"
-              placeholderTextColor={theme.textSecondary}
-              value={amount}
-              onChangeText={setAmount}
-              autoFocus
-              editable={!isProcessing}
+              style={[Type.controlLabel, styles.note, { color: C.textHi, backgroundColor: C.surface }]}
+              placeholder="What’s it for? (optional)"
+              placeholderTextColor={C.textLow}
+              value={description}
+              onChangeText={setDescription}
+              editable={!processing}
             />
-          </View>
-        </ThemedView>
 
-        <ThemedView style={styles.formCard}>
-          <ThemedText themeColor="textSecondary" style={styles.formLabel}>What was this spent on?</ThemedText>
-          <TextInput
-            style={[styles.formInput, { color: theme.text, borderColor: theme.border }]}
-            placeholder="e.g. Milk, Veggies, Lunch (optional)"
-            placeholderTextColor={theme.textSecondary}
-            value={description}
-            onChangeText={setDescription}
-            editable={!isProcessing}
-          />
+            <Text style={[Type.dotLabel, { color: C.textMid }]}>Category</Text>
+            <View style={styles.grid}>
+              {PAY_CATEGORIES.map((cat) => {
+                const meta = categoryMeta(cat);
+                const on = category === cat;
+                return (
+                  <AnimatedPressable
+                    key={cat}
+                    onPress={() => setCategory(cat)}
+                    disabled={processing}
+                    haptic="selection"
+                    pressScale={0.9}
+                    style={[styles.cat, { backgroundColor: on ? withAlpha(meta.color, 0.18) : C.surface }, on && { borderColor: meta.color }]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    accessibilityLabel={cat}
+                  >
+                    <View style={[styles.catIcon, { backgroundColor: on ? meta.color : withAlpha(meta.color, 0.16) }]}>
+                      <MaterialCommunityIcons name={meta.icon} size={20} color={on ? C.onAccent : meta.color} />
+                    </View>
+                    <Text style={[Type.badge, { color: on ? C.textHi : C.textMid, fontSize: 11 }]} numberOfLines={1}>
+                      {cat}
+                    </Text>
+                  </AnimatedPressable>
+                );
+              })}
+            </View>
 
-          <ThemedText themeColor="textSecondary" style={[styles.formLabel, { marginTop: Spacing.four }]}>Category</ThemedText>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryContainer}
-          >
-            {(['Groceries', 'Dairy', 'Veggies', 'Snacks', 'Transport', 'Bills', 'Health', 'Food', 'Shopping', 'Misc'] as const).map((cat) => {
-              const isSelected = category === cat;
-              return (
-                <AnimatedPressable
-                  key={cat}
-                  onPress={() => setCategory(cat)}
-                  disabled={isProcessing}
-                  style={[
-                    styles.categoryChip,
-                    {
-                      backgroundColor: isSelected ? theme.primary : theme.backgroundElement,
-                      borderColor: isSelected ? theme.primary : theme.border,
-                      paddingHorizontal: 16,
-                      flex: 0,
-                      minWidth: 80,
-                    }
-                  ]}>
-                  <ThemedText
-                    style={[
-                      styles.categoryChipText,
-                      { color: isSelected ? '#FFF' : theme.textSecondary }
-                    ]}>
-                    {cat}
-                  </ThemedText>
-                </AnimatedPressable>
-              );
-            })}
+            <ChunkyButton
+              label={processing ? 'Waiting for your UPI app…' : `Pay ₹${amount || '0'}`}
+              icon="send"
+              hue="spend"
+              onPress={pay}
+              loading={processing}
+              disabled={!amount}
+              style={styles.payBtn}
+            />
           </ScrollView>
-        </ThemedView>
-
-        <View style={{ flex: 1 }} />
-
-        <AnimatedPressable
-          onPress={handlePay}
-          disabled={isProcessing || !amount}
-          style={[
-            styles.payBtn,
-            { backgroundColor: isProcessing || !amount ? theme.border : theme.primary }
-          ]}>
-          <ThemedText style={styles.payBtnText}>
-            {isProcessing ? 'Processing...' : `Pay ₹${amount || '0'}`}
-          </ThemedText>
-        </AnimatedPressable>
-      </KeyboardAvoidingView>
-    </ThemedView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontFamily: FontFace.bold,
-  },
-  content: {
-    flex: 1,
-    padding: Spacing.four,
-  },
-  card: {
-    padding: Spacing.five,
-    borderRadius: 24,
-    backgroundColor: 'rgba(128, 128, 128, 0.1)', // subtle surface
-    alignItems: 'center',
-    marginTop: Spacing.six,
-  },
-  label: {
-    fontSize: 14,
-    fontFamily: FontFace.regular,
-    marginBottom: Spacing.two,
-  },
-  upiIdText: {
-    fontSize: 20,
-    fontFamily: FontFace.semibold,
-    marginBottom: Spacing.six,
-  },
-  amountContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  currencySymbol: {
-    fontSize: 42,
-    fontFamily: FontFace.semibold,
-    marginRight: Spacing.two,
-  },
-  amountInput: {
-    fontSize: 48,
-    fontFamily: FontFace.bold,
-    minWidth: 100,
-    textAlign: 'center',
-  },
-  payBtn: {
-    paddingVertical: Spacing.four,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginBottom: Spacing.six,
-  },
-  payBtnText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontFamily: FontFace.bold,
-  },
-  formCard: {
-    padding: Spacing.four,
-    borderRadius: 20,
-    backgroundColor: 'rgba(128, 128, 128, 0.08)',
-    marginTop: Spacing.four,
-    width: '100%',
-  },
-  formLabel: {
-    fontSize: 14,
-    fontFamily: FontFace.semibold,
-    marginBottom: Spacing.two,
-  },
-  formInput: {
-    height: 48,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: Spacing.three,
-    fontSize: 16,
-    fontFamily: FontFace.regular,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  categoryContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: Spacing.two,
-    marginTop: Spacing.one,
-  },
-  categoryChip: {
-    flex: 1,
-    paddingVertical: Spacing.two,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  categoryChipText: {
-    fontSize: 12,
-    fontFamily: FontFace.bold,
-  },
+  root: { flex: 1 },
+  fill: { flex: 1 },
+  flex: { flex: 1 },
+  pad: { paddingHorizontal: Spacing.three },
+  content: { paddingHorizontal: Spacing.three, paddingTop: Spacing.two, gap: 12 },
+  payee: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  amount: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: Radius.xl, paddingVertical: 18, gap: 6 },
+  rupee: { fontFamily: FontFace.displayBold, fontSize: 44 },
+  amountInput: { minWidth: 90, textAlign: 'center', padding: 0, includeFontPadding: false },
+  note: { borderRadius: Radius.lg, paddingHorizontal: 16, height: 52 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8 },
+  cat: { width: '23.5%', alignItems: 'center', gap: 6, paddingVertical: 10, borderRadius: Radius.lg, borderWidth: 2, borderColor: 'transparent' },
+  catIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  payBtn: { marginTop: Spacing.three },
 });

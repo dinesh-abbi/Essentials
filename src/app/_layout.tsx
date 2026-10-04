@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { DarkTheme, DefaultTheme, ThemeProvider, Stack, useRouter, useSegments } from 'expo-router';
-import { AppState, NativeModules, useColorScheme } from 'react-native';
+import { DarkTheme, ThemeProvider, Stack, useRouter, useSegments } from 'expo-router';
+import { AppState, NativeModules } from 'react-native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 // Per-weight subpaths, NOT the package index. Each index module `require()`s
 // every weight and italic it ships, so importing from it would make Metro
-// bundle 5-9 unused faces per family. These four back the "Technical, but
-// kind" screens (Home, Profile, Water, Purchases, Alarm, …) via
+// bundle ~16 unused faces. These six are the whole type ramp in
 // constants/theme.ts.
-import { SpaceGrotesk_500Medium } from '@expo-google-fonts/space-grotesk/500Medium';
-import { SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk/700Bold';
-import { Onest_400Regular } from '@expo-google-fonts/onest/400Regular';
-import { Onest_500Medium } from '@expo-google-fonts/onest/500Medium';
+import { Nunito_600SemiBold } from '@expo-google-fonts/nunito/600SemiBold';
+import { Nunito_700Bold } from '@expo-google-fonts/nunito/700Bold';
+import { Nunito_800ExtraBold } from '@expo-google-fonts/nunito/800ExtraBold';
+import { Nunito_900Black } from '@expo-google-fonts/nunito/900Black';
+import { Doto_800ExtraBold } from '@expo-google-fonts/doto/800ExtraBold';
+import { Doto_900Black } from '@expo-google-fonts/doto/900Black';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import * as WaterStorage from '@/utils/WaterStorage';
@@ -24,7 +25,7 @@ import AppLoader from '@/components/AppLoader';
 import { AppLock } from '@/components/AppLock';
 import { isAppLockEnabled } from '@/utils/Preferences';
 import * as SyncManager from '@/utils/SyncManager';
-import { Motion } from '@/constants/theme';
+import { Colors, Motion } from '@/constants/theme';
 
 // Hold the native splash until the type ramp's faces are in memory. Swapping
 // in a JS loader instead would paint one surface, then the real one — a visible
@@ -245,7 +246,7 @@ function AppStack() {
         options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }}
       />
 
-      {/* Training · Fuel · Coach (merged from Catalyst) */}
+      {/* Training · Fuel (merged from Catalyst) */}
       <Stack.Screen
         name="train/week"
         options={{ headerShown: false, animation: 'slide_from_right' }}
@@ -254,30 +255,33 @@ function AppStack() {
         name="train/brief"
         options={{ headerShown: false, animation: 'fade' }}
       />
-      <Stack.Screen
-        name="coach"
-        options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }}
-      />
     </Stack>
     {showLock && <AppLock onUnlock={() => setLocked(false)} />}
     </>
   );
 }
 
+// Single dark theme: navigation surfaces (screen backgrounds during a push)
+// must match the app's base or a white frame flashes between screens.
+const NAV_THEME = {
+  ...DarkTheme,
+  colors: { ...DarkTheme.colors, background: Colors.dark.bg, card: Colors.dark.bg, primary: Colors.dark.water },
+};
+
 // ── Root layout — wraps everything in providers ────────────────────────────────
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   // The type ramp in `theme.ts` names these four faces directly, so nothing
   // text-bearing may render until they resolve — otherwise the first frame
   // paints in system Roboto at the wrong metrics and visibly reflows.
   // A load *failure* is not worth blocking the app on: fall through and let
   // RN substitute the system face rather than hanging on the loader forever.
   const [fontsLoaded, fontError] = useFonts({
-    SpaceGrotesk_500Medium,
-    SpaceGrotesk_700Bold,
-    Onest_400Regular,
-    Onest_500Medium,
+    Nunito_600SemiBold,
+    Nunito_700Bold,
+    Nunito_800ExtraBold,
+    Nunito_900Black,
+    Doto_800ExtraBold,
+    Doto_900Black,
   });
 
   useEffect(() => {
@@ -289,7 +293,7 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={NAV_THEME}>
       <AuthProvider>
         <AnimatedSplashOverlay />
         <OTAUpdateChecker />

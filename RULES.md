@@ -39,23 +39,34 @@ rule, either don't make it or update the rule here in the same change.
 10. **Keep the signing key.** Releases are signed with the template debug
     keystore the installed app already has. Changing keys breaks OTA updates.
 
-## Design ("Technical, but kind" — `src/constants/theme.ts`)
+## Design ("Glance" — `src/constants/theme.ts`)
 
-11. **One accent.** `water` is the only colour with identity. `alert` is for
-    genuine problems only (an error, a skipped meal). No second accent, no
-    gradients for decoration, no shadows.
-12. **Type and space carry the design.** Use the `Type` ramp — big tabular
-    numbers (`hero`, `numberSm`, `readout`) next to quiet body text; UPPERCASE
-    only inside bracket labels (`[ TRAINING ]`). Sentence case everywhere else.
-13. **Hairlines, not boxes.** Separate with space and `hairline` borders.
-    Don't wrap every section in a card, and never give a screen a grid of
-    identical cards.
-14. **Motion is precise.** Ease-out entrances via `EntranceView`; springs
-    only for direct manipulation (press, drag, a fill after a tap). Every
-    looping animation is gated on `useReducedMotion()`.
-15. **Shared primitives first.** `AnimatedPressable`, `Sheet`,
-    `ScreenHeader`, `EntranceView`, `AnimatedNumber`, the line illustrations.
-    One illustration per screen at most.
+Every screen must be understood from shapes and colours before a word is
+read. The look blends Apple (activity rings, bento tiles), Samsung One UI
+(large airy titles, grouped cards, coloured squircle icons) and Nothing
+(dot-matrix numerals, dot meters, a red "live" dot).
+
+11. **One hue per area, everywhere.** `Hue.water` (cyan), `train` (coral),
+    `fuel` (lime), `spend` (sunshine), `checkin` (lavender), `alarm`
+    (pink), `profile` (blue). Never borrow another area's hue for decoration.
+    `alert` (red) is for real problems and the "live" dot only.
+12. **Picture first, number second, words last.** Prefer a ring, a dot meter,
+    an icon blob, the Drip mascot or a row of plates to a sentence. Numbers
+    use the dot-matrix styles (`dotHero` / `dotNumber` / `dotSmall`);
+    labels are short (`dotLabel`). No literal `[ BRACKET ]` labels.
+13. **Pressable things look pressable.** Use `Tile`, `ChunkyButton`,
+    `IconBlob`, `Chip` (`components/ui/chunky.tsx`) — the darker lip that
+    sinks on press is the only depth cue. No drop shadows.
+14. **Motion is friendly but gated.** Springs (`Motion.bouncy`) for pops and
+    completions, `EntranceView` for arrivals. Every looping animation checks
+    `useReducedMotion()`.
+15. **Shared primitives first** (all in `components/ui/`): `LargeHeader` for
+    tab titles, `ScreenHeader` for pushed screens, `Segmented` for Day/Week/
+    Month switches, `SettingRow` in grouped tiles, `StatTile`/`StatGrid`,
+    `ProgressRing`, `Donut`, `BarChart`, `DotMeter`/`LiveDot`, `ScanFrame` over
+    cameras, `BigMessage` for permission/empty/error screens, `DateTimeSheet`,
+    `Confetti`, `Sheet`, `AnimatedNumber`. No `Feather` icons — use
+    `MaterialCommunityIcons`. No literal `[ BRACKET ]` labels.
 16. **Real state only.** No fake "Synced ✓" badges — show what the app
     actually knows (e.g. Profile's pending-sync count).
 17. **Tap targets ≥ 44 dp**, every interactive element has an
@@ -68,8 +79,8 @@ rule, either don't make it or update the rule here in the same change.
 19. New lint errors in files you touch are fixed, not suppressed — except
     the known React-Compiler false positive on Reanimated shared-value
     writes inside gesture/press handlers.
-20. AI calls (`utils/Coach.ts`) happen only on an explicit user action, never
-    on render or focus.
+20. No AI/chat features — they were removed in v1.3.0 on purpose. Don't add
+    LLM calls or API keys back without the user asking.
 21. Releases: bump `app.json` + `package.json` version, increment
     `versionCode`, add `changelogs/vX.Y.Z.md` (the release body the app
     renders) and a `CHANGELOG.md` entry.

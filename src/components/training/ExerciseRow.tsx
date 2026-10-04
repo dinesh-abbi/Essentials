@@ -1,8 +1,7 @@
-import { Feather } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { memo, useEffect, useState } from 'react';
 import { Linking, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, {
-  Easing,
   FadeIn,
   FadeOut,
   LinearTransition,
@@ -15,18 +14,18 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import { Colors, FontFace, HitTarget, Motion, Radius, Spacing, Type } from '@/constants/theme';
+import { Chip, ChunkyButton, Tile } from '@/components/ui/chunky';
+import { Colors, Hue, Motion, Radius, Spacing, Type } from '@/constants/theme';
 import { prescription, type Exercise } from '@/utils/TrainingStorage';
 
 type Palette = typeof Colors.dark;
 
 /**
- * One movement in today's session. Collapsed it is a single confident line —
- * index, name, prescription, check. Expanded it opens the working surface:
- * the coaching cue, a load stepper pre-filled from last time, and a jump to
- * form videos. The index numeral is the row's only colour cue: it turns
- * `water` when the movement is done, so a finished list reads as a column of
- * lit numbers rather than a column of green cards.
+ * One movement in today's session, as a chunky card. Collapsed: a numbered
+ * badge, the name, the prescription as chips and a big check button. When
+ * done, the card takes the training hue and the badge pops into a tick —
+ * a finished list reads as a column of coral cards. Expanded: the coaching
+ * cue, a load stepper pre-filled from last time, and form videos.
  */
 export const ExerciseRow = memo(function ExerciseRow({
   exercise,
@@ -56,6 +55,7 @@ export const ExerciseRow = memo(function ExerciseRow({
   const isCardio = !!exercise.isCardio;
   const unit = isCardio ? 'min' : 'kg';
   const step = isCardio ? 5 : 2.5;
+  const train = Hue.train;
 
   // Local text so "42." can exist mid-typing; resynced (during render, the
   // React-recommended way) only when the stored weight changes from outside —
@@ -69,13 +69,9 @@ export const ExerciseRow = memo(function ExerciseRow({
 
   useEffect(() => {
     if (!done || reduceMotion) return;
-    pop.value = withSequence(
-      withTiming(1.18, { duration: Motion.duration.fast, easing: Easing.out(Easing.cubic) }),
-      withSpring(1, Motion.spring),
-    );
+    pop.value = withSequence(withTiming(1.3, { duration: 110 }), withSpring(1, Motion.bouncy));
   }, [done, reduceMotion, pop]);
-
-  const checkStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
+  const badgeStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
 
   const commit = (value: number) => {
     const v = Math.max(0, Math.round(value * 10) / 10);
@@ -86,86 +82,74 @@ export const ExerciseRow = memo(function ExerciseRow({
   const openForm = () =>
     Linking.openURL(`https://www.youtube.com/results?search_query=${encodeURIComponent(`${exercise.name} proper form`)}`);
 
-  const number = String(index + 1).padStart(2, '0');
-
   return (
-    <Animated.View
-      layout={reduceMotion ? undefined : LinearTransition.duration(Motion.duration.fast + 80)}
-      style={[styles.card, { backgroundColor: colors.surface, borderColor: expanded ? colors.water : colors.hairline }]}
-    >
-      <View style={styles.head}>
-        <AnimatedPressable
-          onPress={onToggleExpand}
-          haptic="selection"
-          pressScale={0.985}
-          style={styles.headMain}
-          accessibilityRole="button"
-          accessibilityState={{ expanded }}
-          accessibilityLabel={`${exercise.name}, ${prescription(exercise)}${done ? ', done' : ''}. ${expanded ? 'Collapse' : 'Expand'} details.`}
-        >
-          <Text style={[Type.badge, styles.index, { color: done ? colors.water : colors.textMid }]}>{number}</Text>
-          <View style={styles.titleCol}>
-            <Text
-              style={[styles.name, { color: done ? colors.textMid : colors.textHi }]}
-              numberOfLines={expanded ? 3 : 1}
-            >
-              {exercise.name}
-            </Text>
-            <Text style={[Type.subline, { color: colors.textMid }]} numberOfLines={1}>
-              {prescription(exercise)}
-              {exercise.tempo && !isCardio ? `  ·  tempo ${exercise.tempo}` : ''}
-              {weight ? `  ·  ${weight} ${unit}` : ''}
-            </Text>
-          </View>
-        </AnimatedPressable>
-
-        <AnimatedPressable
-          onPress={onToggleDone}
-          haptic={done ? 'light' : 'medium'}
-          style={styles.checkHit}
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: done }}
-          accessibilityLabel={done ? `Mark ${exercise.name} not done` : `Mark ${exercise.name} done`}
-        >
-          <Animated.View
-            style={[
-              styles.check,
-              checkStyle,
-              done
-                ? { backgroundColor: colors.water, borderColor: colors.water }
-                : { backgroundColor: 'transparent', borderColor: colors.hairline },
-            ]}
+    <Animated.View layout={reduceMotion ? undefined : LinearTransition.springify().damping(18)} style={styles.wrap}>
+      <Tile hue={done ? 'train' : null} style={styles.face}>
+        <View style={styles.head}>
+          <AnimatedPressable
+            onPress={onToggleExpand}
+            haptic="selection"
+            pressScale={0.98}
+            style={styles.headMain}
+            accessibilityRole="button"
+            accessibilityState={{ expanded }}
+            accessibilityLabel={`${exercise.name}, ${prescription(exercise)}${done ? ', done' : ''}. ${expanded ? 'Collapse' : 'Expand'} details.`}
           >
-            {done ? <Feather name="check" size={18} color={colors.onAccent} /> : null}
-          </Animated.View>
-        </AnimatedPressable>
-      </View>
-
-      {expanded && (
-        <Animated.View
-          entering={reduceMotion ? undefined : FadeIn.duration(Motion.duration.fast + 60)}
-          exiting={reduceMotion ? undefined : FadeOut.duration(Motion.duration.fast)}
-          style={styles.body}
-        >
-          {exercise.notes ? (
-            <View style={[styles.cue, { borderLeftColor: colors.water }]}>
-              <Text style={[Type.body, { color: colors.textMid }]}>{exercise.notes}</Text>
+            <Animated.View style={[styles.badge, { backgroundColor: done ? train.main : colors.surface2 }, badgeStyle]}>
+              {done ? (
+                <MaterialCommunityIcons name="check-bold" size={20} color={train.on} />
+              ) : (
+                <Text style={[Type.dotSmall, { color: colors.textHi }]}>{index + 1}</Text>
+              )}
+            </Animated.View>
+            <View style={styles.titleCol}>
+              <Text style={[styles.name, { color: colors.textHi }]} numberOfLines={expanded ? 3 : 2}>
+                {exercise.name}
+              </Text>
+              <View style={styles.chips}>
+                <Chip icon={isCardio ? 'timer-outline' : 'repeat'} label={prescription(exercise)} />
+                {weight ? <Chip icon="weight-kilogram" label={`${weight} ${unit}`} hue="train" /> : null}
+              </View>
             </View>
-          ) : null}
+          </AnimatedPressable>
 
-          <View style={styles.loadRow}>
-            <View style={styles.loadLabel}>
-              <Text style={[Type.bracketLabel, { color: colors.textMid }]}>{isCardio ? '[ TIME ]' : '[ LOAD ]'}</Text>
-              {lastWeight ? (
-                <Text style={[Type.subline, { color: colors.textMid }]}>
-                  last {lastWeight} {unit}
-                </Text>
-              ) : null}
-            </View>
+          <ChunkyButton
+            icon={done ? 'check-bold' : 'check'}
+            hue="train"
+            variant={done ? 'solid' : 'soft'}
+            size="md"
+            haptic={done ? 'light' : 'medium'}
+            onPress={onToggleDone}
+            accessibilityLabel={done ? `Mark ${exercise.name} not done` : `Mark ${exercise.name} done`}
+          />
+        </View>
 
-            <View style={styles.stepper}>
-              <StepButton icon="minus" colors={colors} onPress={() => commit((weight ?? lastWeight ?? 0) - step)} label={`Decrease by ${step}`} />
-              <View style={[styles.loadField, { borderColor: colors.hairline, backgroundColor: colors.bg }]}>
+        {expanded && (
+          <Animated.View
+            entering={reduceMotion ? undefined : FadeIn.duration(Motion.duration.fast + 60)}
+            exiting={reduceMotion ? undefined : FadeOut.duration(Motion.duration.fast)}
+            style={styles.body}
+          >
+            {exercise.notes ? (
+              <View style={[styles.cue, { backgroundColor: colors.surface2 }]}>
+                <MaterialCommunityIcons name="lightbulb-on" size={18} color={Hue.spend.main} />
+                <Text style={[Type.body, styles.flex, { color: colors.textMid }]}>{exercise.notes}</Text>
+              </View>
+            ) : null}
+
+            {exercise.tempo && !isCardio ? <Chip icon="metronome" label={`Tempo ${exercise.tempo}`} /> : null}
+
+            <View style={styles.loadRow}>
+              <ChunkyButton
+                icon="minus"
+                variant="soft"
+                hue="train"
+                size="md"
+                haptic="selection"
+                onPress={() => commit((weight ?? lastWeight ?? 0) - step)}
+                accessibilityLabel={`Decrease by ${step}`}
+              />
+              <View style={[styles.loadField, { backgroundColor: colors.bg }]}>
                 <TextInput
                   value={text}
                   onChangeText={(t) => {
@@ -176,112 +160,58 @@ export const ExerciseRow = memo(function ExerciseRow({
                   keyboardType="decimal-pad"
                   placeholder={lastWeight ? String(lastWeight) : '0'}
                   placeholderTextColor={colors.textLow}
-                  style={[styles.loadInput, { color: colors.textHi }]}
+                  style={[Type.dotNumber, styles.loadInput, { color: colors.textHi }]}
                   accessibilityLabel={`${isCardio ? 'Minutes' : 'Kilograms'} for ${exercise.name}`}
                   selectTextOnFocus
                 />
-                <Text style={[Type.subline, { color: colors.textMid }]}>{unit}</Text>
+                <Text style={[Type.controlLabel, { color: colors.textMid }]}>{unit}</Text>
               </View>
-              <StepButton icon="plus" colors={colors} onPress={() => commit((weight ?? lastWeight ?? 0) + step)} label={`Increase by ${step}`} />
+              <ChunkyButton
+                icon="plus"
+                variant="soft"
+                hue="train"
+                size="md"
+                haptic="selection"
+                onPress={() => commit((weight ?? lastWeight ?? 0) + step)}
+                accessibilityLabel={`Increase by ${step}`}
+              />
             </View>
-          </View>
+            {lastWeight ? (
+              <Text style={[Type.subline, styles.last, { color: colors.textMid }]}>
+                Last time: {lastWeight} {unit}
+              </Text>
+            ) : null}
 
-          <AnimatedPressable
-            onPress={openForm}
-            haptic="light"
-            pressOpacity={0.7}
-            style={styles.formLink}
-            accessibilityRole="link"
-            accessibilityLabel={`Watch form videos for ${exercise.name}`}
-          >
-            <Feather name="play-circle" size={15} color={colors.water} />
-            <Text style={[Type.controlLabel, { color: colors.water }]}>Watch form</Text>
-            <Feather name="arrow-up-right" size={14} color={colors.water} />
-          </AnimatedPressable>
-        </Animated.View>
-      )}
+            <ChunkyButton label="Watch form" icon="youtube" variant="soft" hue="train" size="sm" haptic="light" onPress={openForm} />
+          </Animated.View>
+        )}
+      </Tile>
     </Animated.View>
   );
 });
 
-function StepButton({
-  icon,
-  onPress,
-  colors,
-  label,
-}: {
-  icon: 'minus' | 'plus';
-  onPress: () => void;
-  colors: Palette;
-  label: string;
-}) {
-  return (
-    <AnimatedPressable
-      onPress={onPress}
-      haptic="selection"
-      style={[styles.step, { borderColor: colors.hairline }]}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-    >
-      <Feather name={icon} size={16} color={colors.textHi} />
-    </AnimatedPressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: Radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingLeft: Spacing.three,
-    paddingRight: Spacing.two,
-    paddingVertical: Spacing.two,
-    marginBottom: Spacing.two + 2,
-  },
-  head: { flexDirection: 'row', alignItems: 'center' },
-  headMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.three, paddingVertical: Spacing.two },
-  index: { width: 22, fontSize: 13 },
-  titleCol: { flex: 1, gap: 2 },
-  name: { fontFamily: FontFace.displayBold, fontSize: 17, lineHeight: 22, letterSpacing: -0.2 },
-  checkHit: { width: HitTarget + 8, height: HitTarget + 8, alignItems: 'center', justifyContent: 'center' },
-  check: {
-    width: 30,
-    height: 30,
-    borderRadius: Radius.pill,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  body: { paddingLeft: 22 + Spacing.three, paddingRight: Spacing.two, paddingBottom: Spacing.three, gap: Spacing.three },
-  cue: { borderLeftWidth: 2, paddingLeft: Spacing.three },
-  loadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
-  loadLabel: { gap: 2 },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  step: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  wrap: { marginBottom: 10 },
+  face: { paddingVertical: 12, paddingLeft: 12, paddingRight: 12 },
+  flex: { flex: 1 },
+  head: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  headMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  badge: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  titleCol: { flex: 1, gap: 6 },
+  name: { ...Type.title, fontSize: 17, lineHeight: 22 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  body: { paddingTop: Spacing.three, gap: 12 },
+  cue: { flexDirection: 'row', gap: 10, padding: 12, borderRadius: Radius.md, alignItems: 'flex-start' },
+  loadRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   loadField: {
+    flex: 1,
+    height: 51,
+    borderRadius: Radius.md,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.three,
-    height: 44,
-    minWidth: 92,
     justifyContent: 'center',
+    gap: 6,
   },
-  loadInput: {
-    ...Type.readout,
-    fontSize: 20,
-    minWidth: 36,
-    textAlign: 'right',
-    padding: 0,
-    includeFontPadding: false,
-  },
-  formLink: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, alignSelf: 'flex-start', paddingVertical: Spacing.one },
+  loadInput: { minWidth: 48, textAlign: 'center', padding: 0, includeFontPadding: false },
+  last: { textAlign: 'center', marginTop: -4 },
 });

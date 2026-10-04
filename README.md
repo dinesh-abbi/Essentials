@@ -1,8 +1,8 @@
 # Essentials
 
-A personal Android app for the daily basics — **hydration, training, food, spend, check-in and a barcode alarm** — with an AI coach that knows your day. Built with Expo SDK 56 / React Native 0.85, Firebase, and a deliberately quiet "technical, but kind" design.
+A personal Android app for the daily basics — **hydration, training, food, spend, check-in and a barcode alarm** — built to be read at a glance. Expo SDK 56 / React Native 0.85, Firebase, and the "Glance" design: one colour per area, rings and dot meters instead of paragraphs, chunky tappable tiles (Apple rings × One UI layout × Nothing dot-matrix).
 
-As of **v1.2.0** the separate **Catalyst** fitness app lives inside Essentials (Train, Fuel, Coach). The Catalyst repo is retired; see [`docs/CATALYST_MERGE.md`](docs/CATALYST_MERGE.md) for what moved where.
+As of **v1.2.0** the separate **Catalyst** fitness app lives inside Essentials (Train, Fuel). v1.3.0 removed the AI coach and redesigned every main screen. The Catalyst repo is retired; see [`docs/CATALYST_MERGE.md`](docs/CATALYST_MERGE.md) for what moved where.
 
 ---
 
@@ -10,14 +10,13 @@ As of **v1.2.0** the separate **Catalyst** fitness app lives inside Essentials (
 
 | Area | Where | What it does |
 |---|---|---|
-| **Home** | `src/app/(tabs)/index.tsx` | Hydration hero (animated vessel, hourly dots), Spend + Check-in cards, today's Training/Fuel progress, armed alarm |
-| **Train** | `src/app/(tabs)/train.tsx`, `src/app/train/*` | Today's session from the weekly split, load stepper with last-used weights, finish & log, streak, week plan, shift a day, AI split import, anatomy plates |
-| **Fuel** | `src/app/(tabs)/fuel.tsx` | 28-day meal plan as a cycle field, eaten / swapped / skipped logging, restock list (logs real Groceries purchases), AI meal scan |
-| **Coach** | `src/app/coach.tsx` | Gemini chat with today's context, per-model daily budget |
-| **Hydration** | `src/app/water/*` | Daily/weekly/monthly views, goal, celebration, home-screen widget |
-| **Spend** | `src/app/purchases/*`, `src/app/upi/*` | Expenses, reports, biometric gate, UPI QR pay |
-| **Check-in** | `src/app/attendance.tsx` | Camera check-in posted to your own Discord webhook |
-| **Barcode alarm** | `src/app/alarm/*` + `native-android/` | An alarm you can only stop by scanning a barcode across the room |
+| **Home** | `src/app/(tabs)/index.tsx` | Today's rings (water · meals · training), Drip the water mascot, bento tiles for Train / Fuel / Spend / Check-in, armed alarm |
+| **Train** | `src/app/(tabs)/train.tsx`, `src/app/train/*` | Today's session from the weekly split, load stepper with last-used weights, finish & log, streak, week plan, shift a day, anatomy plates |
+| **Fuel** | `src/app/(tabs)/fuel.tsx` | 28-day meal plan as a cycle field, eaten / swapped / skipped logging, restock list (logs real Groceries purchases) |
+| **Hydration** | `src/app/water/*` | Drip fills up as you drink; week bars vs goal line, month dot calendar, confetti on goal, home-screen widget |
+| **Spend** | `src/app/purchases/*`, `src/app/upi/*` | Expenses grouped by day with category pictures, week bars, month category donut, biometric gate, UPI QR pay |
+| **Check-in** | `src/app/attendance.tsx` | Full-screen camera with a live clock; photo posted to your Discord channel, saved offline if there’s no signal |
+| **Barcode alarm** | `src/app/alarm/*` + `native-android/` | Three-step setup checklist; a ringing screen you can only stop by scanning a barcode across the room |
 | **Profile** | `src/app/(tabs)/profile.tsx` | Services, sync status, body metrics, reminder switches, app lock |
 
 **Data is local-first.** Every change is saved on the phone instantly and pushed to Firestore in the background; reads come from the on-device cache and refresh quietly. Works offline; Profile shows how many changes are waiting to upload.
@@ -55,8 +54,6 @@ EXPO_PUBLIC_FIREBASE_APP_ID=
 EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=
 EXPO_PUBLIC_FIREBASE_GOOGLE_WEB_CLIENT_ID=
 
-# The coach (chat, meal scan, split import). Get a key at https://aistudio.google.com/apikey
-EXPO_PUBLIC_GEMINI_API_KEY=
 ```
 
 `EXPO_PUBLIC_*` values are inlined into the JS bundle at build time — rebuild after changing them. Discord webhooks are per-user and set in the app, never here.

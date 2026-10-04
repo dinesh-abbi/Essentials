@@ -1,14 +1,15 @@
-import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import { Colors, HitTarget, Radius, Spacing, Type } from '@/constants/theme';
+import { ChunkyButton } from '@/components/ui/chunky';
+import { Colors, Spacing, Type } from '@/constants/theme';
+
+const ICONS = { 'arrow-left': 'arrow-left', x: 'close', 'chevron-down': 'chevron-down' } as const;
 
 /**
- * Header for pushed (non-tab) screens: a hairline back circle, a bracket
- * label, and an optional trailing action. Deliberately no title bar fill —
- * the screen's own headline does that job below it.
+ * Header for pushed (non-tab) screens: a chunky round back button, a
+ * dot-matrix label, and optional actions on the right. The screen's own big
+ * title sits below it.
  */
 export function ScreenHeader({
   bracket,
@@ -16,15 +17,13 @@ export function ScreenHeader({
   icon = 'arrow-left',
   right,
 }: {
+  /** Short label; any legacy `[ … ]` brackets are stripped. */
   bracket: string;
   onBack?: () => void;
-  icon?: 'arrow-left' | 'x' | 'chevron-down';
+  icon?: keyof typeof ICONS;
   right?: React.ReactNode;
 }) {
   const router = useRouter();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = Colors[scheme];
-
   const back = () => {
     if (onBack) return onBack();
     if (router.canGoBack()) router.back();
@@ -33,64 +32,17 @@ export function ScreenHeader({
 
   return (
     <View style={styles.row}>
-      <AnimatedPressable
-        onPress={back}
-        haptic="light"
-        style={[styles.circle, { borderColor: colors.hairline, backgroundColor: colors.surface }]}
-        accessibilityRole="button"
-        accessibilityLabel="Back"
-      >
-        <Feather name={icon} size={19} color={colors.textHi} />
-      </AnimatedPressable>
-      <Text style={[Type.bracketLabel, styles.label, { color: colors.textMid }]} numberOfLines={1}>
-        {bracket}
+      <ChunkyButton icon={ICONS[icon]} variant="soft" hue="profile" size="md" haptic="light" onPress={back} accessibilityLabel="Back" textColor={Colors.dark.textHi} />
+      <Text style={[Type.dotLabel, styles.label, { color: Colors.dark.textMid }]} numberOfLines={1}>
+        {bracket.replace(/^\[\s*|\s*\]$/g, '')}
       </Text>
       <View style={styles.right}>{right}</View>
     </View>
   );
 }
 
-/** A secondary round icon button matching the header's back circle. */
-export function HeaderIconButton({
-  icon,
-  onPress,
-  accessibilityLabel,
-  disabled,
-}: {
-  icon: React.ComponentProps<typeof Feather>['name'];
-  onPress: () => void;
-  accessibilityLabel: string;
-  disabled?: boolean;
-}) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = Colors[scheme];
-  return (
-    <AnimatedPressable
-      onPress={onPress}
-      disabled={disabled}
-      haptic="light"
-      style={[
-        styles.circle,
-        { borderColor: colors.hairline, backgroundColor: colors.surface, opacity: disabled ? 0.4 : 1 },
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-    >
-      <Feather name={icon} size={18} color={colors.textHi} />
-    </AnimatedPressable>
-  );
-}
-
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, paddingVertical: Spacing.two },
-  circle: {
-    width: HitTarget,
-    height: HitTarget,
-    borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   label: { flex: 1 },
   right: { flexDirection: 'row', gap: Spacing.two },
 });

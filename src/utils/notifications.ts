@@ -111,7 +111,7 @@ export async function configureNotifications() {
       description: 'Training-day wake-ups, meal times and restock reminders',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 120, 80, 120],
-      lightColor: '#7FB8A4',
+      lightColor: '#38D3FF',
       sound: 'training_alert.wav',
     });
   }

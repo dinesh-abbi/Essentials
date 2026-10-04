@@ -1,1952 +1,416 @@
-import { Feather } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from 'expo-router';
-import { useEffect, useState, useCallback, useRef } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  useColorScheme,
-  Modal,
-  TextInput,
-  ScrollView,
-  useWindowDimensions,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Skeleton from '@/components/SkeletonLoader';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withRepeat,
-  useReducedMotion,
-  Easing,
-  FadeInDown,
-} from 'react-native-reanimated';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, FlatList, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Colors, FontFace, Radius, Spacing } from '@/constants/theme';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { AnimatedPressable } from '@/components/ui/animated-pressable';
+import AppLoader from '@/components/AppLoader';
+import Skeleton from '@/components/SkeletonLoader';
+import { categoryMeta } from '@/components/spend/categories';
+import { ExpenseRow, formatAmount } from '@/components/spend/ExpenseRow';
+import { ExpenseSheet, type ExpenseDraft } from '@/components/spend/ExpenseSheet';
+import { BarChart } from '@/components/ui/bar-chart';
+import { Chip, ChunkyButton, Tile } from '@/components/ui/chunky';
+import { Donut } from '@/components/ui/donut';
+import { ScreenHeader } from '@/components/ui/screen-header';
+import { Segmented } from '@/components/ui/segmented';
+import { StatGrid, StatTile } from '@/components/ui/stat-tile';
+import { Colors, FontFace, Hue, Radius, Spacing, Type } from '@/constants/theme';
 import * as PurchasesStorage from '@/utils/PurchasesStorage';
 import * as WidgetSync from '@/utils/WidgetSync';
-import * as LocalAuthentication from 'expo-local-authentication';
-import AppLoader from '@/components/AppLoader';
 
-// Expanded Categories List (20 categories)
-export const CATEGORIES = [
-  'Groceries', 'Dairy', 'Veggies', 'Snacks', 'Transport',
-  'Bills', 'Health', 'Food', 'Shopping', 'Misc',
-  'Rent', 'Entertainment', 'Education', 'Subscriptions',
-  'Travel', 'Clothing', 'Gadgets', 'Investments',
-  'Insurance', 'Income'
-];
-
+export { CATEGORIES } from '@/components/spend/categories';
 export type CategoryType = string;
 
-// Helper to get days in a month
-function getDaysInMonth(year: number, month: number) {
-  return new Date(year, month + 1, 0).getDate();
-}
+const C = Colors.dark;
+const S = Hue.spend;
+type Tab = 'daily' | 'weekly' | 'monthly';
+const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const DAY = 86_400_000;
 
-// Helper to get first day of month weekday index (0 = Sun, 6 = Sat)
-function getFirstDayOfMonth(year: number, month: number) {
-  return new Date(year, month, 1).getDay();
-}
+type Row = { kind: 'header'; key: string; label: string; total: number } | { kind: 'log'; key: string; log: PurchasesStorage.PurchaseLog };
 
-// ── Calendar Picker Component ──────────────────────────────────────────────
-function CalendarPicker({ visible, onClose, selectedDate, onSelectDate, colors }: any) {
-  const [navDate, setNavDate] = useState(new Date(selectedDate));
-
-  const year = navDate.getFullYear();
-  const month = navDate.getMonth();
-
-  const daysInMonth = getDaysInMonth(year, month);
-  const firstDayIndex = getFirstDayOfMonth(year, month);
-  const prevMonthDays = getDaysInMonth(year, month - 1);
-
-  // Generate days grid
-  const gridCells = [];
-
-  // Empty slots from previous month
-  for (let i = firstDayIndex - 1; i >= 0; i--) {
-    gridCells.push({
-      day: prevMonthDays - i,
-      month: month - 1,
-      year: month === 0 ? year - 1 : year,
-      isCurrentMonth: false,
-    });
-  }
-
-  // Days of current month
-  for (let i = 1; i <= daysInMonth; i++) {
-    gridCells.push({
-      day: i,
-      month: month,
-      year: year,
-      isCurrentMonth: true,
-    });
-  }
-
-  // Fill up the rest of the cells to complete grid row
-  const remaining = 42 - gridCells.length;
-  for (let i = 1; i <= remaining; i++) {
-    gridCells.push({
-      day: i,
-      month: month + 1,
-      year: month === 11 ? year + 1 : year,
-      isCurrentMonth: false,
-    });
-  }
-
-  const weekdays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.calendarCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-          {/* Header controls */}
-          <View style={styles.calHeader}>
-            <TouchableOpacity
-              onPress={() => setNavDate(new Date(year, month - 1, 1))}
-              style={styles.calNavBtn}
-            >
-              <Feather name="chevron-left" size={18} color={colors.text} />
-            </TouchableOpacity>
-
-            <Text style={[styles.calMonthText, { color: colors.text }]}>
-              {monthNames[month]} {year}
-            </Text>
-
-            <TouchableOpacity
-              onPress={() => setNavDate(new Date(year, month + 1, 1))}
-              style={styles.calNavBtn}
-            >
-              <Feather name="chevron-right" size={18} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Weekday headers */}
-          <View style={styles.calWeekdays}>
-            {weekdays.map((w, idx) => (
-              <Text key={idx} style={[styles.calWeekdayText, { color: colors.textSecondary }]}>
-                {w}
-              </Text>
-            ))}
-          </View>
-
-          {/* Days Grid */}
-          <View style={styles.calGrid}>
-            {gridCells.map((cell, idx) => {
-              const cellDateStr = new Date(cell.year, cell.month, cell.day).toDateString();
-              const isSelected = selectedDate.toDateString() === cellDateStr;
-              return (
-                <TouchableOpacity
-                  key={idx}
-                  onPress={() => {
-                    const d = new Date(cell.year, cell.month, cell.day);
-                    const now = new Date();
-                    d.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
-                    onSelectDate(d);
-                    onClose();
-                  }}
-                  style={[
-                    styles.calCell,
-                    isSelected && { backgroundColor: colors.primary },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.calCellText,
-                      { color: cell.isCurrentMonth ? colors.text : colors.textSecondary },
-                      isSelected && { color: '#FFF', fontFamily: FontFace.bold },
-                    ]}
-                  >
-                    {cell.day}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Close button */}
-          <TouchableOpacity
-            onPress={onClose}
-            style={[styles.calCloseBtn, { borderColor: colors.border }]}
-          >
-            <Text style={[styles.calCloseBtnText, { color: colors.text }]}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-// ── Custom Time Picker Component ─────────────────────────────────────────────
-function TimePicker({ visible, onClose, selectedDate, onSelectTime, colors }: any) {
-  const date = new Date(selectedDate);
-  let initialHours = date.getHours();
-  const ampm = initialHours >= 12 ? 'PM' : 'AM';
-  initialHours = initialHours % 12;
-  if (initialHours === 0) initialHours = 12;
-  const initialMinutes = date.getMinutes();
-
-  const [hours, setHours] = useState(initialHours);
-  const [minutes, setMinutes] = useState(initialMinutes);
-  const [period, setPeriod] = useState(ampm);
-
-  useEffect(() => {
-    if (visible) {
-      let h = selectedDate.getHours();
-      const p = h >= 12 ? 'PM' : 'AM';
-      h = h % 12;
-      if (h === 0) h = 12;
-      setHours(h);
-      setMinutes(selectedDate.getMinutes());
-      setPeriod(p);
-    }
-  }, [visible, selectedDate]);
-
-  const incrementHours = () => {
-    setHours((prev) => (prev === 12 ? 1 : prev + 1));
-  };
-
-  const decrementHours = () => {
-    setHours((prev) => (prev === 1 ? 12 : prev - 1));
-  };
-
-  const incrementMinutes = () => {
-    setMinutes((prev) => (prev >= 59 ? 0 : prev + 1));
-  };
-
-  const decrementMinutes = () => {
-    setMinutes((prev) => (prev <= 0 ? 59 : prev - 1));
-  };
-
-  const handleSave = () => {
-    const newDate = new Date(selectedDate);
-    let h = hours;
-    if (period === 'PM' && h < 12) h += 12;
-    if (period === 'AM' && h === 12) h = 0;
-    newDate.setHours(h, minutes, 0, 0);
-    onSelectTime(newDate);
-    onClose();
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.calendarCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border, padding: 20 }]}>
-          <Text style={[styles.calMonthText, { color: colors.text, marginBottom: 20, alignSelf: 'center' }]}>
-            Adjust Time
-          </Text>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15, marginBottom: 25 }}>
-            {/* Hours Adjuster */}
-            <View style={{ alignItems: 'center' }}>
-              <TouchableOpacity onPress={incrementHours} style={styles.timeNavBtn}>
-                <Feather name="chevron-up" size={24} color={colors.primary} />
-              </TouchableOpacity>
-              <Text style={{ fontSize: 32, fontFamily: FontFace.bold, color: colors.text, marginVertical: 8 }}>
-                {hours.toString().padStart(2, '0')}
-              </Text>
-              <TouchableOpacity onPress={decrementHours} style={styles.timeNavBtn}>
-                <Feather name="chevron-down" size={24} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={{ fontSize: 32, fontFamily: FontFace.bold, color: colors.textSecondary, alignSelf: 'center', marginTop: -6 }}>
-              :
-            </Text>
-
-            {/* Minutes Adjuster */}
-            <View style={{ alignItems: 'center' }}>
-              <TouchableOpacity onPress={incrementMinutes} style={styles.timeNavBtn}>
-                <Feather name="chevron-up" size={24} color={colors.primary} />
-              </TouchableOpacity>
-              <Text style={{ fontSize: 32, fontFamily: FontFace.bold, color: colors.text, marginVertical: 8 }}>
-                {minutes.toString().padStart(2, '0')}
-              </Text>
-              <TouchableOpacity onPress={decrementMinutes} style={styles.timeNavBtn}>
-                <Feather name="chevron-down" size={24} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* AM/PM Selector */}
-            <View style={{ gap: 8, marginLeft: 10 }}>
-              <TouchableOpacity
-                onPress={() => setPeriod('AM')}
-                style={[
-                  styles.ampmBtn,
-                  { borderColor: colors.border },
-                  period === 'AM' && { backgroundColor: colors.primary, borderColor: colors.primary }
-                ]}
-              >
-                <Text style={{ color: period === 'AM' ? '#FFF' : colors.text, fontSize: 12, fontFamily: FontFace.bold }}>AM</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setPeriod('PM')}
-                style={[
-                  styles.ampmBtn,
-                  { borderColor: colors.border },
-                  period === 'PM' && { backgroundColor: colors.primary, borderColor: colors.primary }
-                ]}
-              >
-                <Text style={{ color: period === 'PM' ? '#FFF' : colors.text, fontSize: 12, fontFamily: FontFace.bold }}>PM</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity
-              onPress={onClose}
-              style={[styles.calCloseBtn, { flex: 1, borderColor: colors.border }]}
-            >
-              <Text style={[styles.calCloseBtnText, { color: colors.text }]}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleSave}
-              style={[styles.calCloseBtn, { flex: 1, backgroundColor: colors.primary, borderColor: colors.primary }]}
-            >
-              <Text style={[styles.calCloseBtnText, { color: '#FFF' }]}>Apply</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-// ── Edit Expense Modal Component ─────────────────────────────────────────────
-function EditExpenseModal({ visible, onClose, log, onSave, onDelete, colors, isSaving }: any) {
-  if (!log) return null;
-
-  const [editName, setEditName] = useState(log.name);
-  const [editCost, setEditCost] = useState(log.cost.toString());
-  const [editCategory, setEditCategory] = useState(log.category);
-  const [editDate, setEditDate] = useState(new Date(log.timestamp));
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
-
-  // Sync state if modal log changes
-  useEffect(() => {
-    if (log) {
-      setEditName(log.name);
-      setEditCost(log.cost.toString());
-      setEditCategory(log.category);
-      setEditDate(new Date(log.timestamp));
-    }
-  }, [log]);
-
-  const handleSave = () => {
-    if (!editName.trim()) {
-      Alert.alert('Validation Error', 'Please enter an item name.');
-      return;
-    }
-    const price = parseFloat(editCost);
-    if (isNaN(price) || price <= 0) {
-      Alert.alert('Validation Error', 'Please enter a valid cost amount.');
-      return;
-    }
-    onSave(log.id, {
-      name: editName.trim(),
-      cost: price,
-      category: editCategory,
-      timestamp: editDate.getTime(),
-    });
-    onClose();
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.editCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-          <Text style={[styles.editTitle, { color: colors.text }]}>Edit Expense</Text>
-
-          <TextInput
-            style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-            placeholder="Item name"
-            placeholderTextColor={colors.textSecondary}
-            value={editName}
-            onChangeText={setEditName}
-          />
-
-          <View style={[styles.costInputWrap, { borderColor: colors.border, backgroundColor: colors.background }]}>
-            <Text style={[styles.currencyPrefix, { color: colors.primary }]}>₹</Text>
-            <TextInput
-              style={[styles.costInputSpacious, { color: colors.text }]}
-              placeholder="0.00"
-              placeholderTextColor={colors.textSecondary}
-              value={editCost}
-              onChangeText={setEditCost}
-              keyboardType="decimal-pad"
-            />
-          </View>
-
-          <View style={styles.dateTimeRow}>
-            <TouchableOpacity
-              onPress={() => setShowDatePicker(true)}
-              style={[styles.datePickerBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
-            >
-              <Feather name="calendar" size={14} color={colors.primary} />
-              <Text style={{ color: colors.text, fontSize: 12, fontFamily: FontFace.semibold }} numberOfLines={1}>
-                {editDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setShowTimePicker(true)}
-              style={[styles.datePickerBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
-            >
-              <Feather name="clock" size={14} color={colors.primary} />
-              <Text style={{ color: colors.text, fontSize: 12, fontFamily: FontFace.semibold }} numberOfLines={1}>
-                {editDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Category Selector */}
-          <Text style={{ fontSize: 10, fontFamily: FontFace.bold, color: colors.textSecondary, marginTop: 4 }}>
-            CATEGORY
-          </Text>
-          <View style={styles.categoryWrapGrid}>
-            {CATEGORIES.map((cat) => {
-              const selected = editCategory === cat;
-              return (
-                <TouchableOpacity
-                  key={cat}
-                  onPress={() => setEditCategory(cat)}
-                  style={[
-                    styles.catBtn,
-                    {
-                      borderColor: selected ? colors.primary : colors.border,
-                      backgroundColor: selected ? colors.primary : 'transparent',
-                    },
-                  ]}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.catBtnText,
-                      { color: selected ? '#FFF' : colors.text, fontFamily: selected ? FontFace.bold : FontFace.semibold },
-                    ]}
-                  >
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <View style={styles.editActions}>
-            <TouchableOpacity
-              onPress={onClose}
-              style={[styles.actionBtn, { borderColor: colors.border }]}
-            >
-              <Text style={{ color: colors.text, fontFamily: FontFace.bold }}>Cancel</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => {
-                Alert.alert('Delete Log', 'Delete this purchase log?', [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: () => {
-                      onDelete(log.id);
-                      onClose();
-                    },
-                  },
-                ]);
-              }}
-              style={[styles.actionBtn, { borderColor: colors.alert }]}
-            >
-              <Text style={{ color: colors.alert, fontFamily: FontFace.bold }}>Delete</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handleSave}
-              disabled={isSaving}
-              style={[styles.actionBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
-            >
-              {isSaving ? (
-                <ActivityIndicator size="small" color="#FFF" />
-              ) : (
-                <Text style={{ color: '#FFF', fontFamily: FontFace.bold }}>Save</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-
-      <CalendarPicker
-        visible={showDatePicker}
-        onClose={() => setShowDatePicker(false)}
-        selectedDate={editDate}
-        onSelectDate={setEditDate}
-        colors={colors}
-      />
-
-      <TimePicker
-        visible={showTimePicker}
-        onClose={() => setShowTimePicker(false)}
-        selectedDate={editDate}
-        onSelectTime={setEditDate}
-        colors={colors}
-      />
-    </Modal>
-  );
-}
-
-// ── Weekly Chart Animated Bar ───────────────────────────────────────────────
-function WeeklySpendBar({
-  dayName,
-  amount,
-  maxAmount,
-  colors,
-  isSelected,
-  onPress,
-}: {
-  dayName: string;
-  amount: number;
-  maxAmount: number;
-  colors: any;
-  isSelected: boolean;
-  onPress: () => void;
-}) {
-  const heightPercent = maxAmount > 0 ? Math.min(amount / maxAmount, 1.2) : 0;
-  const heightVal = useSharedValue(0);
-
-  useEffect(() => {
-    heightVal.value = withTiming(heightPercent * 130, { duration: 1000 });
-  }, [amount, maxAmount]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    height: heightVal.value,
-  }));
-
-  const getBarColor = () => {
-    if (amount > 0) return colors.primary;
-    return colors.border;
-  };
-
-  return (
-    <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={styles.barCol}>
-      <Text style={[styles.barValText, { color: isSelected ? colors.primary : colors.textSecondary, fontFamily: FontFace.bold }]}>
-        {amount > 0 ? `₹${amount.toFixed(0)}` : '0'}
-      </Text>
-      <View style={[styles.barTrack, { backgroundColor: colors.backgroundSelected, borderColor: isSelected ? colors.primary : 'transparent', borderWidth: isSelected ? 1.5 : 0 }]}>
-        <Animated.View
-          style={[
-            styles.barFill,
-            animatedStyle,
-            { backgroundColor: getBarColor() },
-          ]}
-        />
-      </View>
-      <Text style={[styles.barLabel, { color: isSelected ? colors.primary : colors.text, fontFamily: FontFace.bold }]}>
-        {dayName}
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
-// ── Monthly Category Bar Component ───────────────────────────────────────────
-function CategoryBar({ category, amount, percentage, color, textColor }: any) {
-  const progressWidth = useSharedValue(0);
-
-  useEffect(() => {
-    progressWidth.value = withTiming(percentage, { duration: 1000 });
-  }, [percentage]);
-
-  const progressStyle = useAnimatedStyle(() => ({
-    width: `${progressWidth.value}%`,
-  }));
-
-  return (
-    <View style={styles.catRow}>
-      <View style={styles.catInfo}>
-        <Text style={[styles.catName, { color: textColor }]}>
-          {category}
-        </Text>
-        <Text style={[styles.catAmount, { color: textColor }]}>
-          ₹{amount.toFixed(2)} ({percentage.toFixed(0)}%)
-        </Text>
-      </View>
-      <View style={[styles.progressBarTrack, { backgroundColor: 'rgba(120,132,148,0.15)' }]}>
-        <Animated.View
-          style={[
-            styles.progressBarFill,
-            progressStyle,
-            { backgroundColor: color },
-          ]}
-        />
-      </View>
-    </View>
-  );
-}
-
-// ── Navigation Tabs ──────────────────────────────────────────────────────────
-export function PurchasesTabs({ activeTab, onTabPress }: { activeTab: 'daily' | 'weekly' | 'monthly'; onTabPress: (tab: 'daily' | 'weekly' | 'monthly') => void }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = Colors[scheme];
-
-  return (
-    <View style={[styles.tabsWrapper, { backgroundColor: colors.backgroundSelected }]}>
-      <TouchableOpacity
-        onPress={() => onTabPress('daily')}
-        style={[styles.tabBtn, activeTab === 'daily' && [styles.tabActiveBtn, { backgroundColor: colors.backgroundElement }]]}
-      >
-        <Text style={[styles.tabText, { color: activeTab === 'daily' ? colors.text : colors.textSecondary }]}>Daily</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => onTabPress('weekly')}
-        style={[styles.tabBtn, activeTab === 'weekly' && [styles.tabActiveBtn, { backgroundColor: colors.backgroundElement }]]}
-      >
-        <Text style={[styles.tabText, { color: activeTab === 'weekly' ? colors.text : colors.textSecondary }]}>Weekly</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => onTabPress('monthly')}
-        style={[styles.tabBtn, activeTab === 'monthly' && [styles.tabActiveBtn, { backgroundColor: colors.backgroundElement }]]}
-      >
-        <Text style={[styles.tabText, { color: activeTab === 'monthly' ? colors.text : colors.textSecondary }]}>Monthly</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-// ── Spend Tracker Screen ─────────────────────────────────────────────────────
+/**
+ * Spend — Day / Week / Month. Day: today's total big, one button to add, and
+ * every expense grouped by day with its category picture. Week: bars per day.
+ * Month: a category donut and the top categories as coloured bars.
+ */
 function SpendTrackerContent() {
   const router = useRouter();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = Colors[scheme];
+  const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
-  const scrollViewRef = useRef<ScrollView>(null);
+  const pager = useRef<ScrollView>(null);
+  const [tab, setTab] = useState<Tab>('daily');
 
-  const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly'>('daily');
-
-  // Shared pulse animation for loading states
-  const reduceMotion = useReducedMotion();
-  const pulseVal = useSharedValue(0.35);
-  useEffect(() => {
-    if (reduceMotion) {
-      pulseVal.value = 0.6;
-      return;
-    }
-    pulseVal.value = withRepeat(
-      withTiming(0.8, { duration: 1000, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }),
-      -1,
-      true
-    );
-  }, [reduceMotion]);
-
-  const skeletonPulseStyle = useAnimatedStyle(() => ({
-    opacity: pulseVal.value,
-  }));
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // ── DAILY TAB STATES & LOGIC ───────────────────────────────────────────────
-  // ───────────────────────────────────────────────────────────────────────────
   const [logs, setLogs] = useState<PurchasesStorage.PurchaseLog[]>([]);
-  const [loadingDaily, setLoadingDaily] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [sheet, setSheet] = useState<{ open: boolean; log: PurchasesStorage.PurchaseLog | null }>({ open: false, log: null });
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [month, setMonth] = useState(() => new Date());
+  // Frozen at mount so render stays pure; the screen is short-lived.
+  const [openedAt] = useState(() => Date.now());
 
-  // Form Fields
-  const [name, setName] = useState('');
-  const [cost, setCost] = useState('');
-  const [category, setCategory] = useState<CategoryType>('Groceries');
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  useEffect(() => {
+    (async () => {
+      try {
+        setLogs((await PurchasesStorage.getPurchases()).sort((a, b) => b.timestamp - a.timestamp));
+      } catch (e) {
+        console.warn('Failed to load purchases', e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
-
-  // Edit Expense modal states
-  const [editingLog, setEditingLog] = useState<PurchasesStorage.PurchaseLog | null>(null);
-  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-
-  const loadDailyLogs = async () => {
-    setLoadingDaily(true);
+  // ── Mutations ────────────────────────────────────────────────────────────
+  const save = async (d: ExpenseDraft) => {
+    setSaving(true);
     try {
-      const data = await PurchasesStorage.getPurchases();
-      // sort desc by timestamp
-      setLogs(data.sort((a, b) => b.timestamp - a.timestamp));
-    } catch (e) {
-      console.warn('Failed to load purchases', e);
-    } finally {
-      setLoadingDaily(false);
-    }
-  };
-
-  const handleAddPurchase = async () => {
-    if (!name.trim()) {
-      Alert.alert('Validation Error', 'Please enter an item name.');
-      return;
-    }
-    const costVal = parseFloat(cost);
-    if (isNaN(costVal) || costVal <= 0) {
-      Alert.alert('Validation Error', 'Please enter a valid price/cost.');
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const newLog = await PurchasesStorage.savePurchase(
-        name.trim(),
-        costVal,
-        category,
-        selectedDate.getTime()
-      );
-      setLogs((prev) => [newLog, ...prev]);
-
-      // Reset form
-      setName('');
-      setCost('');
-      setSelectedDate(new Date());
+      if (sheet.log) {
+        await PurchasesStorage.updatePurchase(sheet.log.id, d);
+        const id = sheet.log.id;
+        setLogs((prev) => prev.map((l) => (l.id === id ? { ...l, ...d } : l)).sort((a, b) => b.timestamp - a.timestamp));
+      } else {
+        const created = await PurchasesStorage.savePurchase(d.name, d.cost, d.category, d.timestamp);
+        setLogs((prev) => [created, ...prev].sort((a, b) => b.timestamp - a.timestamp));
+      }
       WidgetSync.sync();
-    } catch (e) {
-      Alert.alert('Error', 'Failed to save purchase.');
+      setSheet({ open: false, log: null });
+    } catch {
+      Alert.alert('Error', 'Failed to save that expense.');
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   };
 
-  const handleEditSave = async (id: string, updates: Partial<Omit<PurchasesStorage.PurchaseLog, 'id'>>) => {
-    setIsSaving(true);
+  const remove = async (id: string) => {
     try {
-      await PurchasesStorage.updatePurchase(id, updates);
-      setLogs((prev) =>
-        prev.map((log) => (log.id === id ? { ...log, ...updates } : log))
-      );
+      await PurchasesStorage.deletePurchase(id);
+      setLogs((prev) => prev.filter((l) => l.id !== id));
       WidgetSync.sync();
-    } catch (e) {
-      Alert.alert('Error', 'Failed to update entry.');
-    } finally {
-      setIsSaving(false);
+    } catch {
+      Alert.alert('Error', 'Failed to delete it.');
     }
   };
 
-  const handleDelete = async (id: string) => {
-    Alert.alert('Delete Entry', 'Are you sure you want to delete this purchase?', [
+  const wipeAll = () =>
+    Alert.alert('Erase all expenses?', 'This removes your whole spend history on every device.', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Delete',
+        text: 'Erase all',
         style: 'destructive',
         onPress: async () => {
-          setIsSaving(true);
-          try {
-            await PurchasesStorage.deletePurchase(id);
-            setLogs((prev) => prev.filter((log) => log.id !== id));
-            WidgetSync.sync();
-          } catch (e) {
-            Alert.alert('Error', 'Failed to delete purchase.');
-          } finally {
-            setIsSaving(false);
-          }
-        },
-      },
-    ]);
-  };
-
-  const handleClearAll = async () => {
-    Alert.alert('Clear All Data', 'Are you sure you want to erase all purchases history?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Wipe Memory',
-        style: 'destructive',
-        onPress: async () => {
-          setIsSaving(true);
           try {
             await PurchasesStorage.clearPurchases();
             setLogs([]);
             WidgetSync.sync();
-          } catch (e) {
+          } catch {
             Alert.alert('Error', 'Failed to clear data.');
-          } finally {
-            setIsSaving(false);
           }
         },
       },
     ]);
-  };
 
+  // ── Day ──────────────────────────────────────────────────────────────────
   const midnight = new Date();
   midnight.setHours(0, 0, 0, 0);
-  const todayLogs = logs.filter((log) => log.timestamp >= midnight.getTime());
-  const todayTotal = todayLogs.reduce((acc, curr) => acc + curr.cost, 0);
-  const allTimeTotal = logs.reduce((acc, curr) => acc + curr.cost, 0);
+  const todayLogs = logs.filter((l) => l.timestamp >= midnight.getTime());
+  const todayTotal = todayLogs.reduce((s, l) => s + l.cost, 0);
+  const allTime = logs.reduce((s, l) => s + l.cost, 0);
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // ── WEEKLY TAB STATES & LOGIC ──────────────────────────────────────────────
-  // ───────────────────────────────────────────────────────────────────────────
-  const [loadingWeekly, setLoadingWeekly] = useState(true);
-  const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, -1 = last week, etc.
-  const [weeklySpends, setWeeklySpends] = useState<{ dayName: string; date: Date; amount: number }[]>([]);
-  const [weeklyRawLogs, setWeeklyRawLogs] = useState<PurchasesStorage.PurchaseLog[]>([]);
-  const [selectedWeeklyDay, setSelectedWeeklyDay] = useState<{ dayName: string; date: Date; amount: number } | null>(null);
-  const [selectedWeeklyLogs, setSelectedWeeklyLogs] = useState<PurchasesStorage.PurchaseLog[]>([]);
-
-  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-  const refreshWeeklyData = async () => {
-    setLoadingWeekly(true);
-    try {
-      const refDateMs = Date.now() + weekOffset * 7 * 24 * 60 * 60 * 1000;
-      const now = new Date(refDateMs);
-      const dayOfWeek = now.getDay();
-      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-      const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
-      monday.setHours(0, 0, 0, 0);
-
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      sunday.setHours(23, 59, 59, 999);
-
-      // Filter from master logs list
-      const rawLogs = logs.filter(
-        (log: PurchasesStorage.PurchaseLog) => log.timestamp >= monday.getTime() && log.timestamp <= sunday.getTime()
-      );
-      setWeeklyRawLogs(rawLogs);
-
-      // Accumulate daily totals
-      const dailyTotals = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(monday);
-        d.setDate(monday.getDate() + i);
-        const dayStart = d.getTime();
-        const dayEnd = dayStart + 86400000 - 1;
-        const total = rawLogs
-          .filter((log: PurchasesStorage.PurchaseLog) => log.timestamp >= dayStart && log.timestamp <= dayEnd)
-          .reduce((acc: number, l: PurchasesStorage.PurchaseLog) => acc + l.cost, 0);
-
-        return {
-          dayName: weekdays[i],
-          date: d,
-          amount: total,
-        };
-      });
-      setWeeklySpends(dailyTotals);
-
-      // Default selected day to Monday or the active selection
-      if (dailyTotals.length > 0) {
-        setSelectedWeeklyDay(dailyTotals[0]);
-        const dayStart = dailyTotals[0].date.getTime();
-        const dayEnd = dayStart + 86400000 - 1;
-        const filtered = rawLogs.filter((l: PurchasesStorage.PurchaseLog) => l.timestamp >= dayStart && l.timestamp <= dayEnd);
-        setSelectedWeeklyLogs(filtered.sort((a: PurchasesStorage.PurchaseLog, b: PurchasesStorage.PurchaseLog) => b.timestamp - a.timestamp));
-      } else {
-        setSelectedWeeklyDay(null);
-        setSelectedWeeklyLogs([]);
+  const rows = useMemo<Row[]>(() => {
+    const out: Row[] = [];
+    let current = '';
+    let header: Extract<Row, { kind: 'header' }> | null = null;
+    for (const l of logs) {
+      const key = new Date(l.timestamp).toDateString();
+      if (key !== current) {
+        current = key;
+        header = { kind: 'header', key: `h-${key}`, label: dayLabel(new Date(l.timestamp)), total: 0 };
+        out.push(header);
       }
-    } catch (e) {
-      console.warn('Failed to load weekly spend data:', e);
-    } finally {
-      setLoadingWeekly(false);
+      header!.total += l.cost;
+      out.push({ kind: 'log', key: l.id, log: l });
     }
+    return out;
+  }, [logs]);
+
+  // ── Week ─────────────────────────────────────────────────────────────────
+  const ref = new Date(openedAt + weekOffset * 7 * DAY);
+  const monday = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() - ((ref.getDay() + 6) % 7));
+  const week = Array.from({ length: 7 }, (_, i) => {
+    const start = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i).getTime();
+    const amount = logs.filter((l) => l.timestamp >= start && l.timestamp < start + DAY).reduce((s, l) => s + l.cost, 0);
+    return { date: new Date(start), amount };
+  });
+  const weekTotal = week.reduce((s, d) => s + d.amount, 0);
+  const weekMax = Math.max(0, ...week.map((d) => d.amount));
+  const weekCount = logs.filter((l) => l.timestamp >= monday.getTime() && l.timestamp < monday.getTime() + 7 * DAY).length;
+  const todayKey = new Date().toDateString();
+
+  // ── Month ────────────────────────────────────────────────────────────────
+  const y = month.getFullYear();
+  const m = month.getMonth();
+  const monthLogs = logs.filter((l) => {
+    const d = new Date(l.timestamp);
+    return d.getFullYear() === y && d.getMonth() === m;
+  });
+  const monthTotal = monthLogs.reduce((s, l) => s + l.cost, 0);
+  const byCat = Object.entries(
+    monthLogs.reduce<Record<string, number>>((acc, l) => ((acc[l.category] = (acc[l.category] ?? 0) + l.cost), acc), {}),
+  ).sort((a, b) => b[1] - a[1]);
+
+  const goTab = (t: Tab) => {
+    setTab(t);
+    pager.current?.scrollTo({ x: ['daily', 'weekly', 'monthly'].indexOf(t) * windowWidth, animated: true });
   };
-
-  const handleSelectWeeklyDay = (day: { dayName: string; date: Date; amount: number }) => {
-    router.push({
-      pathname: '/purchases/report' as any,
-      params: { dateMs: day.date.getTime().toString() }
-    });
-  };
-
-  // Weekly calculations
-  const weeklyTotal = weeklySpends.reduce((acc: number, curr: { amount: number }) => acc + curr.amount, 0);
-  const weeklyAvg = weeklyTotal / 7;
-  const weeklyMax = weeklySpends.reduce((acc: number, curr: { amount: number }) => (curr.amount > acc ? curr.amount : acc), 0);
-  const getWeeklySubtitleRange = () => {
-    if (weeklySpends.length < 7) return 'Loading...';
-    const firstDate = weeklySpends[0].date;
-    const lastDate = weeklySpends[6].date;
-    return `${firstDate.toLocaleDateString([], { day: 'numeric', month: 'short' })} — ${lastDate.toLocaleDateString([], { day: 'numeric', month: 'short' })}`;
-  };
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // ── MONTHLY TAB STATES & LOGIC ─────────────────────────────────────────────
-  // ───────────────────────────────────────────────────────────────────────────
-  const [loadingMonthly, setLoadingMonthly] = useState(true);
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [monthlyTotal, setMonthlyTotal] = useState(0);
-  const [monthlyLogs, setMonthlyLogs] = useState<PurchasesStorage.PurchaseLog[]>([]);
-  const [categoryAllocation, setCategoryAllocation] = useState<{ category: string; amount: number; percentage: number; color: string }[]>([]);
-
-  const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth();
-  const monthName = currentDate.toLocaleString('default', { month: 'long' });
-
-  const refreshMonthlyData = async () => {
-    setLoadingMonthly(true);
-    try {
-      const startOfMonth = new Date(currentYear, currentMonth, 1);
-      const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999);
-
-      // Filter from master logs list
-      const rawLogs = logs.filter(
-        (log: PurchasesStorage.PurchaseLog) => log.timestamp >= startOfMonth.getTime() && log.timestamp <= endOfMonth.getTime()
-      );
-      setMonthlyLogs(rawLogs);
-
-      const total = rawLogs.reduce((acc: number, curr: PurchasesStorage.PurchaseLog) => acc + curr.cost, 0);
-      setMonthlyTotal(total);
-
-      // Group categories
-      const catMap: Record<string, number> = {};
-      rawLogs.forEach((l: PurchasesStorage.PurchaseLog) => {
-        catMap[l.category] = (catMap[l.category] || 0) + l.cost;
-      });
-
-      const catColors = [
-        '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
-        '#EC4899', '#06B6D4', '#F97316', '#14B8A6', '#64748B'
-      ];
-
-      const allocation = Object.entries(catMap)
-        .map(([cat, amt]: [string, number], idx: number) => ({
-          category: cat,
-          amount: amt,
-          percentage: total > 0 ? (amt / total) * 100 : 0,
-          color: catColors[idx % catColors.length],
-        }))
-        .sort((a: any, b: any) => b.amount - a.amount);
-
-      setCategoryAllocation(allocation);
-    } catch (e) {
-      console.warn('Failed to load monthly purchases:', e);
-    } finally {
-      setLoadingMonthly(false);
-    }
-  };
-
-  // Monthly stats calculations
-  const monthlyTransactions = monthlyLogs.length;
-  const monthlyAvgPerSpend = monthlyTransactions > 0 ? monthlyTotal / monthlyTransactions : 0;
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // ── CENTRAL DISPATCH & TAB BINDING ─────────────────────────────────────────
-  // ───────────────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    loadDailyLogs();
-  }, []);
-
-  useEffect(() => {
-    refreshWeeklyData();
-  }, [weekOffset]);
-
-  useEffect(() => {
-    refreshMonthlyData();
-  }, [currentDate]);
-
-  const handleTabPress = (tab: 'daily' | 'weekly' | 'monthly') => {
-    setActiveTab(tab);
-    let index = 0;
-    if (tab === 'weekly') index = 1;
-    if (tab === 'monthly') index = 2;
-    scrollViewRef.current?.scrollTo({ x: index * windowWidth, animated: true });
-  };
+  const pageBottom = { paddingBottom: insets.bottom + Spacing.six };
 
   return (
-    <ThemedView style={styles.root}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        {/* Top Header */}
-        <View style={styles.header}>
-          <AnimatedPressable
-            onPress={() => router.back()}
-            style={[styles.backBtn, { borderColor: colors.border }]}
-          >
-            <Feather name="arrow-left" size={20} color={colors.text} />
-          </AnimatedPressable>
-          <ThemedText type="smallBold" style={styles.headerTitle} themeColor="textSecondary">
-            SPEND TRACKER
-          </ThemedText>
-          {logs.length > 0 ? (
-            <AnimatedPressable
-              onPress={handleClearAll}
-              style={[styles.clearBtn, { borderColor: colors.alert }]}
-            >
-              <ThemedText type="code" style={{ color: colors.alert, fontSize: 10, fontFamily: FontFace.bold }}>
-                WIPE_ALL
-              </ThemedText>
-            </AnimatedPressable>
-          ) : (
-            <View style={{ width: 60 }} />
-          )}
+    <View style={[styles.root, { backgroundColor: C.bg }]}>
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.pad}>
+          <ScreenHeader
+            bracket="Spend"
+            right={
+              <ChunkyButton icon="qrcode-scan" variant="soft" hue="spend" size="md" haptic="light" onPress={() => router.push('/upi/scanner' as any)} accessibilityLabel="Scan a UPI QR to pay" />
+            }
+          />
+          <Segmented
+            hue="spend"
+            value={tab}
+            onChange={goTab}
+            options={[
+              { value: 'daily', label: 'Day' },
+              { value: 'weekly', label: 'Week' },
+              { value: 'monthly', label: 'Month' },
+            ]}
+          />
         </View>
 
-        {/* Swipeable Tabs Bar */}
-        <PurchasesTabs activeTab={activeTab} onTabPress={handleTabPress} />
-
-        <Animated.ScrollView
-          ref={scrollViewRef}
+        <ScrollView
+          ref={pager}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={(e) => {
-            const offsetX = e.nativeEvent.contentOffset.x;
-            const index = Math.round(offsetX / windowWidth);
-            if (index === 0) setActiveTab('daily');
-            else if (index === 1) setActiveTab('weekly');
-            else if (index === 2) setActiveTab('monthly');
-          }}
+          onMomentumScrollEnd={(e) => setTab((['daily', 'weekly', 'monthly'] as Tab[])[Math.round(e.nativeEvent.contentOffset.x / windowWidth)] ?? 'daily')}
         >
-          {/* ============================================== */}
-          {/* ================ 1. DAILY PANEL ============== */}
-          {/* ============================================== */}
+          {/* ── Day ───────────────────────────────────────────────────── */}
           <View style={{ width: windowWidth }}>
             <FlatList
-              data={loadingDaily ? [] : logs}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.scrollContent}
+              data={loading ? [] : rows}
+              keyExtractor={(r) => r.key}
+              contentContainerStyle={[styles.page, pageBottom]}
               showsVerticalScrollIndicator={false}
               ListHeaderComponent={
-                <View style={{ gap: Spacing.four, marginBottom: Spacing.two }}>
-                  {/* Daily Total Summary Card */}
-                  <View style={[styles.totalBar, { borderColor: colors.border, backgroundColor: colors.backgroundElement }]}>
-                    <View>
-                      <ThemedText type="code" style={{ fontSize: 10, fontFamily: FontFace.bold }} themeColor="textSecondary">
-                        TODAY'S SPEND
-                      </ThemedText>
-                      <ThemedText type="subtitle" style={[styles.totalCost, { color: colors.primary }]}>
-                        ₹{todayTotal.toFixed(2)}
-                      </ThemedText>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <ThemedText type="code" style={{ fontSize: 10, fontFamily: FontFace.bold }} themeColor="textSecondary">
-                        ALL-TIME SPEND
-                      </ThemedText>
-                      <ThemedText type="subtitle" style={[styles.totalCost, { color: colors.text }]}>
-                        ₹{allTimeTotal.toFixed(2)}
-                      </ThemedText>
-                    </View>
-                  </View>
-
-                  {/* Input Form Panel */}
-                  <View style={[styles.formPanel, { borderColor: colors.border, backgroundColor: colors.backgroundElement }]}>
-                    <ThemedText type="code" style={{ fontSize: 10, fontFamily: FontFace.bold, marginBottom: Spacing.one }} themeColor="textSecondary">
-                      RECORD EXPENSE
-                    </ThemedText>
-
-                    <TextInput
-                      style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                      placeholder="Item name (e.g. Eggs, Coffee, Bills...)"
-                      placeholderTextColor={colors.textSecondary}
-                      value={name}
-                      onChangeText={setName}
-                      autoCorrect={false}
-                    />
-
-                    <View style={[styles.costInputWrap, { borderColor: colors.border, backgroundColor: colors.background }]}>
-                      <Text style={[styles.currencyPrefix, { color: colors.primary }]}>₹</Text>
-                      <TextInput
-                        style={[styles.costInputSpacious, { color: colors.text }]}
-                        placeholder="0.00"
-                        placeholderTextColor={colors.textSecondary}
-                        value={cost}
-                        onChangeText={setCost}
-                        keyboardType="decimal-pad"
-                        autoCorrect={false}
-                      />
-                    </View>
-
-                    <View style={styles.dateTimeRow}>
-                      <TouchableOpacity
-                        onPress={() => setShowDatePicker(true)}
-                        style={[styles.datePickerBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
-                      >
-                        <Feather name="calendar" size={14} color={colors.primary} />
-                        <Text style={{ color: colors.text, fontSize: 12, fontFamily: FontFace.semibold }} numberOfLines={1}>
-                          {selectedDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={() => setShowTimePicker(true)}
-                        style={[styles.datePickerBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
-                      >
-                        <Feather name="clock" size={14} color={colors.primary} />
-                        <Text style={{ color: colors.text, fontSize: 12, fontFamily: FontFace.semibold }} numberOfLines={1}>
-                          {selectedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Category Toggles (Wrap grid with zero gesture collision) */}
-                    <ThemedText type="code" style={{ fontSize: 10, fontFamily: FontFace.bold, marginTop: 4 }} themeColor="textSecondary">
-                      CATEGORY
-                    </ThemedText>
-                    <View style={styles.categoryWrapGrid}>
-                      {CATEGORIES.map((cat) => {
-                        const selected = category === cat;
-                        return (
-                          <TouchableOpacity
-                            key={cat}
-                            onPress={() => setCategory(cat)}
-                            style={[
-                              styles.catBtn,
-                              {
-                                borderColor: selected ? colors.primary : colors.border,
-                                backgroundColor: selected ? colors.primary : (scheme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
-                              },
-                            ]}
-                            activeOpacity={0.7}
-                          >
-                            <Text
-                              style={[
-                                styles.catBtnText,
-                                { color: selected ? '#FFF' : colors.text, fontFamily: selected ? FontFace.bold : FontFace.semibold },
-                              ]}
-                            >
-                              {cat}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-
-                    <AnimatedPressable
-                      onPress={handleAddPurchase}
-                      disabled={isSaving}
-                      style={[
-                        styles.submitBtn,
-                        {
-                          borderColor: colors.primary,
-                          backgroundColor: colors.primary,
-                          opacity: isSaving ? 0.8 : 1,
-                        },
-                      ]}
-                    >
-                      {isSaving ? (
-                        <ActivityIndicator size="small" color="#FFF" />
-                      ) : (
-                        <ThemedText type="smallBold" style={{ color: '#FFF' }}>
-                          Record Entry
-                      </ThemedText>
-                      )}
-                    </AnimatedPressable>
-                  </View>
-
-                  <ThemedText type="smallBold" style={styles.sectionTitle} themeColor="textSecondary">
-                    ALL RECORDED SPENDS (TAP TO EDIT)
-                  </ThemedText>
-                </View>
-              }
-              renderItem={({ item }) => {
-                const itemDate = new Date(item.timestamp);
-                const todayStr = new Date().toDateString();
-                const yesterday = new Date();
-                yesterday.setDate(yesterday.getDate() - 1);
-                const yesterdayStr = yesterday.toDateString();
-
-                let dateStr = '';
-                if (itemDate.toDateString() === todayStr) {
-                  dateStr = 'Today';
-                } else if (itemDate.toDateString() === yesterdayStr) {
-                  dateStr = 'Yesterday';
-                } else {
-                  dateStr = itemDate.toLocaleDateString('en-IN', {
-                    day: '2-digit',
-                    month: 'short',
-                    year: itemDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
-                    timeZone: 'Asia/Kolkata',
-                  });
-                }
-                const timeStr = itemDate.toLocaleTimeString('en-IN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  timeZone: 'Asia/Kolkata',
-                });
-                const formattedDate = `${dateStr} • ${timeStr}`;
-
-                return (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setEditingLog(item);
-                      setIsEditModalVisible(true);
-                    }}
-                    style={[styles.itemCard, { borderColor: colors.border }]}
-                  >
-                    <View style={{ flex: 1, gap: Spacing.half }}>
-                      <View style={styles.itemNameRow}>
-                        <ThemedText type="smallBold">{item.name}</ThemedText>
-                        <View style={[styles.miniBadge, { borderColor: colors.border }]}>
-                          <ThemedText type="code" style={{ fontSize: 9, fontFamily: FontFace.bold, color: colors.textSecondary }}>
-                            {item.category.toUpperCase()}
-                          </ThemedText>
+                <View style={styles.dayHead}>
+                  <Tile hue="spend" style={styles.hero}>
+                    <View style={styles.heroTop}>
+                      <View style={styles.flex}>
+                        <Text style={[Type.dotLabel, { color: S.main }]}>Today</Text>
+                        <View style={styles.amountRow}>
+                          <Text style={[styles.rupeeBig, { color: C.textHi }]}>₹</Text>
+                          <Text style={[Type.dotHero, { color: C.textHi }]} numberOfLines={1} adjustsFontSizeToFit>
+                            {formatAmount(todayTotal)}
+                          </Text>
                         </View>
                       </View>
-                      <ThemedText type="code" style={{ fontFamily: FontFace.regular, fontSize: 10 }} themeColor="textSecondary">
-                        {formattedDate}
-                      </ThemedText>
+                      <Donut size={74} stroke={11} slices={todayLogs.map((l) => ({ value: l.cost, color: categoryMeta(l.category).color }))}>
+                        <MaterialCommunityIcons name="wallet" size={24} color={S.main} />
+                      </Donut>
                     </View>
-                    <View style={styles.rightItemBlock}>
-                      <ThemedText type="subtitle" style={[styles.itemPrice, { color: colors.text }]}>
-                        ₹{item.cost.toFixed(2)}
-                      </ThemedText>
-                      <AnimatedPressable
-                        onPress={() => handleDelete(item.id)}
-                        style={styles.trashBtn}
-                      >
-                        <Feather name="trash-2" size={16} color={colors.alert} />
-                      </AnimatedPressable>
+                    <View style={styles.chips}>
+                      <Chip icon="receipt" label={`${todayLogs.length} today`} hue="spend" />
+                      <Chip icon="sigma" label={`₹${formatAmount(Math.round(allTime))} all time`} />
                     </View>
-                  </TouchableOpacity>
-                );
-              }}
-              ListEmptyComponent={
-                loadingDaily ? (
-                  <View style={{ gap: 12, width: '100%' }}>
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <Animated.View key={i} style={[styles.itemCard, { borderColor: colors.border, padding: 12, opacity: pulseVal.value }]}>
-                        <View style={{ gap: 6, flex: 1 }}>
-                          <Skeleton width={120} height={14} />
-                          <Skeleton width={160} height={10} />
-                        </View>
-                      </Animated.View>
-                    ))}
-                  </View>
-                ) : (
-                  <View style={styles.emptyContainer}>
-                    <Feather name="shopping-bag" size={32} color={colors.textSecondary} style={{ marginBottom: Spacing.two, opacity: 0.8 }} />
-                    <ThemedText type="code" themeColor="textSecondary" style={{ textAlign: 'center', fontFamily: FontFace.regular, fontSize: 12 }}>
-                      No records logged
-                    </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center', marginTop: Spacing.one }}>
-                      Log items above to track shopping expenses.
-                    </ThemedText>
-                  </View>
-                )
-              }
-            />
-          </View>
-
-          {/* ============================================== */}
-          {/* ================ 2. WEEKLY PANEL ============= */}
-          {/* ============================================== */}
-          <View style={{ width: windowWidth }}>
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-              {/* Week Navigation controls */}
-              <View style={styles.navRow}>
-                <TouchableOpacity onPress={() => setWeekOffset((prev) => prev - 1)} style={[styles.navBtn, { borderColor: colors.border }]}>
-                  <Feather name="chevron-left" size={16} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={[styles.monthLabel, { color: colors.text }]}>
-                  {weekOffset === 0 ? 'This Week' : weekOffset === -1 ? 'Last Week' : `Week (${weekOffset} w)`}
-                </Text>
-                <TouchableOpacity onPress={() => setWeekOffset((prev) => Math.min(0, prev + 1))} disabled={weekOffset === 0} style={[styles.navBtn, { borderColor: colors.border, opacity: weekOffset === 0 ? 0.3 : 1 }]}>
-                  <Feather name="chevron-right" size={16} color={colors.text} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Weekly bar chart card */}
-              {loadingWeekly ? (
-                <Animated.View style={[styles.chartCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border, gap: 16 }, skeletonPulseStyle]}>
-                  <Skeleton width={160} height={10} />
-                  <View style={[styles.barsContainer, { justifyContent: 'space-between', alignItems: 'flex-end', height: 130 }]}>
-                    {Array.from({ length: 7 }).map((_, i) => (
-                      <View key={i} style={{ alignItems: 'center', gap: 8 }}>
-                        <Skeleton width={14} height={20 + i * 12} borderRadius={4} />
-                        <Skeleton width={20} height={8} />
-                      </View>
-                    ))}
-                  </View>
-                </Animated.View>
-              ) : (
-                <Animated.View entering={FadeInDown.duration(400)}>
-                  <View style={[styles.chartCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-                    <View style={styles.chartHeader}>
-                      <Text style={[styles.chartTitle, { color: colors.textSecondary }]}>WEEKLY EXPENSE HISTORY</Text>
-                      <Text style={[styles.chartSubtitle, { color: colors.text }]}>{getWeeklySubtitleRange()}</Text>
-                    </View>
-
-                    <View style={styles.barsContainer}>
-                      {weeklySpends.map((d, index) => (
-                        <WeeklySpendBar
-                          key={index}
-                          dayName={d.dayName}
-                          amount={d.amount}
-                          maxAmount={weeklyMax}
-                          colors={colors}
-                          isSelected={selectedWeeklyDay?.date.toDateString() === d.date.toDateString()}
-                          onPress={() => handleSelectWeeklyDay(d)}
-                        />
-                      ))}
-                    </View>
-                  </View>
-                </Animated.View>
-              )}
-
-              {/* Weekly Stats Grid */}
-              <View style={styles.statsGrid}>
-                {loadingWeekly ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <Animated.View key={i} style={[styles.statItem, { backgroundColor: colors.backgroundElement, borderColor: colors.border }, skeletonPulseStyle]}>
-                      <Skeleton width={60} height={10} />
-                      <Skeleton width={90} height={20} style={{ marginTop: 4 }} />
-                    </Animated.View>
-                  ))
-                ) : (
-                  <>
-                    <View style={[styles.statItem, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-                      <Feather name="activity" size={16} color={colors.primary} />
-                      <Text style={[styles.statVal, { color: colors.text }]}>₹{weeklyTotal.toFixed(2)}</Text>
-                      <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Total Spent</Text>
-                    </View>
-
-                    <View style={[styles.statItem, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-                      <Feather name="trending-up" size={16} color={colors.success} />
-                      <Text style={[styles.statVal, { color: colors.text }]}>₹{weeklyAvg.toFixed(2)}</Text>
-                      <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Daily Average</Text>
-                    </View>
-
-                    <View style={[styles.statItem, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-                      <Feather name="award" size={16} color={colors.warn} />
-                      <Text style={[styles.statVal, { color: colors.text }]}>₹{weeklyMax.toFixed(2)}</Text>
-                      <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Highest Spend</Text>
-                    </View>
-                  </>
-                )}
-              </View>
-
-
-            </ScrollView>
-          </View>
-
-          {/* ============================================== */}
-          {/* ================ 3. MONTHLY PANEL ============ */}
-          {/* ============================================== */}
-          <View style={{ width: windowWidth }}>
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-              {/* Monthly controls */}
-              <View style={styles.navRow}>
-                <TouchableOpacity onPress={() => setCurrentDate(new Date(currentYear, currentMonth - 1, 1))} style={[styles.navBtn, { borderColor: colors.border }]}>
-                  <Feather name="chevron-left" size={16} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={[styles.monthLabel, { color: colors.text }]}>
-                  {monthName} {currentYear}
-                </Text>
-                <TouchableOpacity onPress={() => setCurrentDate(new Date(currentYear, currentMonth + 1, 1))} style={[styles.navBtn, { borderColor: colors.border }]}>
-                  <Feather name="chevron-right" size={16} color={colors.text} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Monthly Summary card */}
-              {loadingMonthly ? (
-                <Animated.View style={[styles.summaryCard, { borderColor: colors.border, backgroundColor: colors.backgroundElement, gap: 12 }, skeletonPulseStyle]}>
-                  <Skeleton width={140} height={10} />
-                  <Skeleton width={180} height={28} style={{ marginTop: 4 }} />
-                </Animated.View>
-              ) : (
-                <Animated.View entering={FadeInDown.duration(500)}>
-                  <View style={[styles.summaryCard, { borderColor: colors.border, backgroundColor: colors.backgroundElement }]}>
-                    <View style={styles.summaryHeader}>
-                      <Text style={[styles.summaryTitle, { color: colors.textSecondary }]}>
-                        {monthName.toUpperCase()} SUMMARY
-                      </Text>
-                      <Feather name="pie-chart" size={14} color={colors.primary} />
-                    </View>
-
-                    <View style={styles.totalRow}>
-                      <Text style={[styles.totalSpentText, { color: colors.primary }]}>
-                        ₹{monthlyTotal.toFixed(2)}
-                      </Text>
-                      <Text style={{ color: colors.textSecondary, fontSize: 10, fontFamily: FontFace.bold, marginLeft: 8 }}>
-                        SPENT IN TOTAL
-                      </Text>
-                    </View>
-                  </View>
-                </Animated.View>
-              )}
-
-              {/* Category Allocation breakdown */}
-              {loadingMonthly ? (
-                <Animated.View style={[styles.breakdownCard, { borderColor: colors.border, backgroundColor: colors.backgroundElement, gap: 15 }, skeletonPulseStyle]}>
-                  <Skeleton width={160} height={10} style={{ marginBottom: 4 }} />
-                  <View style={{ gap: 12 }}>
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <View key={i} style={{ gap: 6 }}>
-                        <Skeleton width={80} height={10} />
-                        <Skeleton width="100%" height={8} borderRadius={4} />
-                      </View>
-                    ))}
-                  </View>
-                </Animated.View>
-              ) : (
-                <View style={[styles.breakdownCard, { borderColor: colors.border, backgroundColor: colors.backgroundElement }]}>
-                  <Text style={[styles.cardSectionTitle, { color: colors.textSecondary }]}>
-                    CATEGORY ALLOCATION
-                  </Text>
-
-                  {categoryAllocation.length === 0 ? (
-                    <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-                      <Text style={{ fontFamily: FontFace.regular, fontSize: 12, color: colors.textSecondary }}>No expenditures logged in this month.</Text>
-                    </View>
-                  ) : (
-                    <View style={styles.categoriesList}>
-                      {categoryAllocation.map((cat, idx) => (
-                        <CategoryBar
-                          key={idx}
-                          category={cat.category}
-                          amount={cat.amount}
-                          percentage={cat.percentage}
-                          color={cat.color}
-                          textColor={colors.textSecondary}
-                        />
+                    <ChunkyButton label="Add expense" icon="plus" hue="spend" onPress={() => setSheet({ open: true, log: null })} />
+                  </Tile>
+                  {loading && (
+                    <View style={styles.skeletons}>
+                      {[0, 1, 2].map((i) => (
+                        <Skeleton key={i} width="100%" height={64} borderRadius={22} />
                       ))}
                     </View>
                   )}
                 </View>
-              )}
-
-              {/* Monthly transaction stats grid */}
-              <View style={styles.statsGrid}>
-                {loadingMonthly ? (
-                  Array.from({ length: 2 }).map((_, i) => (
-                    <Animated.View key={i} style={[styles.statBox, { borderColor: colors.border, backgroundColor: colors.backgroundElement, gap: 8 }, skeletonPulseStyle]}>
-                      <Skeleton width={90} height={10} />
-                      <Skeleton width={60} height={20} />
-                    </Animated.View>
-                  ))
+              }
+              renderItem={({ item }) =>
+                item.kind === 'header' ? (
+                  <View style={styles.groupHead}>
+                    <Text style={[Type.dotLabel, { color: C.textMid }]}>{item.label}</Text>
+                    <Text style={[Type.badge, { color: C.textMid }]}>₹{formatAmount(Math.round(item.total))}</Text>
+                  </View>
                 ) : (
-                  <>
-                    <View style={[styles.statBox, { borderColor: colors.border, backgroundColor: colors.backgroundElement }]}>
-                      <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-                        TRANSACTIONS
-                      </Text>
-                      <Text style={[styles.statValue, { color: colors.text }]}>
-                        {monthlyTransactions}
-                      </Text>
-                    </View>
-
-                    <View style={[styles.statBox, { borderColor: colors.border, backgroundColor: colors.backgroundElement }]}>
-                      <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-                        AVG PER SPEND
-                      </Text>
-                      <Text style={[styles.statValue, { color: colors.text }]}>
-                        ₹{monthlyAvgPerSpend.toFixed(2)}
-                      </Text>
-                    </View>
-                  </>
-                )}
-              </View>
-            </ScrollView>
+                  <ExpenseRow log={item.log} onPress={() => setSheet({ open: true, log: item.log })} />
+                )
+              }
+              ListEmptyComponent={
+                loading ? null : (
+                  <Tile style={styles.empty}>
+                    <MaterialCommunityIcons name="piggy-bank-outline" size={44} color={S.main} />
+                    <Text style={[Type.body, { color: C.textMid }]}>No expenses yet — add your first one.</Text>
+                  </Tile>
+                )
+              }
+              ListFooterComponent={
+                logs.length > 0 ? (
+                  <ChunkyButton label="Erase all expenses" icon="delete-sweep-outline" variant="soft" hue="alarm" textColor={C.alert} size="sm" onPress={wipeAll} style={styles.wipe} />
+                ) : null
+              }
+            />
           </View>
-        </Animated.ScrollView>
 
-        {/* Global Calendar Picker modal */}
-        <CalendarPicker
-          visible={showDatePicker}
-          onClose={() => setShowDatePicker(false)}
-          selectedDate={selectedDate}
-          onSelectDate={setSelectedDate}
-          colors={colors}
-        />
+          {/* ── Week ──────────────────────────────────────────────────── */}
+          <ScrollView style={{ width: windowWidth }} contentContainerStyle={[styles.page, pageBottom]} showsVerticalScrollIndicator={false}>
+            <Stepper
+              title={weekOffset === 0 ? 'This week' : weekOffset === -1 ? 'Last week' : `${-weekOffset} weeks ago`}
+              subtitle={`${fmtShort(week[0].date)} – ${fmtShort(week[6].date)}`}
+              onPrev={() => setWeekOffset((w) => w - 1)}
+              onNext={() => setWeekOffset((w) => Math.min(0, w + 1))}
+              nextDisabled={weekOffset === 0}
+            />
+            <Tile style={styles.chart}>
+              <BarChart
+                hue="spend"
+                height={150}
+                bars={week.map((d, i) => ({
+                  label: WEEKDAYS[i],
+                  value: d.amount,
+                  caption: d.amount ? compact(d.amount) : '',
+                  strong: d.amount > 0 && d.amount === weekMax,
+                  selected: d.date.toDateString() === todayKey,
+                  onPress: () => router.push({ pathname: '/purchases/report' as any, params: { dateMs: d.date.getTime().toString() } }),
+                }))}
+              />
+              <Text style={[Type.subline, { color: C.textMid }]}>Bright bar = biggest day · tap a day for details</Text>
+            </Tile>
+            <StatGrid>
+              <StatTile icon="cash-multiple" hue="spend" prefix="₹" value={formatAmount(Math.round(weekTotal))} label="this week" />
+              <StatTile icon="calendar-today" hue="water" prefix="₹" value={formatAmount(Math.round(weekTotal / 7))} label="a day" />
+              <StatTile icon="arrow-up-bold" hue="train" prefix="₹" value={formatAmount(Math.round(weekMax))} label="biggest day" />
+              <StatTile icon="receipt" hue="checkin" value={`${weekCount}`} label="expenses" />
+            </StatGrid>
+          </ScrollView>
 
-        {/* Global Time Picker modal */}
-        <TimePicker
-          visible={showTimePicker}
-          onClose={() => setShowTimePicker(false)}
-          selectedDate={selectedDate}
-          onSelectTime={setSelectedDate}
-          colors={colors}
-        />
+          {/* ── Month ─────────────────────────────────────────────────── */}
+          <ScrollView style={{ width: windowWidth }} contentContainerStyle={[styles.page, pageBottom]} showsVerticalScrollIndicator={false}>
+            <Stepper
+              title={month.toLocaleString('default', { month: 'long' })}
+              subtitle={`${y}`}
+              onPrev={() => setMonth(new Date(y, m - 1, 1))}
+              onNext={() => setMonth(new Date(y, m + 1, 1))}
+            />
+            <Tile hue="spend" style={styles.monthHero}>
+              <Donut size={150} stroke={20} slices={byCat.map(([cat, v]) => ({ value: v, color: categoryMeta(cat).color }))}>
+                <Text style={[Type.dotLabel, { color: C.textMid }]}>Spent</Text>
+                <Text style={[Type.dotSmall, { color: C.textHi }]} numberOfLines={1} adjustsFontSizeToFit>
+                  {compact(monthTotal)}
+                </Text>
+              </Donut>
+              <View style={styles.monthSide}>
+                {byCat.slice(0, 4).map(([cat, v]) => (
+                  <View key={cat} style={styles.legendRow}>
+                    <View style={[styles.legendDot, { backgroundColor: categoryMeta(cat).color }]} />
+                    <Text style={[Type.subline, styles.flex, { color: C.textHi }]} numberOfLines={1}>
+                      {cat}
+                    </Text>
+                    <Text style={[Type.badge, { color: C.textMid }]}>{Math.round((v / monthTotal) * 100)}%</Text>
+                  </View>
+                ))}
+                {byCat.length === 0 && <Text style={[Type.subline, { color: C.textMid }]}>Nothing this month</Text>}
+              </View>
+            </Tile>
 
-        {/* Edit Expense Modal */}
-        <EditExpenseModal
-          visible={isEditModalVisible}
-          onClose={() => {
-            setIsEditModalVisible(false);
-            setEditingLog(null);
-          }}
-          log={editingLog}
-          onSave={handleEditSave}
-          onDelete={handleDelete}
-          colors={colors}
-          isSaving={isSaving}
-        />
+            {byCat.length > 0 && (
+              <Tile style={styles.cats}>
+                <Text style={[Type.dotLabel, { color: C.textMid }]}>By category</Text>
+                {byCat.map(([cat, v]) => {
+                  const meta = categoryMeta(cat);
+                  return (
+                    <View key={cat} style={styles.catRow}>
+                      <View style={[styles.catIcon, { backgroundColor: meta.color + '2E' }]}>
+                        <MaterialCommunityIcons name={meta.icon} size={18} color={meta.color} />
+                      </View>
+                      <View style={styles.flex}>
+                        <View style={styles.catTop}>
+                          <Text style={[Type.controlLabel, { color: C.textHi, fontSize: 14 }]}>{cat}</Text>
+                          <Text style={[Type.badge, { color: C.textMid }]}>₹{formatAmount(Math.round(v))}</Text>
+                        </View>
+                        <View style={[styles.track, { backgroundColor: C.surface2 }]}>
+                          <View style={[styles.fill, { width: `${Math.max(4, (v / byCat[0][1]) * 100)}%`, backgroundColor: meta.color }]} />
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </Tile>
+            )}
+
+            <StatGrid>
+              <StatTile icon="receipt" hue="checkin" value={`${monthLogs.length}`} label="expenses" />
+              <StatTile icon="scale-balance" hue="water" prefix="₹" value={formatAmount(Math.round(monthLogs.length ? monthTotal / monthLogs.length : 0))} label="each, avg" />
+            </StatGrid>
+          </ScrollView>
+        </ScrollView>
       </SafeAreaView>
-    </ThemedView>
+
+      <ExpenseSheet
+        visible={sheet.open}
+        log={sheet.log}
+        saving={saving}
+        onClose={() => setSheet({ open: false, log: null })}
+        onSave={save}
+        onDelete={remove}
+      />
+    </View>
   );
 }
 
-// ── StyleSheet ──────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 12,
-    fontFamily: FontFace.bold,
-    letterSpacing: 1.5,
-  },
-  clearBtn: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  tabsWrapper: {
-    flexDirection: 'row',
-    marginHorizontal: 20,
-    marginVertical: 10,
-    borderRadius: 12,
-    padding: 3,
-  },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 9,
-  },
-  tabActiveBtn: {
-    shadowColor: '#1B2430',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  tabText: {
-    fontSize: 13,
-    fontFamily: FontFace.bold,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    gap: 20,
-  },
-  totalBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginTop: 10,
-  },
-  totalCost: {
-    fontSize: 20,
-    fontFamily: FontFace.bold,
-  },
-  formPanel: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    gap: 12,
-  },
-  costInputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    height: 48,
-  },
-  currencyPrefix: {
-    fontSize: 18,
-    fontFamily: FontFace.bold,
-    marginRight: 8,
-  },
-  costInputSpacious: {
-    flex: 1,
-    fontSize: 17,
-    fontFamily: FontFace.bold,
-    paddingVertical: 0,
-  },
-  dateTimeRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  textInput: {
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 10,
-    fontSize: 14,
-    fontFamily: FontFace.medium,
-  },
-  datePickerBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-  },
-  categoryWrapGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginVertical: 4,
-  },
-  catBtn: {
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  catBtnText: {
-    fontSize: 11,
-    fontFamily: FontFace.regular,
-    letterSpacing: 0.3,
-  },
-  submitBtn: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  sectionTitle: {
-    fontSize: 10,
-    fontFamily: FontFace.bold,
-    letterSpacing: 0.8,
-    marginTop: 24,
-    marginBottom: 8,
-    alignSelf: 'flex-start',
-  },
-  itemCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 12,
-  },
-  itemNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  miniBadge: {
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-  },
-  rightItemBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  itemPrice: {
-    fontSize: 16,
-    fontFamily: FontFace.bold,
-  },
-  trashBtn: {
-    padding: 6,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  calendarCard: {
-    width: '100%',
-    maxWidth: 340,
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-  },
-  calHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  calNavBtn: {
-    padding: 8,
-  },
-  calMonthText: {
-    fontSize: 16,
-    fontFamily: FontFace.bold,
-  },
-  calWeekdays: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  calWeekdayText: {
-    width: 36,
-    textAlign: 'center',
-    fontSize: 11,
-    fontFamily: FontFace.bold,
-  },
-  calGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    rowGap: 8,
-    columnGap: 8,
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  calCell: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  calCellText: {
-    fontSize: 12,
-    fontFamily: FontFace.semibold,
-  },
-  calCloseBtn: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  calCloseBtnText: {
-    fontSize: 13,
-    fontFamily: FontFace.bold,
-  },
-  timeNavBtn: {
-    padding: 4,
-  },
-  ampmBtn: {
-    borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    alignItems: 'center',
-  },
-  editCard: {
-    width: '100%',
-    maxWidth: 340,
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 20,
-    gap: 12,
-  },
-  editTitle: {
-    fontSize: 18,
-    fontFamily: FontFace.bold,
-    letterSpacing: -0.5,
-    marginBottom: 4,
-  },
-  editActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 8,
-  },
-  actionBtn: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  navRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 10,
-  },
-  navBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  monthLabel: {
-    fontSize: 18,
-    fontFamily: FontFace.bold,
-  },
-  chartCard: {
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    padding: 16,
-    gap: 24,
-  },
-  chartHeader: {
-    gap: 4,
-  },
-  chartTitle: {
-    fontSize: 10,
-    fontFamily: FontFace.bold,
-    letterSpacing: 0.8,
-  },
-  chartSubtitle: {
-    fontSize: 16,
-    fontFamily: FontFace.bold,
-  },
-  barsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: 170,
-    paddingBottom: 8,
-  },
-  barCol: {
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  barValText: {
-    fontSize: 9,
-    fontFamily: FontFace.regular,
-  },
-  barTrack: {
-    width: 14,
-    height: 130,
-    borderRadius: 7,
-    overflow: 'hidden',
-    justifyContent: 'flex-end',
-  },
-  barFill: {
-    width: '100%',
-    borderRadius: 7,
-  },
-  barLabel: {
-    fontSize: 10,
-    fontFamily: FontFace.regular,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  statItem: {
-    flex: 1,
-    minWidth: '45%',
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    padding: 14,
-    gap: 4,
-  },
-  statVal: {
-    fontSize: 18,
-    fontFamily: FontFace.bold,
-    marginTop: 4,
-  },
-  statLabel: {
-    fontSize: 11,
-    fontFamily: FontFace.semibold,
-  },
-  breakdownCard: {
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-  },
-  summaryCard: {
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    padding: 16,
-    marginTop: 10,
-    gap: 8,
-  },
-  summaryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  summaryTitle: {
-    fontSize: 10,
-    fontFamily: FontFace.bold,
-    letterSpacing: 0.8,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
-  },
-  totalSpentText: {
-    fontSize: 28,
-    fontFamily: FontFace.bold,
-    letterSpacing: -1,
-  },
-  breakdownCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  cardSectionTitle: {
-    fontSize: 10,
-    fontFamily: FontFace.bold,
-    letterSpacing: 0.8,
-  },
-  categoriesList: {
-    gap: 16,
-  },
-  catRow: {
-    gap: 6,
-  },
-  catInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  catName: {
-    fontSize: 12,
-    fontFamily: FontFace.regular,
-  },
-  catAmount: {
-    fontSize: 11,
-    fontFamily: FontFace.semibold,
-  },
-  progressBarTrack: {
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  statBox: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    padding: 16,
-    gap: 4,
-  },
-  statValue: {
-    fontSize: 20,
-    fontFamily: FontFace.bold,
-    letterSpacing: -0.5,
-  },
-});
+function Stepper({
+  title,
+  subtitle,
+  onPrev,
+  onNext,
+  nextDisabled,
+}: {
+  title: string;
+  subtitle?: string;
+  onPrev: () => void;
+  onNext: () => void;
+  nextDisabled?: boolean;
+}) {
+  return (
+    <View style={styles.stepper}>
+      <ChunkyButton icon="chevron-left" variant="soft" hue="spend" size="md" haptic="selection" onPress={onPrev} accessibilityLabel="Previous" />
+      <View style={styles.stepperText}>
+        <Text style={[Type.title, { color: C.textHi }]}>{title}</Text>
+        {subtitle ? <Text style={[Type.dotLabel, { color: C.textMid }]}>{subtitle}</Text> : null}
+      </View>
+      <ChunkyButton icon="chevron-right" variant="soft" hue="spend" size="md" haptic="selection" onPress={onNext} disabled={nextDisabled} accessibilityLabel="Next" />
+    </View>
+  );
+}
+
+const fmtShort = (d: Date) => d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+
+/** ₹1.2k style for chart captions. */
+const compact = (n: number) => (n >= 100_000 ? `${(n / 100_000).toFixed(1)}L` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${Math.round(n)}`);
+
+function dayLabel(d: Date) {
+  const today = new Date();
+  const yest = new Date();
+  yest.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yest.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString('en-IN', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
+  });
+}
 
 export default function SpendTrackerScreen() {
   const router = useRouter();
@@ -1958,18 +422,15 @@ export default function SpendTrackerScreen() {
       try {
         const hasHardware = await LocalAuthentication.hasHardwareAsync();
         const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-
         if (hasHardware && isEnrolled) {
           const result = await LocalAuthentication.authenticateAsync({
-            promptMessage: 'Authenticate to access Spend Tracker',
-            fallbackLabel: 'Use Device Passcode',
+            promptMessage: 'Unlock Spend',
+            fallbackLabel: 'Use device passcode',
             disableDeviceFallback: false,
           });
-
-          if (result.success) {
-            setIsAuthenticated(true);
-          } else {
-            Alert.alert('Access Denied', 'Authentication is required to view purchases.');
+          if (result.success) setIsAuthenticated(true);
+          else {
+            Alert.alert('Locked', 'Unlock is needed to see your spending.');
             router.back();
           }
         } else {
@@ -1977,22 +438,51 @@ export default function SpendTrackerScreen() {
         }
       } catch (e) {
         console.error('Biometric auth failed', e);
-        Alert.alert('Security Error', 'Biometric verification failed.');
+        Alert.alert('Security error', 'Biometric check failed.');
         router.back();
       } finally {
         setIsVerifying(false);
       }
     }
     authenticateUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (isVerifying) {
-    return <AppLoader label="Verifying credentials…" />;
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
-
+  if (isVerifying) return <AppLoader label="Unlocking…" />;
+  if (!isAuthenticated) return null;
   return <SpendTrackerContent />;
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  safe: { flex: 1 },
+  pad: { paddingHorizontal: Spacing.three, gap: 10, paddingBottom: 10 },
+  page: { paddingHorizontal: Spacing.three, paddingTop: 6, gap: 12 },
+  flex: { flex: 1 },
+
+  dayHead: { gap: 12, marginBottom: 4 },
+  hero: { gap: 14 },
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  amountRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
+  rupeeBig: { fontFamily: FontFace.displayBold, fontSize: 34, lineHeight: 58 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  skeletons: { gap: 8 },
+  groupHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 6, paddingHorizontal: 6 },
+  empty: { alignItems: 'center', gap: 10, paddingVertical: 32 },
+  wipe: { marginTop: Spacing.four },
+
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  stepperText: { flex: 1, alignItems: 'center' },
+  chart: { gap: 12, paddingTop: 20 },
+
+  monthHero: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  monthSide: { flex: 1, gap: 8 },
+  legendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  cats: { gap: 14 },
+  catRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  catIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  catTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  track: { height: 10, borderRadius: Radius.pill, overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: Radius.pill },
+});

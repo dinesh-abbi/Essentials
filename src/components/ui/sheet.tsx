@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Dimensions,
@@ -122,16 +122,16 @@ export function Sheet({
           <Animated.View
             style={[
               styles.panel,
-              { height: panelHeight, backgroundColor: colors.bg, borderColor: colors.hairline, paddingBottom: insets.bottom },
+              { height: panelHeight, backgroundColor: colors.surface, borderColor: colors.hairline, paddingBottom: insets.bottom },
               panelStyle,
             ]}
           >
             <GestureDetector gesture={drag}>
               <View style={styles.header}>
-                <View style={[styles.grabber, { backgroundColor: colors.hairline }]} />
+                <View style={[styles.grabber, { backgroundColor: colors.textLow }]} />
                 <View style={styles.headerRow}>
                   <View style={styles.headerText}>
-                    <Text style={[Type.bracketLabel, { color: colors.water }]}>{bracket}</Text>
+                    <Text style={[Type.dotLabel, { color: colors.water }]}>{bracket.replace(/^\[\s*|\s*\]$/g, '')}</Text>
                     {title ? (
                       <Text style={[Type.title, { color: colors.textHi }]} numberOfLines={1}>
                         {title}
@@ -142,11 +142,11 @@ export function Sheet({
                     onPress={requestClose}
                     disabled={!dismissable}
                     haptic="light"
-                    style={[styles.close, { borderColor: colors.hairline, backgroundColor: colors.surface, opacity: dismissable ? 1 : 0.4 }]}
+                    style={[styles.close, { backgroundColor: colors.surface2, opacity: dismissable ? 1 : 0.4 }]}
                     accessibilityRole="button"
                     accessibilityLabel="Close"
                   >
-                    <Feather name="x" size={18} color={colors.textHi} />
+                    <MaterialCommunityIcons name="close" size={20} color={colors.textHi} />
                   </AnimatedPressable>
                 </View>
               </View>
@@ -161,7 +161,7 @@ export function Sheet({
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  backdrop: { backgroundColor: 'rgba(5,12,10,0.66)' },
+  backdrop: { backgroundColor: 'rgba(0,0,0,0.6)' },
   anchor: { flex: 1, justifyContent: 'flex-end' },
   panel: {
     borderTopLeftRadius: Radius.xl,
@@ -172,14 +172,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   header: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two, paddingBottom: Spacing.three },
-  grabber: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, marginBottom: Spacing.three },
+  grabber: { alignSelf: 'center', width: 44, height: 5, borderRadius: 3, marginBottom: Spacing.three },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.three },
   headerText: { flex: 1, gap: Spacing.one },
   close: {
     width: HitTarget,
     height: HitTarget,
     borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
   },

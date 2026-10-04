@@ -1,367 +1,159 @@
-import { Feather } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  useColorScheme,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Colors, FontFace, Radius, Spacing } from '@/constants/theme';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { AnimatedPressable } from '@/components/ui/animated-pressable';
-import * as WidgetSync from '@/utils/WidgetSync';
+import Droplet from '@/components/illustrations/Droplet';
+import Skeleton from '@/components/SkeletonLoader';
+import { Chip, ChunkyButton, IconBlob, Tile } from '@/components/ui/chunky';
+import { DotMeter } from '@/components/ui/dots';
+import { ScreenHeader } from '@/components/ui/screen-header';
+import { Colors, Hue, Spacing, Type } from '@/constants/theme';
 import * as WaterStorage from '@/utils/WaterStorage';
+import * as WidgetSync from '@/utils/WidgetSync';
 
+const C = Colors.dark;
+
+/** One day of water: Drip at that day's level, the total vs goal, and every glass. */
 export default function WaterDailyReportScreen() {
-  const router = useRouter();
   const { dateMs } = useLocalSearchParams<{ dateMs: string }>();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = Colors[scheme];
-
-  const targetDate = dateMs ? new Date(parseInt(dateMs)) : new Date();
+  const insets = useSafeAreaInsets();
+  const reduceMotion = useReducedMotion();
+  const target = dateMs ? new Date(parseInt(dateMs, 10)) : new Date();
 
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState<WaterStorage.WaterLog[]>([]);
-  const [goal, setGoal] = useState(2000);
-  const [isDeleting, setIsDeleting] = useState<string | null>(null);
-
-  const fetchDayData = async () => {
-    setLoading(true);
-    try {
-      const allLogs = await WaterStorage.getWaterLogs();
-      const userGoal = await WaterStorage.getUserWaterGoal();
-      setGoal(userGoal);
-
-      const dayStart = new Date(targetDate);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(targetDate);
-      dayEnd.setHours(23, 59, 59, 999);
-
-      const filtered = allLogs.filter(
-        (l) => l.timestamp >= dayStart.getTime() && l.timestamp <= dayEnd.getTime()
-      );
-      setLogs(filtered.sort((a, b) => b.timestamp - a.timestamp));
-    } catch (e) {
-      console.warn('Failed to load water report:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [goal, setGoal] = useState(WaterStorage.DEFAULT_DAILY_GOAL);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchDayData();
+    (async () => {
+      setLoading(true);
+      try {
+        const start = new Date(target);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(target);
+        end.setHours(23, 59, 59, 999);
+        const [day, g] = await Promise.all([
+          WaterStorage.getWaterLogsBetween(start.getTime(), end.getTime()),
+          WaterStorage.getUserWaterGoal(),
+        ]);
+        setGoal(g);
+        setLogs(day.sort((a, b) => b.timestamp - a.timestamp));
+      } catch (e) {
+        console.warn('Failed to load water report:', e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateMs]);
 
-  const handleDeleteLog = async (id: string) => {
-    Alert.alert('Delete Entry', 'Are you sure you want to remove this water log?', [
+  const remove = (id: string) =>
+    Alert.alert('Remove this glass?', undefined, [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Delete',
+        text: 'Remove',
         style: 'destructive',
         onPress: async () => {
-          setIsDeleting(id);
+          setDeleting(id);
           try {
             await WaterStorage.deleteWaterLog(id);
             setLogs((prev) => prev.filter((l) => l.id !== id));
             WidgetSync.sync();
-          } catch (e) {
-            Alert.alert('Error', 'Failed to delete entry.');
+          } catch {
+            Alert.alert('Error', 'Failed to remove it.');
           } finally {
-            setIsDeleting(null);
+            setDeleting(null);
           }
         },
       },
     ]);
-  };
 
-  const totalDrank = logs.reduce((sum, l) => sum + l.amountMl, 0);
-  const percentMet = Math.min((totalDrank / goal) * 100, 100);
-
-  const progressWidth = useSharedValue(0);
-  useEffect(() => {
-    if (!loading) {
-      progressWidth.value = withTiming(percentMet, { duration: 1000 });
-    }
-  }, [percentMet, loading]);
-
-  const progressStyle = useAnimatedStyle(() => ({
-    width: `${progressWidth.value}%`,
-  }));
-
-  const formattedDate = targetDate.toLocaleDateString('en-IN', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  const total = logs.reduce((s, l) => s + l.amountMl, 0);
+  const ratio = goal > 0 ? total / goal : 0;
+  const glasses = Math.round(total / 250);
 
   return (
-    <ThemedView style={styles.root}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <AnimatedPressable
-            onPress={() => router.back()}
-            style={[styles.backBtn, { borderColor: colors.border }]}
-          >
-            <Feather name="arrow-left" size={20} color={colors.text} />
-          </AnimatedPressable>
-          <ThemedText type="smallBold" themeColor="textSecondary" style={styles.headerTitle}>
-            DAILY WATER REPORT
-          </ThemedText>
-          <View style={{ width: 40 }} />
+    <View style={[styles.root, { backgroundColor: C.bg }]}>
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.pad}>
+          <ScreenHeader bracket="Water · day" />
         </View>
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.five }]} showsVerticalScrollIndicator={false}>
+          <Text style={[Type.largeTitle, { color: C.textHi }]}>
+            {target.toLocaleDateString('en-IN', { weekday: 'long' })}
+          </Text>
+          <Text style={[Type.dotLabel, { color: C.textMid }]}>
+            {target.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+          </Text>
 
-        {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color={colors.primary} />
+          <Tile hue="water" style={styles.hero}>
+            {loading ? (
+              <Skeleton width={110} height={136} borderRadius={55} />
+            ) : (
+              <Droplet ratio={ratio} size={110} />
+            )}
+            <View style={styles.flex}>
+              <Text style={[Type.dotNumber, { color: C.textHi }]}>{total}</Text>
+              <Text style={[Type.subline, { color: C.textMid }]}>of {goal.toLocaleString('en-IN')} ml</Text>
+              <DotMeter total={10} lit={Math.min(10, Math.round(ratio * 10))} color={Hue.water.main} size={10} gap={4} style={styles.meter} />
+              <Chip icon={ratio >= 1 ? 'trophy' : 'water-percent'} label={ratio >= 1 ? 'Goal hit' : `${Math.round(ratio * 100)}%`} hue="water" solid={ratio >= 1} />
+            </View>
+          </Tile>
+
+          <View style={styles.sectionRow}>
+            <Text style={[Type.headline, { color: C.textHi }]}>Glasses</Text>
+            <Chip icon="cup-water" label={`≈ ${glasses}`} hue="water" />
           </View>
-        ) : (
-          <FlatList
-            data={logs}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.scrollContent}
-            ListHeaderComponent={
-              <View style={{ gap: Spacing.four, marginBottom: Spacing.two }}>
-                {/* Selected Day Name */}
-                <Animated.View entering={FadeInDown.duration(400)} style={styles.titleCard}>
-                  <Text style={[styles.dateLabel, { color: colors.text }]}>{formattedDate}</Text>
-                  <Text style={[styles.subtitleLabel, { color: colors.textSecondary }]}>
-                    Consumption details and log history.
+
+          {!loading && logs.length === 0 && (
+            <Tile style={styles.empty}>
+              <MaterialCommunityIcons name="cup-off-outline" size={40} color={C.textLow} />
+              <Text style={[Type.body, { color: C.textMid }]}>No water logged this day.</Text>
+            </Tile>
+          )}
+          {logs.map((l, i) => (
+            <Animated.View key={l.id} entering={reduceMotion ? undefined : FadeInDown.delay(i * 30).springify().damping(18)}>
+              <Tile style={styles.row}>
+                <IconBlob name="cup-water" hue="water" size={40} variant="soft" />
+                <View style={styles.flex}>
+                  <Text style={[Type.dotSmall, { color: C.textHi }]}>{l.amountMl} ml</Text>
+                  <Text style={[Type.subline, { color: C.textMid }]}>
+                    {new Date(l.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
                   </Text>
-                </Animated.View>
-
-                {/* Progress Summary Card */}
-                <Animated.View
-                  entering={FadeInDown.duration(500).delay(100)}
-                  style={[styles.summaryCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}
-                >
-                  <View style={styles.summaryRow}>
-                    <View>
-                      <Text style={{ fontSize: 11, fontFamily: FontFace.bold, color: colors.textSecondary, letterSpacing: 0.5 }}>
-                        TOTAL CONSUMED
-                      </Text>
-                      <Text style={[styles.totalVolume, { color: colors.primary }]}>
-                        {totalDrank} <Text style={{ fontSize: 16, fontFamily: FontFace.bold }}>ml</Text>
-                      </Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ fontSize: 11, fontFamily: FontFace.bold, color: colors.textSecondary, letterSpacing: 0.5 }}>
-                        DAILY GOAL
-                      </Text>
-                      <Text style={[styles.goalVolume, { color: colors.text }]}>
-                        {goal} <Text style={{ fontSize: 14, fontFamily: FontFace.bold }}>ml</Text>
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.progressBarWrapper}>
-                    <View style={styles.progressHeader}>
-                      <Text style={{ fontSize: 11, color: colors.textSecondary, fontFamily: FontFace.semibold }}>
-                        Goal Met
-                      </Text>
-                      <Text style={{ fontSize: 11, color: colors.primary, fontFamily: FontFace.bold }}>
-                        {percentMet.toFixed(0)}%
-                      </Text>
-                    </View>
-                    <View style={[styles.progressBarTrack, { backgroundColor: colors.surfaceSunken }]}>
-                      <Animated.View style={[styles.progressBarFill, progressStyle, { backgroundColor: colors.primary }]} />
-                    </View>
-                  </View>
-                </Animated.View>
-
-                <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-                  LOG HISTORY ({logs.length} Entries)
-                </Text>
-              </View>
-            }
-            renderItem={({ item }) => {
-              const itemDate = new Date(item.timestamp);
-              const timeStr = itemDate.toLocaleTimeString('en-IN', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true,
-                timeZone: 'Asia/Kolkata',
-              });
-
-              return (
-                <View style={[styles.itemRow, { borderColor: colors.border }]}>
-                  <View style={styles.itemLeft}>
-                    <View style={[styles.cupIconWrapper, { backgroundColor: colors.primary + '12' }]}>
-                      <Feather name="droplet" size={16} color={colors.primary} />
-                    </View>
-                    <View>
-                      <Text style={[styles.itemMlText, { color: colors.text }]}>
-                        {item.amountMl} ml
-                      </Text>
-                      <Text style={{ fontFamily: FontFace.regular, fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>
-                        Logged at {timeStr}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={() => handleDeleteLog(item.id)}
-                    disabled={isDeleting === item.id}
-                    style={styles.deleteBtn}
-                  >
-                    {isDeleting === item.id ? (
-                      <ActivityIndicator size="small" color={colors.alert} />
-                    ) : (
-                      <Feather name="trash-2" size={16} color={colors.alert} />
-                    )}
-                  </TouchableOpacity>
                 </View>
-              );
-            }}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Feather name="info" size={24} color={colors.textSecondary} style={{ marginBottom: Spacing.one, opacity: 0.6 }} />
-                <Text style={{ fontFamily: FontFace.regular, fontSize: 12, color: colors.textSecondary }}>
-                  No hydration entries found for this day.
-                </Text>
-              </View>
-            }
-          />
-        )}
+                <ChunkyButton
+                  icon="trash-can-outline"
+                  variant="soft"
+                  hue="alarm"
+                  textColor={C.alert}
+                  size="sm"
+                  haptic="light"
+                  loading={deleting === l.id}
+                  onPress={() => remove(l.id)}
+                  accessibilityLabel="Remove this glass"
+                />
+              </Tile>
+            </Animated.View>
+          ))}
+        </ScrollView>
       </SafeAreaView>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 12,
-    fontFamily: FontFace.bold,
-    letterSpacing: 1.5,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  titleCard: {
-    marginTop: 10,
-    gap: 4,
-  },
-  dateLabel: {
-    fontSize: 22,
-    fontFamily: FontFace.bold,
-    letterSpacing: -0.5,
-  },
-  subtitleLabel: {
-    fontSize: 12,
-    fontFamily: FontFace.medium,
-  },
-  summaryCard: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    gap: 16,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  totalVolume: {
-    fontSize: 32,
-    fontFamily: FontFace.bold,
-    letterSpacing: -1,
-    marginTop: 4,
-  },
-  goalVolume: {
-    fontSize: 24,
-    fontFamily: FontFace.bold,
-    marginTop: 4,
-  },
-  progressBarWrapper: {
-    gap: 6,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  progressBarTrack: {
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  sectionTitle: {
-    fontSize: 10,
-    fontFamily: FontFace.bold,
-    letterSpacing: 0.8,
-    marginTop: 20,
-    marginBottom: 8,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 12,
-  },
-  itemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  cupIconWrapper: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  itemMlText: {
-    fontSize: 15,
-    fontFamily: FontFace.bold,
-  },
-  deleteBtn: {
-    padding: 8,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
+  root: { flex: 1 },
+  safe: { flex: 1 },
+  pad: { paddingHorizontal: Spacing.three },
+  content: { paddingHorizontal: Spacing.three, paddingTop: Spacing.two, gap: 10 },
+  flex: { flex: 1, gap: 4 },
+  hero: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, marginTop: Spacing.three },
+  meter: { marginVertical: 6 },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.three },
+  empty: { alignItems: 'center', gap: 8, paddingVertical: 28 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
 });

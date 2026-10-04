@@ -17,7 +17,8 @@ alarm subsystem's design doc.
 app: hydration tracking, expense tracking, camera check-in/attendance, a
 barcode-dismiss alarm, a home-screen hydration widget — and, since v1.2.0,
 the former **Catalyst** fitness app: training (weekly split, session logging),
-fuel (28-day meal plan, restock list, meal scan) and a Gemini coach. The
+fuel (28-day meal plan, restock list). AI/chat features were removed in
+v1.3.0. The
 Catalyst repo is retired; `docs/CATALYST_MERGE.md` maps every old feature to
 its new home. Single user-facing app, single developer, distributed by
 sideloaded APK + self-hosted OTA updates via GitHub Releases (not the Play
@@ -36,15 +37,14 @@ Stack: Expo SDK 56, React Native 0.85.3, React 19.2, Expo Router v4
 src/app/            expo-router routes (file-based). (tabs)/ = bottom tabs
                      (index · train · fuel · profile; explore is a hidden
                      template leftover), everything else is pushed on the root
-                     Stack in _layout.tsx (train/week, train/brief, coach, …).
+                     Stack in _layout.tsx (train/week, train/brief, …).
 src/data/            static content: training/split.json (default 7-day split),
-                     fuel/plan.json (28-day meals + grocery list),
-                     coach/models.json (Gemini models + local daily budgets)
+                     fuel/plan.json (28-day meals + grocery list)
 src/utils/           per-feature storage modules (see pattern below) + firebase.ts,
                      notifications.ts, SyncManager.ts (local-first write queue +
                      background flusher + change events), localFirst.ts and
                      userDocs.ts (cache-first read helpers), TrainingStorage.ts,
-                     FuelStorage.ts, BodyStorage.ts, Coach.ts (Gemini REST),
+                     FuelStorage.ts, BodyStorage.ts,
                      Preferences.ts (device switches), WidgetSync.ts,
                      updates.ts (OTA/GitHub Releases), changelogParser.ts,
                      blurTarget.ts (tab-bar blur registry)
@@ -189,14 +189,18 @@ around the widget-native rewrite). The setup:
   `widget_colors.xml` (light) / `values-night/widget_colors.xml` (dark) is a
   hand-kept mirror of the same palette — update both sides if the palette
   changes.
-- **Design system ("Cockpit")**: graphite neutrals + one signal azure, with
-  `aqua` reserved for the hydration domain and `success`/`warn`/`alert` for
-  semantics. Use the `Type` ramp (`display`/`title`/`body`/`label`/`readout`)
-  and the `Motion` constants rather than ad-hoc font sizes and durations;
-  `readout` is monospace + tabular figures for any number that animates, so
-  count-ups don't jitter the layout. Every looping animation must be gated on
-  `useReducedMotion()`. Prefer the shared `<Button>` (`components/ui/button.tsx`)
-  over hand-rolled `TouchableOpacity` buttons.
+- **Design system ("Glance", v1.3.0)**: a true-dark base with one vivid hue
+  per area (`Hue` in theme.ts — water cyan, train coral, fuel lime, spend
+  sunshine, check-in lavender, alarm pink, profile blue), Nunito for words
+  and Doto (dot-matrix, monospaced, no ₹ glyph) for numerals. Signature
+  pieces: `LargeHeader` (One UI title area), `Tile`/`ChunkyButton`/
+  `IconBlob`/`Chip` (chunky surfaces with a sinking lip), `ProgressRing`
+  (Apple rings), `DotMeter`/`LiveDot` (Nothing), `SettingRow`, `Segmented`,
+  `StatTile`, `BarChart`, `Donut`, `ScanFrame`, `BigMessage`, `DateTimeSheet`,
+  `Confetti`, and the `Droplet` mascot (Home, Water, login). Spend categories
+  (icon + colour) live in `components/spend/categories.ts`; add/edit an expense
+  through `ExpenseSheet`. Every looping animation must be gated on
+  `useReducedMotion()`. See RULES.md §Design.
 - **Visual hierarchy**: do *not* give every card the same fixed height. The
   home screen deliberately runs one tall hero card (hydration) above a shorter
   secondary stat row — uniform card heights are what made it read as a
@@ -214,18 +218,13 @@ follow the routing/storage conventions above unless noted.
   schedule offset is per-week local state that expires on Monday. Today's
   checklist/weights are local-only scratch (reset at local midnight); only a
   finished session is written (`workoutLogs`). Last-used weights pre-fill the
-  stepper. Custom splits come from `Coach.parseSplit` and are validated
-  before saving to `training/split`.
+  stepper. A custom split saved by an older build (`training/split`) is still
+  honoured; the week plan can reset it to the default.
 - **Fuel** (from Catalyst) — `(tabs)/fuel.tsx`, `utils/FuelStorage.ts`,
   `components/fuel/*`. Cycle position derives from a stored start date
   (`fuel/cycle`), not a counter. Meal logs are keyed by calendar date. Grocery
   ticks call `PurchasesStorage.savePurchase(..., 'Groceries')` and store the
   purchase id per restock window so unticking deletes the same purchase.
-- **Coach** — `utils/Coach.ts` calls Gemini over REST (`fetch`), no SDK. Key
-  from `EXPO_PUBLIC_GEMINI_API_KEY`; missing/rejected keys surface as calm
-  UI states, never thrown errors. `dailyBudget` in `data/coach/models.json`
-  is a local per-device guard, not Google's quota. Calls are on demand only
-  (never on render/focus). Chat history is local (last 60).
 - **Routine reminders** — `notifications.ts` `rescheduleRoutineReminders()`:
   training wake/go (WEEKLY, skip recovery slots), meals (DAILY), restock
   (WEEKLY on the cycle-start weekday) on channel `routine#001`. Every

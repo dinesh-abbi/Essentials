@@ -6,6 +6,7 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
   withDelay,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -14,7 +15,7 @@ import { Motion } from '@/constants/theme';
 /**
  * The house entrance: fade + translateY(10 → 0), ease-out, staggered by
  * `index`. Same curve and numbers as Home's local EntranceView so the new
- * Train / Fuel / Coach screens arrive with the identical rhythm. Under
+ * Train / Fuel screens arrive with the identical rhythm. Under
  * Reduce Motion it renders in place with no animation.
  */
 export function EntranceView({
@@ -35,7 +36,8 @@ export function EntranceView({
     const delay = index * 70;
     const config = { duration: Motion.duration.entrance, easing: Easing.out(Easing.cubic) };
     opacity.value = withDelay(delay, withTiming(1, config));
-    translateY.value = withDelay(delay, withTiming(0, config));
+    // Rises with a soft spring so blocks settle rather than slide.
+    translateY.value = withDelay(delay, withSpring(0, Motion.softSpring));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

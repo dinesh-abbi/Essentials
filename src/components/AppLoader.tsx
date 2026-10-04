@@ -1,86 +1,52 @@
 import React, { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
-  useSharedValue,
   useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
   withRepeat,
+  withSequence,
+  withSpring,
   withTiming,
-  Easing,
 } from 'react-native-reanimated';
-import { useTheme } from '@/hooks/use-theme';
-import { FontFace } from '@/constants/theme';
 
-/**
- * AppLoader — elegant, clean, and simple minimalist loading spinner.
- */
+import { Colors, Hue, Type, type HueName } from '@/constants/theme';
+
+const C = Colors.dark;
+const DOTS: HueName[] = ['water', 'train', 'fuel', 'spend', 'checkin'];
+
+/** Full-screen loader: a row of hue dots hopping in a wave, and one short line. */
 export default function AppLoader({ label = 'Loading…' }: { label?: string }) {
-  const theme = useTheme();
-  const rotation = useSharedValue(0);
-
-  useEffect(() => {
-    rotation.value = withRepeat(
-      withTiming(360, {
-        duration: 1000,
-        easing: Easing.linear,
-      }),
-      -1,
-      false
-    );
-  }, []);
-
-  const spinnerStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
-  }));
-
   return (
-    <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <View style={styles.spinnerContainer}>
-        {/* Simple elegant spinning ring */}
-        <Animated.View
-          style={[
-            styles.spinner,
-            spinnerStyle,
-            {
-              borderWidth: 3,
-              borderColor: theme.primary,
-              borderTopColor: 'transparent',
-            },
-          ]}
-        />
+    <View style={[styles.root, { backgroundColor: C.bg }]}>
+      <View style={styles.row}>
+        {DOTS.map((h, i) => (
+          <Dot key={h} color={Hue[h].main} index={i} />
+        ))}
       </View>
-      {label ? (
-        <Text style={[styles.label, { color: theme.textSecondary }]}>
-          {label}
-        </Text>
-      ) : null}
+      {label ? <Text style={[Type.dotLabel, styles.label, { color: C.textMid }]}>{label}</Text> : null}
     </View>
   );
 }
 
-const SPINNER_SIZE = 36;
+function Dot({ color, index }: { color: string; index: number }) {
+  const reduceMotion = useReducedMotion();
+  const y = useSharedValue(0);
+  useEffect(() => {
+    if (reduceMotion) return;
+    y.value = withDelay(
+      index * 110,
+      withRepeat(withSequence(withSpring(-14, { damping: 7, stiffness: 300 }), withSpring(0, { damping: 9 }), withTiming(0, { duration: 350 })), -1, false),
+    );
+  }, [index, reduceMotion, y]);
+  const style = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }] }));
+  return <Animated.View style={[styles.dot, { backgroundColor: color }, style]} />;
+}
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  spinnerContainer: {
-    width: SPINNER_SIZE,
-    height: SPINNER_SIZE,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  spinner: {
-    width: SPINNER_SIZE,
-    height: SPINNER_SIZE,
-    borderRadius: SPINNER_SIZE / 2,
-  },
-  label: {
-    marginTop: 16,
-    fontSize: 12,
-    fontFamily: FontFace.semibold,
-    letterSpacing: 0.5,
-  },
+  root: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  row: { flexDirection: 'row', gap: 10, height: 40, alignItems: 'flex-end' },
+  dot: { width: 14, height: 14, borderRadius: 7 },
+  label: { marginTop: 18 },
 });

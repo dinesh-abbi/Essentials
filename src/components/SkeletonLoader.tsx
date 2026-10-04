@@ -32,7 +32,7 @@ export default function Skeleton({ width, height, borderRadius = 8, style }: Ske
   }, []);
 
   const animatedStyle = useAnimatedStyle(() => {
-    const baseColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+    const baseColor = 'rgba(255, 255, 255, 0.08)';
     return {
       backgroundColor: baseColor,
       opacity: opacity.value,

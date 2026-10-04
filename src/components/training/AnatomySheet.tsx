@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Dimensions, ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
 import { Sheet } from '@/components/ui/sheet';
-import { Colors, Radius, Spacing, Type } from '@/constants/theme';
+import { Colors, Hue, Radius, Spacing, Type } from '@/constants/theme';
 
 const ANATOMY: Record<string, any> = {
   chest: require('../../../assets/anatomy/chest.png'),
@@ -37,7 +37,7 @@ export function AnatomySheet({ visible, onClose, focus }: { visible: boolean; on
   const [page, setPage] = useState(0);
 
   return (
-    <Sheet visible={visible} onClose={onClose} bracket="[ MUSCLES ]" title={plates.map((p) => LABEL[p]).join(' · ')}>
+    <Sheet visible={visible} onClose={onClose} bracket="MUSCLES" title={plates.map((p) => LABEL[p]).join(' · ')}>
       <ScrollView
         horizontal
         pagingEnabled
@@ -49,7 +49,7 @@ export function AnatomySheet({ visible, onClose, focus }: { visible: boolean; on
             <View style={[styles.plate, { borderColor: colors.hairline }]}>
               <Image source={ANATOMY[p]} style={styles.image} contentFit="contain" transition={180} />
             </View>
-            <Text style={[Type.bracketLabel, styles.caption, { color: colors.textMid }]}>[ {LABEL[p]} ]</Text>
+            <Text style={[Type.dotLabel, styles.caption, { color: Hue.train.main }]}>{LABEL[p]}</Text>
           </View>
         ))}
       </ScrollView>
@@ -58,7 +58,7 @@ export function AnatomySheet({ visible, onClose, focus }: { visible: boolean; on
           {plates.map((p, i) => (
             <View
               key={p}
-              style={[styles.dot, { backgroundColor: i === page ? colors.water : colors.hairline, width: i === page ? 18 : 6 }]}
+              style={[styles.dot, { backgroundColor: i === page ? Hue.train.main : colors.surface2, width: i === page ? 22 : 8 }]}
             />
           ))}
         </View>
@@ -79,5 +79,5 @@ const styles = StyleSheet.create({
   image: { flex: 1 },
   caption: { textAlign: 'center', marginTop: Spacing.three },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: Spacing.three },
-  dot: { height: 6, borderRadius: 3 },
+  dot: { height: 8, borderRadius: 4 },
 });

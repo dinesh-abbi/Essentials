@@ -1,489 +1,187 @@
-import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  LayoutAnimation,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  useColorScheme,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, { FadeInDown, LinearTransition, useReducedMotion } from 'react-native-reanimated';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useAuth } from '@/contexts/AuthContext';
-import { Colors, FontFace, Radius, Spacing } from '@/constants/theme';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
+import { Chip, ChunkyButton, IconBlob, Tile, type IconName } from '@/components/ui/chunky';
+import { LiveDot } from '@/components/ui/dots';
+import { ScreenHeader } from '@/components/ui/screen-header';
+import { Colors, Hue, Radius, Spacing, Type } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
 
-const DISCORD_STEPS = [
-  {
-    number: '1',
-    title: 'Open Discord & Pick a Server',
-    detail: 'Open the Discord app (or discord.com) and navigate to the server where you want logs posted.',
-  },
-  {
-    number: '2',
-    title: 'Open Channel Settings',
-    detail: 'Right-click (or long-press on mobile) the text channel → select "Edit Channel".',
-  },
-  {
-    number: '3',
-    title: 'Go to Integrations → Webhooks',
-    detail: 'In the channel settings sidebar, tap "Integrations", then "Webhooks".',
-  },
-  {
-    number: '4',
-    title: 'Create a New Webhook',
-    detail: 'Tap "New Webhook". Optionally rename it (e.g. "Essentials"). Then tap "Copy Webhook URL".',
-  },
-  {
-    number: '5',
-    title: 'Paste & Save',
-    detail: 'Come back here, paste the URL in the field, and tap "Save Changes".',
-  },
+const C = Colors.dark;
+const L = Hue.checkin;
+
+const STEPS: { icon: IconName; title: string; detail: string }[] = [
+  { icon: 'message-text', title: 'Open Discord', detail: 'Go to the server where check-ins should be posted.' },
+  { icon: 'cog', title: 'Edit the channel', detail: 'Long-press the text channel → Edit Channel.' },
+  { icon: 'puzzle', title: 'Integrations → Webhooks', detail: 'Tap Integrations, then Webhooks.' },
+  { icon: 'plus-circle', title: 'New webhook', detail: 'Name it “Essentials”, then Copy Webhook URL.' },
+  { icon: 'content-paste', title: 'Paste & save', detail: 'Come back here, paste it and tap Save.' },
 ];
 
-export default function DiscordScreen() {
-  const router = useRouter();
-  const { discordWebhookUrl, updateDiscordWebhook } = useAuth();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colors = Colors[scheme];
-  const isDark = scheme === 'dark';
+const mask = (url: string) => (url.length <= 45 ? url : `${url.substring(0, 35)}…••••${url.substring(url.length - 8)}`);
 
-  const [webhookUrl, setWebhookUrl] = useState(discordWebhookUrl ?? '');
-  const [isEditing, setIsEditing] = useState(!discordWebhookUrl);
+/** Connect the Discord channel that receives check-in photos — a status tile, the URL, and five picture steps. */
+export default function DiscordScreen() {
+  const insets = useSafeAreaInsets();
+  const reduceMotion = useReducedMotion();
+  const { discordWebhookUrl, updateDiscordWebhook } = useAuth();
+  const linked = !!discordWebhookUrl;
+
+  const [url, setUrl] = useState(discordWebhookUrl ?? '');
+  const [editing, setEditing] = useState(!discordWebhookUrl);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [showHelp, setShowHelp] = useState(!discordWebhookUrl);
 
-  const isLinked = !!discordWebhookUrl;
-
-  function maskWebhookUrl(url: string): string {
-    if (url.length <= 45) return url;
-    return url.substring(0, 35) + '...••••' + url.substring(url.length - 8);
-  }
-
-  async function handleSave() {
-    const trimmed = webhookUrl.trim();
-    if (!trimmed) {
-      Alert.alert('URL Required', 'Please enter your Discord Webhook URL.');
-      return;
-    }
+  async function save() {
+    const trimmed = url.trim();
     if (!trimmed.startsWith('https://discord.com/api/webhooks/')) {
-      Alert.alert('Invalid URL', 'The URL must start with https://discord.com/api/webhooks/');
+      Alert.alert('Check the URL', 'It should start with https://discord.com/api/webhooks/');
       return;
     }
     setSaving(true);
     try {
       await updateDiscordWebhook(trimmed);
-      setIsEditing(false);
-      Alert.alert('Success', 'Discord Webhook URL updated successfully.');
+      setEditing(false);
+      Alert.alert('Connected', 'Check-ins will post to this channel.');
     } catch (err: any) {
-      Alert.alert('Save Failed', err?.message ?? 'Could not update webhook URL.');
+      Alert.alert('Save failed', err?.message ?? 'Could not update the webhook URL.');
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleTestWebhook() {
+  async function test() {
     if (!discordWebhookUrl) return;
     setTesting(true);
     try {
-      const response = await fetch(discordWebhookUrl, {
+      const res = await fetch(discordWebhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: '🔔 **Essentials App Test Connection**\nYour Discord Integration is working perfectly! 🚀',
-        }),
+        body: JSON.stringify({ content: '🔔 **Essentials test**\nYour check-in channel is connected! 🚀' }),
       });
-      if (response.ok) {
-        Alert.alert('Test Successful', 'A test message was sent to your Discord channel.');
-      } else {
-        throw new Error(`Server returned status code: ${response.status}`);
-      }
+      if (!res.ok) throw new Error(`Discord said ${res.status}`);
+      Alert.alert('Sent!', 'Look in your Discord channel for the test message.');
     } catch (err: any) {
-      Alert.alert('Test Failed', `Could not reach Discord: ${err.message}`);
+      Alert.alert('Test failed', `Couldn’t reach Discord: ${err.message}`);
     } finally {
       setTesting(false);
     }
   }
 
-  function toggleHelp() {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setShowHelp(!showHelp);
-  }
+  const enter = (d: number) => (reduceMotion ? undefined : FadeInDown.delay(d).springify().damping(18));
 
   return (
-    <ThemedView style={styles.root}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        <View style={styles.header}>
-          <AnimatedPressable
-            onPress={() => router.back()}
-            style={[styles.backBtn, { borderColor: colors.border }]}
-          >
-            <Feather name="arrow-left" size={20} color={colors.text} />
-          </AnimatedPressable>
-          <ThemedText type="smallBold" themeColor="textSecondary" style={styles.headerTitle}>
-            INTEGRATION
-          </ThemedText>
-          <View style={{ width: 40 }} />
+    <View style={[styles.root, { backgroundColor: C.bg }]}>
+      <SafeAreaView style={styles.root} edges={['top']}>
+        <View style={styles.pad}>
+          <ScreenHeader bracket="Check-in channel" />
         </View>
-
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <Animated.View entering={FadeInDown.duration(400)} style={styles.heroSection}>
-            <View style={[styles.discordLogoBg, { backgroundColor: '#5865F2' }]}>
-              <Feather name="message-circle" size={40} color="#FFF" />
-            </View>
-            <ThemedText type="subtitle" style={styles.title}>Discord Webhook</ThemedText>
-            <ThemedText type="code" themeColor="textSecondary" style={styles.subtitle}>
-              Receive automated push summaries, hydration alerts, and offline check-ins right in your Discord channel.
-            </ThemedText>
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.five }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <Animated.View entering={enter(0)} style={styles.hero}>
+            <IconBlob name="forum" hue="checkin" size={88} />
+            <Text style={[Type.largeTitle, { color: C.textHi }]}>Discord</Text>
+            <Text style={[Type.body, styles.center, { color: C.textMid }]}>Every check-in photo is posted to your own channel.</Text>
           </Animated.View>
 
-          {/* Connected/Not-connected Status Banner */}
-          <Animated.View entering={FadeInDown.delay(100).duration(400)}>
-            <View
-              style={[
-                styles.statusBanner,
-                {
-                  borderColor: isLinked ? '#10B981' : colors.border,
-                  backgroundColor: isLinked
-                    ? '#10B98115'
-                    : colors.backgroundElement,
-                },
-              ]}
-            >
-              <View style={[styles.statusIndicatorCircle, { backgroundColor: isLinked ? '#10B981' : colors.textSecondary }]} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.statusText, { color: isLinked ? '#10B981' : colors.textSecondary }]}>
-                  {isLinked ? 'Connected & Configured' : 'No Webhook Linked'}
-                </Text>
-                {isLinked && (
-                  <Text style={[styles.maskedUrl, { color: colors.textSecondary }]}>
-                    {maskWebhookUrl(discordWebhookUrl!)}
+          <Animated.View entering={enter(80)}>
+            <Tile hue={linked ? 'checkin' : null} style={styles.status}>
+              {linked ? <LiveDot color={L.main} size={12} /> : <View style={[styles.offDot, { backgroundColor: C.textLow }]} />}
+              <View style={styles.flex}>
+                <Text style={[Type.controlLabel, { color: C.textHi }]}>{linked ? 'Connected' : 'Not connected yet'}</Text>
+                {linked ? (
+                  <Text style={[Type.subline, { color: C.textMid }]} numberOfLines={1}>
+                    {mask(discordWebhookUrl!)}
                   </Text>
-                )}
+                ) : null}
               </View>
-            </View>
+              {linked ? <Chip icon="check-bold" label="Live" hue="checkin" solid /> : null}
+            </Tile>
           </Animated.View>
 
-          {/* Configuration Input Box */}
-          <Animated.View entering={FadeInDown.delay(180).duration(400)}>
-            {isEditing ? (
-              <View style={[styles.card, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-                <ThemedText type="smallBold" themeColor="textSecondary" style={styles.inputLabel}>
-                  WEBHOOK URL
-                </ThemedText>
+          <Animated.View entering={enter(160)} layout={reduceMotion ? undefined : LinearTransition}>
+            {editing ? (
+              <Tile style={styles.card}>
+                <Text style={[Type.dotLabel, { color: C.textMid }]}>Webhook URL</Text>
                 <TextInput
-                  value={webhookUrl}
-                  onChangeText={setWebhookUrl}
-                  style={[
-                    styles.inputField,
-                    {
-                      color: colors.text,
-                      borderColor: colors.border,
-                      backgroundColor: colors.backgroundSelected,
-                    },
-                  ]}
-                  placeholder="https://discord.com/api/webhooks/..."
-                  placeholderTextColor={colors.textSecondary}
+                  value={url}
+                  onChangeText={setUrl}
+                  style={[Type.body, styles.input, { color: C.textHi, backgroundColor: C.bg }]}
+                  placeholder="https://discord.com/api/webhooks/…"
+                  placeholderTextColor={C.textLow}
                   autoCapitalize="none"
                   autoCorrect={false}
                   keyboardType="url"
                   multiline
-                  numberOfLines={2}
                 />
-                <View style={styles.actionRow}>
-                  <AnimatedPressable
-                    onPress={handleSave}
-                    disabled={saving}
-                    style={[styles.saveBtn, { backgroundColor: colors.primary, opacity: saving ? 0.6 : 1 }]}
-                  >
-                    {saving ? (
-                      <ActivityIndicator size="small" color="#FFF" />
-                    ) : (
-                      <>
-                        <Feather name="check" size={16} color="#FFF" />
-                        <Text style={styles.saveBtnText}>Save Webhook</Text>
-                      </>
-                    )}
-                  </AnimatedPressable>
-                  {isLinked && (
-                    <AnimatedPressable
+                <View style={styles.row}>
+                  {linked && (
+                    <ChunkyButton
+                      label="Cancel"
+                      variant="soft"
+                      hue="checkin"
+                      size="md"
+                      style={styles.flex}
                       onPress={() => {
-                        setWebhookUrl(discordWebhookUrl ?? '');
-                        setIsEditing(false);
+                        setUrl(discordWebhookUrl ?? '');
+                        setEditing(false);
                       }}
-                      style={[styles.cancelBtn, { borderColor: colors.border }]}
-                    >
-                      <Text style={[styles.cancelText, { color: colors.text }]}>Cancel</Text>
-                    </AnimatedPressable>
+                    />
                   )}
+                  <ChunkyButton label="Save" icon="check-bold" hue="checkin" size="md" style={styles.flex} onPress={save} loading={saving} />
                 </View>
-              </View>
+              </Tile>
             ) : (
-              <View style={[styles.card, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-                <View style={styles.buttonStack}>
-                  <AnimatedPressable
-                    onPress={handleTestWebhook}
-                    disabled={testing}
-                    style={[styles.primaryActionBtn, { backgroundColor: colors.primary }]}
-                  >
-                    {testing ? (
-                      <ActivityIndicator size="small" color="#FFF" />
-                    ) : (
-                      <>
-                        <Feather name="bell" size={16} color="#FFF" />
-                        <Text style={styles.actionText}>Send Test Notification</Text>
-                      </>
-                    )}
-                  </AnimatedPressable>
-
-                  <AnimatedPressable
-                    onPress={() => setIsEditing(true)}
-                    style={[styles.secondaryActionBtn, { borderColor: colors.border }]}
-                  >
-                    <Feather name="edit-2" size={16} color={colors.text} />
-                    <Text style={[styles.actionTextSecondary, { color: colors.text }]}>Change Webhook URL</Text>
-                  </AnimatedPressable>
-                </View>
+              <View style={styles.row}>
+                <ChunkyButton label="Send a test" icon="bell-ring" hue="checkin" style={styles.flex} onPress={test} loading={testing} />
+                <ChunkyButton label="Change" icon="pencil" variant="soft" hue="checkin" style={styles.flex} onPress={() => setEditing(true)} />
               </View>
             )}
           </Animated.View>
 
-          {/* Step-by-Step Instructions */}
-          <Animated.View entering={FadeInDown.delay(250).duration(400)}>
-            <TouchableOpacity onPress={toggleHelp} activeOpacity={0.7} style={styles.helpHeaderRow}>
-              <ThemedText type="smallBold" themeColor="textSecondary">
-                INSTRUCTIONS
-              </ThemedText>
-              <Feather name={showHelp ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textSecondary} />
-            </TouchableOpacity>
-
-            {showHelp && (
-              <View style={[styles.helpList, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-                {DISCORD_STEPS.map((step, index) => (
-                  <View key={step.number} style={[styles.stepItem, { borderBottomColor: colors.border, borderBottomWidth: index < DISCORD_STEPS.length - 1 ? StyleSheet.hairlineWidth : 0 }]}>
-                    <View style={[styles.stepBadge, { backgroundColor: '#5865F2' }]}>
-                      <Text style={styles.stepBadgeText}>{step.number}</Text>
-                    </View>
-                    <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={[styles.stepTitle, { color: colors.text }]}>{step.title}</Text>
-                      <Text style={[styles.stepDetail, { color: colors.textSecondary }]}>{step.detail}</Text>
-                    </View>
+          <Animated.View entering={enter(240)} layout={reduceMotion ? undefined : LinearTransition}>
+            <AnimatedPressable onPress={() => setShowHelp((s) => !s)} haptic="light" style={styles.helpHead} accessibilityRole="button" accessibilityState={{ expanded: showHelp }}>
+              <Text style={[Type.headline, { color: C.textHi }]}>How to get one</Text>
+              <MaterialCommunityIcons name={showHelp ? 'chevron-up' : 'chevron-down'} size={26} color={C.textMid} />
+            </AnimatedPressable>
+            {showHelp &&
+              STEPS.map((s, i) => (
+                <Tile key={s.title} style={styles.step} containerStyle={styles.stepBox}>
+                  <View style={[styles.num, { backgroundColor: L.main }]}>
+                    <Text style={[Type.dotSmall, { color: L.on, fontSize: 16 }]}>{i + 1}</Text>
                   </View>
-                ))}
-              </View>
-            )}
+                  <View style={styles.flex}>
+                    <Text style={[Type.controlLabel, { color: C.textHi }]}>{s.title}</Text>
+                    <Text style={[Type.subline, { color: C.textMid }]}>{s.detail}</Text>
+                  </View>
+                  <MaterialCommunityIcons name={s.icon} size={24} color={L.main} />
+                </Tile>
+              ))}
           </Animated.View>
         </ScrollView>
       </SafeAreaView>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  safeArea: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 12,
-    fontFamily: FontFace.bold,
-    letterSpacing: 1.5,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: Spacing.three,
-    paddingBottom: Spacing.five,
-    gap: Spacing.four,
-  },
-  heroSection: {
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 10,
-  },
-  discordLogoBg: {
-    width: 80,
-    height: 80,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 26,
-    fontFamily: FontFace.bold,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    textAlign: 'center',
-    paddingHorizontal: 16,
-    fontSize: 13,
-    fontFamily: FontFace.regular,
-    lineHeight: 19,
-  },
-  statusBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    padding: 16,
-  },
-  statusIndicatorCircle: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  statusText: {
-    fontSize: 14,
-    fontFamily: FontFace.bold,
-  },
-  maskedUrl: {
-    fontSize: 11,
-    marginTop: 2,
-    fontFamily: 'monospace',
-  },
-  card: {
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    padding: 16,
-    gap: 14,
-  },
-  inputLabel: {
-    fontSize: 10,
-    fontFamily: FontFace.bold,
-  },
-  inputField: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    fontFamily: FontFace.regular,
-    minHeight: 60,
-    textAlignVertical: 'top',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  saveBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: 8,
-    paddingVertical: 12,
-  },
-  saveBtnText: {
-    color: '#FFF',
-    fontSize: 13,
-    fontFamily: FontFace.bold,
-  },
-  cancelBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-  },
-  cancelText: {
-    fontSize: 13,
-    fontFamily: FontFace.semibold,
-  },
-  buttonStack: {
-    gap: 10,
-  },
-  primaryActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderRadius: 8,
-    paddingVertical: 14,
-  },
-  secondaryActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingVertical: 14,
-  },
-  actionText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontFamily: FontFace.bold,
-  },
-  actionTextSecondary: {
-    fontSize: 14,
-    fontFamily: FontFace.bold,
-  },
-  helpHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  helpList: {
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    paddingHorizontal: 16,
-    marginTop: 10,
-  },
-  stepItem: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingVertical: 14,
-    alignItems: 'flex-start',
-  },
-  stepBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  stepBadgeText: {
-    color: '#FFF',
-    fontSize: 12,
-    fontFamily: FontFace.bold,
-  },
-  stepTitle: {
-    fontSize: 14,
-    fontFamily: FontFace.bold,
-  },
-  stepDetail: {
-    fontSize: 12,
-    fontFamily: FontFace.regular,
-    lineHeight: 18,
-    marginTop: 2,
-  },
+  pad: { paddingHorizontal: Spacing.three },
+  content: { paddingHorizontal: Spacing.three, gap: 12 },
+  flex: { flex: 1 },
+  center: { textAlign: 'center' },
+  hero: { alignItems: 'center', gap: 6, paddingVertical: Spacing.three },
+  status: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  offDot: { width: 12, height: 12, borderRadius: 6 },
+  card: { gap: 12 },
+  input: { borderRadius: Radius.lg, padding: 14, minHeight: 72, textAlignVertical: 'top' },
+  row: { flexDirection: 'row', gap: 10 },
+  helpHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.three, marginBottom: 10 },
+  stepBox: { marginBottom: 6 },
+  step: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  num: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
 });

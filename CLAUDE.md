@@ -18,8 +18,9 @@ cd android && ./gradlew.bat assembleRelease -PreactNativeArchitectures=arm64-v8a
   hand the APK to the user to sideload; say plainly that a successful build
   doesn't prove runtime behaviour.
 - Don't commit, push, tag or publish a release unless the user asks.
-- The design system is strict (one accent, type-led, hairlines, no shadows) —
-  read `src/constants/theme.ts` and `RULES.md` before touching UI.
+- The design system is strict ("Glance": one hue per area, picture first,
+  chunky tiles, dot-matrix numbers) — read `src/constants/theme.ts` and
+  `RULES.md` before touching UI.
 - Catalyst is retired; don't reintroduce its packages (NativeWind, zustand,
   @react-native-firebase, notifee, @google/generative-ai, expo-video). Map of
   what went where: `docs/CATALYST_MERGE.md`.

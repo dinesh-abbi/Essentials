@@ -1,226 +1,141 @@
-import { Feather } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  NativeModules,
-  Platform,
-  StyleSheet,
-  TextInput,
-  View,
-  useWindowDimensions,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, NativeModules, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { FontFace, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
-import { AnimatedPressable } from '@/components/ui/animated-pressable';
+import { BigMessage } from '@/components/ui/big-message';
+import { ChunkyButton, Tile } from '@/components/ui/chunky';
+import { ScanFrame } from '@/components/ui/scan-frame';
+import { Colors, Hue, Radius, Spacing, Type } from '@/constants/theme';
 
+const C = Colors.dark;
+
+// Pull `pa` out of a upi://pay URI, or accept a raw VPA like name@bank.
+const parseUpiId = (data: string) => {
+  if (data.startsWith('upi://pay')) {
+    try {
+      return new URLSearchParams(data.split('?')[1]).get('pa') || null;
+    } catch {
+      return null;
+    }
+  }
+  return /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/.test(data) ? data : null;
+};
+
+/** Point the camera at a UPI QR, pick one from your photos, or type an ID. */
 export default function UpiScannerScreen() {
   const router = useRouter();
-  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [manualUpi, setManualUpi] = useState('');
   const [isScanning, setIsScanning] = useState(true);
 
-  const { width, height } = useWindowDimensions();
-  const frameSize = 250;
+  const go = (upiId: string, data?: string) =>
+    router.push({ pathname: '/upi/amount' as any, params: data?.startsWith('upi://pay') ? { upiId, qrData: data } : { upiId } });
 
-  const handleSelectFromGallery = async () => {
+  const fromGallery = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Permission to access your photos is required to upload a QR code.');
+        Alert.alert('Photos needed', 'Allow photo access to read a QR from your gallery.');
         return;
       }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 1,
-      });
-
-      if (result.canceled || !result.assets?.[0]?.uri) {
-        return;
-      }
-
-      const pickedUri = result.assets[0].uri;
-      
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 1 });
+      if (result.canceled || !result.assets?.[0]?.uri) return;
       const { QrCodeScanner } = NativeModules;
       if (!QrCodeScanner) {
-        Alert.alert('Scanner Error', 'Native QR scanner module is not available.');
+        Alert.alert('Scanner error', 'The QR reader is not available in this build.');
         return;
       }
-
       setIsScanning(false);
-      const decodedCode = await QrCodeScanner.scanQrCodeFromImage(pickedUri);
-      
-      const upiId = parseUpiId(decodedCode);
-      if (upiId) {
-        if (decodedCode.startsWith('upi://pay')) {
-          router.push({ pathname: '/upi/amount' as any, params: { upiId, qrData: decodedCode } });
-        } else {
-          router.push({ pathname: '/upi/amount' as any, params: { upiId } });
-        }
-      } else {
-        Alert.alert('Invalid QR Code', 'No valid UPI QR code detected in the selected image.');
+      const decoded: string = await QrCodeScanner.scanQrCodeFromImage(result.assets[0].uri);
+      const upiId = parseUpiId(decoded);
+      if (upiId) go(upiId, decoded);
+      else {
+        Alert.alert('No UPI code', 'That picture doesn’t have a UPI QR code in it.');
         setIsScanning(true);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Gallery scan error:', error);
-      Alert.alert('Scan Failed', 'Could not detect a QR code. Please try another image.');
+      Alert.alert('Couldn’t read it', 'Try another picture.');
       setIsScanning(true);
     }
   };
 
-  // Extract pa parameter from upi://pay URI or assume it's a raw VPA
-  const parseUpiId = (data: string) => {
-    if (data.startsWith('upi://pay')) {
-      try {
-        const urlParams = new URLSearchParams(data.split('?')[1]);
-        const pa = urlParams.get('pa');
-        return pa || null;
-      } catch (e) {
-        return null;
-      }
-    }
-    // Simple basic regex check for UPI ID format (e.g., name@bank)
-    if (/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/.test(data)) {
-      return data;
-    }
-    return null;
-  };
-
-  const handleBarcodeScanned = ({ data }: { data: string }) => {
+  const onScanned = ({ data }: { data: string }) => {
     if (!isScanning) return;
-    
     const upiId = parseUpiId(data);
     if (upiId) {
       setIsScanning(false);
-      if (data.startsWith('upi://pay')) {
-        router.push({ pathname: '/upi/amount' as any, params: { upiId, qrData: data } });
-      } else {
-        router.push({ pathname: '/upi/amount' as any, params: { upiId } });
-      }
-    } else {
-      // Optional: show a small toast or ignore invalid QR codes
+      go(upiId, data);
     }
   };
 
-  const handleManualSubmit = () => {
+  const submitManual = () => {
     const upiId = parseUpiId(manualUpi.trim());
-    if (upiId) {
-      router.push({ pathname: '/upi/amount' as any, params: { upiId } });
-    } else {
-      Alert.alert('Invalid UPI ID', 'Please enter a valid UPI ID (e.g., user@bank).');
-    }
+    if (upiId) go(upiId);
+    else Alert.alert('Check the UPI ID', 'It looks like name@bank.');
   };
 
   if (!permission) {
     return (
-      <ThemedView style={styles.centeredContainer}>
-        <ActivityIndicator size="large" color={theme.primary} />
-      </ThemedView>
+      <View style={[styles.center, { backgroundColor: C.bg }]}>
+        <ActivityIndicator size="large" color={Hue.spend.main} />
+      </View>
     );
   }
 
   if (!permission.granted) {
     return (
-      <ThemedView style={styles.permissionContainer}>
-        <Feather name="camera" size={48} color={theme.primary} style={{ marginBottom: Spacing.four }} />
-        <ThemedText type="subtitle" style={styles.permissionTitle}>
-          Camera Required
-        </ThemedText>
-        <ThemedText themeColor="textSecondary" style={styles.permissionSubtitle}>
-          Camera permission is required to scan UPI QR codes.
-        </ThemedText>
-        <AnimatedPressable
-          onPress={requestPermission}
-          style={[
-            styles.primaryButton,
-            { backgroundColor: theme.primary },
-          ]}>
-          <ThemedText type="smallBold" style={{ color: theme.background }}>
-            Enable Camera
-          </ThemedText>
-        </AnimatedPressable>
-      </ThemedView>
+      <SafeAreaView style={[styles.fill, { backgroundColor: C.bg }]}>
+        <BigMessage icon="qrcode-scan" hue="spend" title="Camera needed" text="To scan a UPI QR code, Essentials needs your camera.">
+          <ChunkyButton label="Allow camera" icon="camera" hue="spend" onPress={requestPermission} />
+          <ChunkyButton label="Pick from photos" icon="image" variant="soft" hue="spend" onPress={fromGallery} />
+        </BigMessage>
+      </SafeAreaView>
     );
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.container}>
-        {/* Camera View */}
+    <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={styles.camera}>
         <CameraView
           style={StyleSheet.absoluteFill}
           facing="back"
-          onBarcodeScanned={isScanning ? handleBarcodeScanned : undefined}
-          barcodeScannerSettings={{
-            barcodeTypes: ['qr'],
-          }}
+          onBarcodeScanned={isScanning ? onScanned : undefined}
+          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
         />
-
-        {/* HUD Overlay */}
-        <View style={styles.hudOverlay} pointerEvents="none">
-          <View
-            style={[
-              styles.focusFrame,
-              {
-                position: 'absolute',
-                left: (width - frameSize) / 2,
-                top: (height - frameSize) / 2,
-              },
-            ]}>
-            <View style={[styles.corner, styles.cornerTL]} />
-            <View style={[styles.corner, styles.cornerTR]} />
-            <View style={[styles.corner, styles.cornerBL]} />
-            <View style={[styles.corner, styles.cornerBR]} />
+        <View style={[StyleSheet.absoluteFill, styles.center]} pointerEvents="none">
+          <ScanFrame color={Hue.spend.main} />
+          <View style={[styles.hint, { backgroundColor: 'rgba(11,11,15,0.7)' }]}>
+            <Text style={[Type.dotLabel, { color: '#FFFFFF' }]}>Point at a UPI QR</Text>
           </View>
         </View>
 
-        {/* Top Controls */}
-        <View style={[styles.topRow, { paddingTop: insets.top + Spacing.four }]}>
-          <AnimatedPressable
-            onPress={() => router.back()}
-            style={[styles.roundBtn, { backgroundColor: 'rgba(15, 23, 42, 0.6)' }]}>
-            <Feather name="arrow-left" size={20} color="#FFF" />
-          </AnimatedPressable>
-          <AnimatedPressable
-            onPress={handleSelectFromGallery}
-            style={[styles.roundBtn, { backgroundColor: 'rgba(15, 23, 42, 0.6)', marginLeft: 'auto' }]}>
-            <Feather name="image" size={20} color="#FFF" />
-          </AnimatedPressable>
+        <View style={[styles.top, { paddingTop: insets.top + Spacing.two }]}>
+          <ChunkyButton icon="arrow-left" variant="soft" hue="spend" size="md" haptic="light" onPress={() => router.back()} accessibilityLabel="Back" />
+          <ChunkyButton label="Photos" icon="image" variant="soft" hue="spend" size="md" haptic="light" onPress={fromGallery} />
         </View>
 
-        {/* Bottom Fallback Input */}
-        <View style={[styles.bottomContainer, { paddingBottom: Math.max(insets.bottom, Spacing.four) }]}>
-          <View style={styles.inputCard}>
-            <ThemedText style={styles.inputLabel}>Or enter UPI ID manually:</ThemedText>
-            <View style={styles.inputRow}>
+        <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, Spacing.three) }]}>
+          <Tile style={styles.manual}>
+            <Text style={[Type.dotLabel, { color: C.textMid }]}>Or type a UPI ID</Text>
+            <View style={styles.row}>
               <TextInput
-                style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                placeholder="e.g., name@bank"
-                placeholderTextColor={theme.textSecondary}
+                style={[Type.controlLabel, styles.input, { color: C.textHi, backgroundColor: C.bg }]}
+                placeholder="name@bank"
+                placeholderTextColor={C.textLow}
                 value={manualUpi}
                 onChangeText={setManualUpi}
                 autoCapitalize="none"
                 autoCorrect={false}
+                onSubmitEditing={submitManual}
               />
-              <AnimatedPressable
-                onPress={handleManualSubmit}
-                style={[styles.submitBtn, { backgroundColor: theme.primary }]}>
-                <Feather name="arrow-right" size={20} color="#FFF" />
-              </AnimatedPressable>
+              <ChunkyButton icon="arrow-right" hue="spend" size="md" onPress={submitManual} disabled={!manualUpi.trim()} accessibilityLabel="Continue" />
             </View>
-          </View>
+          </Tile>
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -228,137 +143,13 @@ export default function UpiScannerScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  centeredContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  permissionContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.five,
-  },
-  permissionTitle: {
-    fontSize: 20,
-    fontFamily: FontFace.bold,
-    marginBottom: Spacing.two,
-  },
-  permissionSubtitle: {
-    textAlign: 'center',
-    fontSize: 14,
-    fontFamily: FontFace.regular,
-    marginBottom: Spacing.five,
-  },
-  primaryButton: {
-    borderRadius: 12,
-    paddingHorizontal: Spacing.five,
-    paddingVertical: Spacing.three,
-  },
-  topRow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.four,
-    zIndex: 10,
-  },
-  roundBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  hudOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  focusFrame: {
-    width: 250,
-    height: 250,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    position: 'relative',
-  },
-  corner: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    borderColor: '#FFFFFF',
-  },
-  cornerTL: {
-    top: -1,
-    left: -1,
-    borderLeftWidth: 3,
-    borderTopWidth: 3,
-  },
-  cornerTR: {
-    top: -1,
-    right: -1,
-    borderRightWidth: 3,
-    borderTopWidth: 3,
-  },
-  cornerBL: {
-    bottom: -1,
-    left: -1,
-    borderLeftWidth: 3,
-    borderBottomWidth: 3,
-  },
-  cornerBR: {
-    bottom: -1,
-    right: -1,
-    borderRightWidth: 3,
-    borderBottomWidth: 3,
-  },
-  bottomContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: Spacing.four,
-  },
-  inputCard: {
-    backgroundColor: 'rgba(15, 23, 42, 0.82)',
-    padding: Spacing.four,
-    borderRadius: 24,
-  },
-  inputLabel: {
-    color: '#FFF',
-    fontSize: 14,
-    fontFamily: FontFace.regular,
-    marginBottom: Spacing.three,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-  },
-  input: {
-    flex: 1,
-    height: 48,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: Spacing.three,
-    fontSize: 16,
-    fontFamily: FontFace.regular,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-  },
-  submitBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  fill: { flex: 1 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  camera: { flex: 1, backgroundColor: '#000' },
+  hint: { marginTop: 24, paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.pill },
+  top: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: Spacing.three },
+  bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: Spacing.three },
+  manual: { gap: 10 },
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  input: { flex: 1, height: 51, borderRadius: Radius.lg, paddingHorizontal: 16 },
 });

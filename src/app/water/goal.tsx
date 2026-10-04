@@ -1,486 +1,94 @@
-import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  useColorScheme,
-  Dimensions,
-} from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown, FadeInUp, useReducedMotion, ZoomIn } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withRepeat,
-  withDelay,
-  withSpring,
-  withSequence,
-  Easing,
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  interpolate,
-  useDerivedValue,
-  useReducedMotion,
-} from 'react-native-reanimated';
-import { AnimatedPressable } from '@/components/ui/animated-pressable';
+
+import Droplet from '@/components/illustrations/Droplet';
+import { ChunkyButton } from '@/components/ui/chunky';
+import { Confetti } from '@/components/ui/confetti';
+import { StatGrid, StatTile } from '@/components/ui/stat-tile';
+import { Colors, Spacing, Type } from '@/constants/theme';
 import * as WaterStorage from '@/utils/WaterStorage';
-import { FontFace } from '@/constants/theme';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const C = Colors.dark;
 
-// ── Single floating droplet particle ────────────────────────────────────────
-function WaterDroplet({
-  x,
-  delay,
-  size,
-  duration,
-}: {
-  x: number;
-  delay: number;
-  size: number;
-  duration: number;
-}) {
-  const translateY = useSharedValue(SCREEN_HEIGHT * 0.6);
-  const opacity = useSharedValue(0);
-  const scale = useSharedValue(0.5);
-  const reduceMotion = useReducedMotion();
-
-  useEffect(() => {
-    if (reduceMotion) return; // no floating droplets under reduced motion
-    translateY.value = withDelay(
-      delay,
-      withRepeat(
-        withTiming(-SCREEN_HEIGHT * 0.1, { duration, easing: Easing.out(Easing.ease) }),
-        -1,
-        false
-      )
-    );
-    opacity.value = withDelay(
-      delay,
-      withRepeat(
-        withSequence(
-          withTiming(0.8, { duration: duration * 0.15 }),
-          withTiming(0.6, { duration: duration * 0.6 }),
-          withTiming(0, { duration: duration * 0.25 })
-        ),
-        -1,
-        false
-      )
-    );
-    scale.value = withDelay(
-      delay,
-      withRepeat(
-        withSequence(
-          withTiming(1, { duration: duration * 0.2 }),
-          withTiming(0.7, { duration: duration * 0.8 })
-        ),
-        -1,
-        false
-      )
-    );
-  }, []);
-
-  const style = useAnimatedStyle(() => ({
-    position: 'absolute',
-    left: x,
-    bottom: 0,
-    width: size,
-    height: size * 1.3,
-    borderRadius: size / 2,
-    backgroundColor: '#5AD7EC',
-    transform: [{ translateY: translateY.value }, { scale: scale.value }],
-    opacity: opacity.value,
-  }));
-
-  return <Animated.View style={style} />;
-}
-
-// ── Rising wave layer ────────────────────────────────────────────────────────
-function RisingWave({ delay, color }: { delay: number; color: string }) {
-  const translateY = useSharedValue(SCREEN_HEIGHT);
-  const rotation = useSharedValue(0);
-  const reduceMotion = useReducedMotion();
-
-  useEffect(() => {
-    translateY.value = withDelay(
-      delay,
-      withTiming(SCREEN_HEIGHT * 0.25, {
-        duration: 2200,
-        easing: Easing.out(Easing.cubic),
-      })
-    );
-    if (!reduceMotion) {
-      rotation.value = withRepeat(
-        withTiming(360, { duration: 12000, easing: Easing.linear }),
-        -1,
-        false
-      );
-    }
-  }, []);
-
-  const style = useAnimatedStyle(() => ({
-    position: 'absolute',
-    bottom: 0,
-    left: -SCREEN_WIDTH * 0.3,
-    width: SCREEN_WIDTH * 1.6,
-    height: SCREEN_WIDTH * 1.6,
-    borderRadius: SCREEN_WIDTH * 0.8,
-    backgroundColor: color,
-    transform: [
-      { translateY: translateY.value },
-      { rotate: `${rotation.value}deg` },
-    ],
-  }));
-
-  return <Animated.View style={style} />;
-}
-
-// ── Trophy pulse animation ───────────────────────────────────────────────────
-function TrophyIcon() {
-  const scale = useSharedValue(0);
-  const glow = useSharedValue(0);
-  const reduceMotion = useReducedMotion();
-
-  useEffect(() => {
-    scale.value = withDelay(
-      600,
-      withSpring(1, { damping: 8, stiffness: 100 })
-    );
-    if (!reduceMotion) {
-      glow.value = withDelay(
-        1000,
-        withRepeat(
-          withSequence(
-            withTiming(1, { duration: 1200 }),
-            withTiming(0.4, { duration: 1200 })
-          ),
-          -1,
-          true
-        )
-      );
-    }
-  }, []);
-
-  const containerStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: glow.value * 0.5,
-    transform: [{ scale: 1 + glow.value * 0.15 }],
-  }));
-
-  return (
-    <Animated.View style={[styles.trophyContainer, containerStyle]}>
-      {/* Glow ring */}
-      <Animated.View style={[styles.trophyGlow, glowStyle]} />
-      <View style={styles.trophyInner}>
-        <Text style={styles.trophyEmoji}>🏆</Text>
-      </View>
-    </Animated.View>
-  );
-}
-
-// ── Main Goal Screen ─────────────────────────────────────────────────────────
+/**
+ * The "goal hit" celebration (opened from the goal notification): confetti,
+ * Drip at full joy, three facts, one button home.
+ */
 export default function WaterGoalScreen() {
   const router = useRouter();
-  const scheme = useColorScheme();
-  const isDark = scheme === 'dark';
-
-  const [totalDrank, setTotalDrank] = useState(0);
+  const reduceMotion = useReducedMotion();
+  const [total, setTotal] = useState(0);
   const [goal, setGoal] = useState(WaterStorage.DEFAULT_DAILY_GOAL);
-  const [goalReachedTime, setGoalReachedTime] = useState<string>('');
+  const [reachedAt, setReachedAt] = useState('');
 
   useEffect(() => {
-    loadGoalData();
+    (async () => {
+      try {
+        const [g, t, logs] = await Promise.all([
+          WaterStorage.getUserWaterGoal(),
+          WaterStorage.getTodayTotalMl(),
+          WaterStorage.getTodayWaterLogs(),
+        ]);
+        setGoal(g);
+        setTotal(t);
+        let running = 0;
+        for (const l of logs.sort((a, b) => a.timestamp - b.timestamp)) {
+          running += l.amountMl;
+          if (running >= g) {
+            setReachedAt(new Date(l.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+            break;
+          }
+        }
+      } catch {
+        // Celebration still renders with defaults.
+      }
+    })();
   }, []);
 
-  async function loadGoalData() {
-    try {
-      const userGoal = await WaterStorage.getUserWaterGoal();
-      setGoal(userGoal);
-      const total = await WaterStorage.getTodayTotalMl();
-      setTotalDrank(total);
-
-      // Find the approximate time the goal was crossed by reading today's logs
-      const logs = await WaterStorage.getTodayWaterLogs();
-      const sorted = logs.sort((a, b) => a.timestamp - b.timestamp);
-      let running = 0;
-      for (const log of sorted) {
-        running += log.amountMl;
-        if (running >= userGoal) {
-          setGoalReachedTime(
-            new Date(log.timestamp).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-          );
-          break;
-        }
-      }
-    } catch {
-      // fallback silently
-    }
-  }
-
-  // Droplet particles
-  const droplets = [
-    { x: SCREEN_WIDTH * 0.08, delay: 0, size: 10, duration: 3200 },
-    { x: SCREEN_WIDTH * 0.2, delay: 500, size: 7, duration: 2800 },
-    { x: SCREEN_WIDTH * 0.35, delay: 200, size: 12, duration: 3600 },
-    { x: SCREEN_WIDTH * 0.5, delay: 800, size: 8, duration: 3000 },
-    { x: SCREEN_WIDTH * 0.62, delay: 100, size: 11, duration: 3400 },
-    { x: SCREEN_WIDTH * 0.75, delay: 600, size: 6, duration: 2600 },
-    { x: SCREEN_WIDTH * 0.88, delay: 300, size: 9, duration: 3100 },
-  ];
+  const enter = (d: number) => (reduceMotion ? undefined : FadeInDown.delay(d).springify().damping(16));
 
   return (
-    <View style={styles.root}>
-      {/* ── Background wave layers ── */}
-      <RisingWave delay={0} color="#0C3540" />
-      <RisingWave delay={200} color="#0E8FA820" />
-      <RisingWave delay={400} color="#34C6DE15" />
-
-      {/* ── Floating droplet particles ── */}
-      {droplets.map((d, i) => (
-        <WaterDroplet key={i} {...d} />
-      ))}
-
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        {/* ── Back button ── */}
-        <Animated.View entering={FadeIn.delay(300)} style={styles.backRow}>
-          <AnimatedPressable
-            onPress={() => router.back()}
-            style={styles.backBtn}
-          >
-            <Feather name="x" size={20} color="#FFFFFF" />
-          </AnimatedPressable>
-        </Animated.View>
-
-        {/* ── Main content ── */}
+    <View style={[styles.root, { backgroundColor: C.bg }]}>
+      <Confetti />
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        <View style={styles.top}>
+          <ChunkyButton icon="close" variant="soft" hue="water" size="md" haptic="light" onPress={() => router.back()} accessibilityLabel="Close" />
+        </View>
         <View style={styles.content}>
-          {/* Trophy */}
-          <TrophyIcon />
-
-          {/* Headline */}
-          <Animated.Text entering={FadeInDown.delay(800).duration(600)} style={styles.headline}>
-            Goal Reached!
-          </Animated.Text>
-
-          <Animated.Text entering={FadeInDown.delay(1000).duration(600)} style={styles.subline}>
-            You've hit your daily hydration goal.{'\n'}Your body thanks you 💧
-          </Animated.Text>
-
-          {/* Stats card */}
-          <Animated.View
-            entering={FadeInUp.delay(1200).duration(600)}
-            style={styles.statsCard}
-          >
-            <View style={styles.statRow}>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{totalDrank}</Text>
-                <Text style={styles.statLabel}>ML DRANK</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{goal}</Text>
-                <Text style={styles.statLabel}>ML GOAL</Text>
-              </View>
-              {goalReachedTime ? (
-                <>
-                  <View style={styles.statDivider} />
-                  <View style={styles.statItem}>
-                    <Text style={styles.statValue}>{goalReachedTime}</Text>
-                    <Text style={styles.statLabel}>REACHED AT</Text>
-                  </View>
-                </>
-              ) : null}
-            </View>
-
-            {/* Progress bar */}
-            <View style={styles.progressTrack}>
-              <Animated.View
-                entering={FadeIn.delay(1500)}
-                style={[
-                  styles.progressFill,
-                  { width: `${Math.min((totalDrank / goal) * 100, 100)}%` },
-                ]}
-              />
-            </View>
-            <Text style={styles.progressLabel}>
-              {totalDrank > goal
-                ? `${totalDrank - goal}ml over goal! 🚀`
-                : '100% complete ✓'}
-            </Text>
+          <Animated.View entering={reduceMotion ? undefined : ZoomIn.delay(150).springify().damping(10)}>
+            <Droplet ratio={Math.max(1, total / goal)} size={190} />
           </Animated.View>
-
-          {/* CTA Button */}
-          <Animated.View entering={FadeInUp.delay(1600).duration(500)} style={styles.ctaWrap}>
-            <AnimatedPressable
-              onPress={() => router.replace('/water')}
-              style={styles.ctaBtn}
-            >
-              <Feather name="droplet" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={styles.ctaBtnText}>Back to Hydration</Text>
-            </AnimatedPressable>
+          <Animated.Text entering={enter(400)} style={[styles.headline, { color: C.textHi }]}>
+            Goal hit!
+          </Animated.Text>
+          <Animated.Text entering={enter(520)} style={[Type.title, styles.center, { color: C.textMid }]}>
+            {total > goal ? `${(total - goal).toLocaleString('en-IN')} ml extra today` : 'Drip is very happy'}
+          </Animated.Text>
+          <Animated.View entering={enter(650)} style={styles.stats}>
+            <StatGrid>
+              <StatTile icon="cup-water" hue="water" value={`${total}`} label="ml today" />
+              <StatTile icon="clock-check-outline" hue="spend" value={reachedAt || '--:--'} label="reached at" />
+            </StatGrid>
           </Animated.View>
         </View>
+        <Animated.View entering={reduceMotion ? undefined : FadeInUp.delay(800)} style={styles.actions}>
+          <ChunkyButton label="Back to hydration" icon="water" hue="water" onPress={() => router.replace('/water')} />
+        </Animated.View>
       </SafeAreaView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#07171E',
-    overflow: 'hidden',
-  },
-  safeArea: {
-    flex: 1,
-  },
-  backRow: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    alignItems: 'flex-end',
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF20',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-    paddingBottom: 20,
-    gap: 0,
-  },
-  // Trophy
-  trophyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
-  trophyGlow: {
-    position: 'absolute',
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    backgroundColor: '#22B8D4',
-  },
-  trophyInner: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: '#0B5566',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: '#5AD7EC',
-  },
-  trophyEmoji: {
-    fontSize: 52,
-    fontFamily: FontFace.regular,
-  },
-  // Text
-  headline: {
-    fontSize: 38,
-    fontFamily: FontFace.bold,
-    color: '#FFFFFF',
-    letterSpacing: -1,
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  subline: {
-    fontSize: 15,
-    fontFamily: FontFace.medium,
-    color: '#9BE7F3',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 32,
-  },
-  // Stats card
-  statsCard: {
-    width: '100%',
-    backgroundColor: '#FFFFFF12',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#34C6DE30',
-    padding: 20,
-    marginBottom: 28,
-    gap: 16,
-  },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-  statItem: {
-    alignItems: 'center',
-    gap: 4,
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 22,
-    fontFamily: FontFace.bold,
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
-  },
-  statLabel: {
-    fontSize: 9,
-    fontFamily: FontFace.bold,
-    color: '#5AD7EC',
-    letterSpacing: 0.8,
-  },
-  statDivider: {
-    width: 1,
-    height: 36,
-    backgroundColor: '#34C6DE30',
-  },
-  progressTrack: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#FFFFFF15',
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-    backgroundColor: '#22B8D4',
-  },
-  progressLabel: {
-    fontSize: 11,
-    fontFamily: FontFace.bold,
-    color: '#9BE7F3',
-    textAlign: 'center',
-    letterSpacing: 0.3,
-    marginTop: -4,
-  },
-  // CTA
-  ctaWrap: {
-    width: '100%',
-  },
-  ctaBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0E8FA8',
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-  },
-  ctaBtnText: {
-    fontSize: 15,
-    fontFamily: FontFace.bold,
-    color: '#FFFFFF',
-    letterSpacing: 0.3,
-  },
+  root: { flex: 1, overflow: 'hidden' },
+  safe: { flex: 1 },
+  top: { alignItems: 'flex-end', paddingHorizontal: Spacing.three, paddingTop: Spacing.two },
+  content: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: Spacing.three },
+  headline: { ...Type.dotHero, fontSize: 64, lineHeight: 72, marginTop: 10 },
+  center: { textAlign: 'center' },
+  stats: { alignSelf: 'stretch', marginTop: Spacing.three },
+  actions: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.three },
 });

@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.0] - 2026-10-04
+### "Glance" redesign
+- New design system in `constants/theme.ts`: true-dark base, one hue per area (`Hue`), Nunito + Doto (dot-matrix) type, chunky `Tile`/`ChunkyButton`/`IconBlob`/`Chip` with a sinking lip, `LargeHeader`, `ProgressRing`, `DotMeter`/`LiveDot`, `SettingRow`.
+- Home rebuilt: activity rings (water/meals/training), Drip mascot (`illustrations/Droplet.tsx`), bento tiles, hour dots. Train, Fuel, Profile, week plan and brief screens rebuilt on the same primitives; new hue tab bar with labels.
+- Bracket labels removed app-wide; sheets and headers use dot-matrix eyebrows. Widget + notification accent recoloured.
+- Every remaining screen rebuilt on the same primitives: Water (day/week/month, goal sheet, goal celebration, day report), Spend (grouped list, ExpenseSheet, week bars, category donut, day report), UPI scanner/pay, Check-in camera, Alarm setup + ringing screen, Login, App lock, Discord, What's new, Update, Restock sheet, Anatomy sheet, AppLoader.
+- New shared primitives: Segmented, StatTile/StatGrid, BarChart, Donut, DateTimeSheet, ScanFrame, BigMessage, Confetti; spend categories with icons/colours (components/spend).
+- Removed dead template code (explore tab, themed-text/view, Button, Collapsible, old line illustrations, use-theme/use-color-scheme hooks) and all Feather icon usage.
+- Fixed: goal notification used the default goal instead of the user's; failed check-in uploads took a second photo for the offline copy.
+
+### Removed
+- AI features: Coach chat (`app/coach.tsx`), `utils/Coach.ts`, `data/coach/models.json`, meal scan sheet, AI split import, session read-out, `EXPO_PUBLIC_GEMINI_API_KEY`.
+- Fonts Space Grotesk and Onest (replaced by Nunito and Doto).
+
 ## [1.2.0] - 2026-10-03
 ### Catalyst merged into Essentials
 - **Train** tab (today's session, load stepper with last-used weights, finish & log, streak), **Week plan** (shift a day, Monday reset, AI split import from PDF/photo/text, default-split reset), anatomy plates.

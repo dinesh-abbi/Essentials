@@ -5,12 +5,12 @@
   never looks like a different app.
 -->
 <resources>
-    <color name="widget_text">#EFF4F1</color>
-    <color name="widget_text_secondary">#9DB3AA</color>
-    <color name="widget_primary">#7FB8A4</color>
-    <color name="widget_track">#147FB8A4</color>
+    <color name="widget_text">#FFFFFF</color>
+    <color name="widget_text_secondary">#A6A6B3</color>
+    <color name="widget_primary">#38D3FF</color>
+    <color name="widget_track">#1438D3FF</color>
     <!-- quick-log chip fill: primary @ 14% -->
-    <color name="widget_chip_fill">#247FB8A4</color>
+    <color name="widget_chip_fill">#2438D3FF</color>
     <!-- tap ripple: dark @ 12%, since the widget sits on an arbitrary wallpaper -->
     <color name="widget_ripple">#1F000000</color>
 </resources>
