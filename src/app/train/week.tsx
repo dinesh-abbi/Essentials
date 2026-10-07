@@ -170,6 +170,20 @@ export default function WeekPlanScreen() {
               accessibilityLabel={`Make ${openDay.focus} today's session`}
             />
           )}
+          {openDay && (
+            <ChunkyButton
+              label="Edit this day"
+              icon="pencil"
+              variant="soft"
+              hue="train"
+              onPress={() => {
+                const slot = openDay.dayNumber;
+                setOpenSlot(null);
+                router.push(`/train/edit-day?slot=${slot}` as any);
+              }}
+              accessibilityLabel={`Edit ${openDay.focus}`}
+            />
+          )}
           {openDay && openDay.exercises.length === 0 && (
             <View style={styles.restNote}>
               <MaterialCommunityIcons name="weather-night" size={28} color={C.textMid} />

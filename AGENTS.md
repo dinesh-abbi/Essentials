@@ -220,6 +220,18 @@ follow the routing/storage conventions above unless noted.
   finished session is written (`workoutLogs`). Last-used weights pre-fill the
   stepper. A custom split saved by an older build (`training/split`) is still
   honoured; the week plan can reset it to the default.
+  **Forma merge (v1.4.0):** rep-based moves are logged set by set
+  (`SetEntry` in `DayState.sets`, `LoggedSet[]` on the session; `isSetBased`
+  decides which moves). New fields are all optional so old sessions and custom
+  splits stay valid. `ExerciseCatalog.ts` serves the static library
+  (`data/training/exercises.json`, `muscles.json`); `musclesFor()` resolves a
+  split move's muscles (`muscles` → `catalogId` → default split by name).
+  `BodyMap`/`ExerciseArt` are react-native-svg ports (art data in
+  `data/training/poses.ts`). Records (`TrainingRecords.ts`), muscle load/recap
+  (`TrainingVolume.ts`) are computed from sessions, never stored. Stored:
+  `goals/{id}`, `reviews/{monday}`, `training/favourites`. Screens:
+  `train/explore`, `train/exercise/[id]`, `train/edit-day`, `train/progress`.
+  See `docs/FORMA_MERGE.md`.
 - **Fuel** (from Catalyst) — `(tabs)/fuel.tsx`, `utils/FuelStorage.ts`,
   `components/fuel/*`. Cycle position derives from a stored start date
   (`fuel/cycle`), not a counter. Meal logs are keyed by calendar date. Grocery

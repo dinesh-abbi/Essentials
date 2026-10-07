@@ -19,6 +19,11 @@ import {
  *   training/split        { days: TrainingDay[], updatedAt }   custom split, absent = default
  *   workoutLogs/{id}      WorkoutSession                        one per finished session
  *
+ * Since v1.4.0 (the Forma merge) a session can carry the individual sets of
+ * each move (reps × kg), and split exercises can name the muscles they train
+ * and the library entry they come from (see utils/ExerciseCatalog.ts). Both
+ * are optional, so older sessions and custom splits stay valid.
+ *
  * Local-only (AsyncStorage, per uid): today's checklist + weights, the
  * last weight used per exercise, and the weekly schedule offset. Those are
  * scratch state for one day/week — syncing every keystroke of a weight field
@@ -34,6 +39,10 @@ export interface Exercise {
   notes: string;
   rir?: string;
   isCardio?: boolean;
+  /** Library entry (data/training/exercises.json) when it's the same movement. */
+  catalogId?: string;
+  /** Muscle ids, primary first — drives the body map and muscle-load heat. */
+  muscles?: string[];
 }
 
 export interface TrainingDay {
@@ -42,7 +51,6 @@ export interface TrainingDay {
   assignedDay?: string;
   focus: string;
   isRecovery: boolean;
-  anatomyFocus?: string[];
   exercises: Exercise[];
 }
 
@@ -50,11 +58,39 @@ export interface DayState {
   date: string;
   completed: Record<string, boolean>;
   weights: Record<string, number>;
+  /** Per-set plan and ticks for set-based moves, keyed by exercise id. */
+  sets?: Record<string, SetEntry[]>;
+  /** First tick of the day — the session's start for its duration. */
+  startedAt?: number;
   /** Morning / evening "did you train?" check-ins — 'none' until answered. */
   morning: 'none' | 'yes' | 'no';
   evening: 'none' | 'yes' | 'no';
   /** Set once the session has been finished and logged today. */
   finishedAt?: number;
+}
+
+export interface SetEntry {
+  reps: number;
+  weight: number;
+  done: boolean;
+}
+
+export interface LoggedSet {
+  reps: number;
+  weight: number;
+}
+
+export interface SessionExercise {
+  id: string;
+  name: string;
+  isCompleted: boolean;
+  /** Heaviest working weight (kg), or minutes for cardio. */
+  weight: number;
+  isCardio?: boolean;
+  catalogId?: string;
+  muscles?: string[];
+  /** Completed sets only. Absent on sessions logged before v1.4.0. */
+  sets?: LoggedSet[];
 }
 
 export interface WorkoutSession {
@@ -63,8 +99,14 @@ export interface WorkoutSession {
   dayNumber: number;
   completedAt: number;
   date: string;
+  /**
+   * Volume: Σ reps × kg over logged sets. Sessions from before v1.4.0 (no
+   * sets) stored the sum of each move's weight instead.
+   */
   totalLoadKg: number;
-  exercises: { id: string; name: string; isCompleted: boolean; weight: number; isCardio?: boolean }[];
+  /** First tick → finish, when known. */
+  minutes?: number;
+  exercises: SessionExercise[];
 }
 
 export const DEFAULT_SPLIT = defaultSplitJson as TrainingDay[];
@@ -74,6 +116,7 @@ const DAY_STATE = '@essentials_training_day';
 const LAST_WEIGHTS = '@essentials_training_last_weights';
 const OFFSET = '@essentials_training_offset';
 const SESSIONS_CACHE = '@essentials_training_sessions';
+const FAVOURITES = '@essentials_training_favourites';
 
 export const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 export const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -104,6 +147,29 @@ export async function saveCustomSplit(days: TrainingDay[]): Promise<void> {
 export async function clearCustomSplit(): Promise<void> {
   await cacheSet<TrainingDay[] | null>(SPLIT_CACHE, null);
   await deleteUserDoc(['training', 'split']);
+}
+
+// ── Library favourites ────────────────────────────────────────────────────────
+
+/** Starred library exercise ids — users/{uid}/training/favourites { ids, updatedAt }. */
+export async function getFavourites(): Promise<string[]> {
+  const doc = await cacheFirst<{ ids: string[]; updatedAt: number }>(
+    FAVOURITES,
+    { ids: [], updatedAt: 0 },
+    () => readUserDoc<{ ids: string[]; updatedAt: number }>(['training', 'favourites']),
+    // An unsynced local change is newer than the server copy — keep it.
+    { merge: (cached, remote) => (cached.updatedAt > (remote.updatedAt ?? 0) ? cached : remote) },
+  );
+  return Array.isArray(doc.ids) ? doc.ids : [];
+}
+
+export async function setFavourite(id: string, on: boolean): Promise<string[]> {
+  const current = await cacheGet<{ ids: string[]; updatedAt: number }>(FAVOURITES, { ids: [], updatedAt: 0 });
+  const ids = on ? [...new Set([...current.ids, id])] : current.ids.filter((x) => x !== id);
+  const next = { ids, updatedAt: Date.now() };
+  await cacheSet(FAVOURITES, next);
+  await writeUserDoc(['training', 'favourites'], next, false);
+  return ids;
 }
 
 // ── Schedule offset ───────────────────────────────────────────────────────────
@@ -250,6 +316,64 @@ export function currentStreak(sessions: WorkoutSession[], days: TrainingDay[], o
     cursor.setDate(cursor.getDate() - 1);
   }
   return streak;
+}
+
+// ── Sets ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Moves logged set by set: a numeric rep target and not cardio. Timed holds
+ * ("60 sec") and cardio keep the single minutes/kg stepper.
+ */
+export function isSetBased(ex: Exercise): boolean {
+  return !ex.isCardio && /^s*d+(s*[-–]s*d+)?s*$/.test(ex.reps);
+}
+
+/** Planned set count, clamped to 1–10. */
+export function plannedSetCount(ex: Exercise): number {
+  const n = parseInt(ex.sets, 10);
+  return Number.isFinite(n) ? Math.min(10, Math.max(1, n)) : 3;
+}
+
+/** Bottom of the rep range — "12-15" → 12. */
+export function plannedReps(ex: Exercise): number {
+  const n = parseInt(ex.reps, 10);
+  return Number.isFinite(n) && n > 0 ? n : 10;
+}
+
+/**
+ * Today's starting sets: last time's sets by position where they exist,
+ * otherwise the plan at the remembered weight.
+ */
+export function planSets(ex: Exercise, last?: LoggedSet[], weight = 0): SetEntry[] {
+  return Array.from({ length: plannedSetCount(ex) }, (_, i) => {
+    const prev = last?.[i] ?? last?.[last.length - 1];
+    return { reps: prev?.reps ?? plannedReps(ex), weight: prev?.weight ?? weight, done: false };
+  });
+}
+
+const sameMove = (a: { id: string; name: string }, b: { id: string; name: string }) =>
+  a.name.trim().toLowerCase() === b.name.trim().toLowerCase() || a.id === b.id;
+
+/**
+ * The latest finished performance of a move — matched by name, so "Hack
+ * Squat" on day 3 and day 6 share history. `sessions` is newest first.
+ */
+export function lastPerformance(
+  sessions: WorkoutSession[],
+  ex: { id: string; name: string },
+  beforeDate?: string,
+): { date: string; weight: number; sets?: LoggedSet[] } | null {
+  for (const s of sessions) {
+    if (beforeDate && s.date >= beforeDate) continue;
+    const hit = s.exercises.find((e) => e.isCompleted && sameMove(e, ex));
+    if (hit && (hit.sets?.length || hit.weight > 0)) return { date: s.date, weight: hit.weight, sets: hit.sets };
+  }
+  return null;
+}
+
+/** Σ reps × kg. */
+export function setVolume(sets: LoggedSet[]): number {
+  return sets.reduce((sum, s) => sum + s.reps * s.weight, 0);
 }
 
 /** "3 × 12–15" (strength) / "20 min" (cardio). */

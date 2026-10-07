@@ -7,8 +7,9 @@ import Animated from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Skeleton from '@/components/SkeletonLoader';
-import { AnatomySheet } from '@/components/training/AnatomySheet';
+import { BodyMap } from '@/components/training/BodyMap';
 import { ExerciseRow } from '@/components/training/ExerciseRow';
+import { MusclesSheet } from '@/components/training/MusclesSheet';
 import { WeekStrip } from '@/components/training/WeekStrip';
 import { AnimatedNumber } from '@/components/ui/animated-number';
 import { AnimatedPressable } from '@/components/ui/animated-pressable';
@@ -19,9 +20,12 @@ import { LargeHeader } from '@/components/ui/large-header';
 import { ProgressRing } from '@/components/ui/progress-ring';
 import { BottomTabInset, Colors, Hue, MaxContentWidth, Spacing, Type } from '@/constants/theme';
 import { useDataRefresh } from '@/hooks/use-data-refresh';
+import { catalogFor, musclesFor } from '@/utils/ExerciseCatalog';
 import { rescheduleRoutineReminders } from '@/utils/notifications';
 import { showTabBar, useTabBarScrollHandler } from '@/utils/tabBarVisibility';
 import * as Training from '@/utils/TrainingStorage';
+import { normalise, plannedLoad } from '@/utils/TrainingVolume';
+import { localDateKey } from '@/utils/userDocs';
 
 const C = Colors.dark;
 const TEMPO_DISMISSED = '@essentials_tempo_note_dismissed';
@@ -46,7 +50,7 @@ export default function TrainScreen() {
   const [sessions, setSessions] = useState<Training.WorkoutSession[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [tempoHidden, setTempoHidden] = useState(true);
-  const [anatomyOpen, setAnatomyOpen] = useState(false);
+  const [musclesOpen, setMusclesOpen] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [reloadTick, setReloadTick] = useState(0);
@@ -95,14 +99,40 @@ export default function TrainScreen() {
   const day = Training.dayForSlot(split.days, slot);
   const exercises = day.exercises;
   const completed = state?.completed ?? {};
-  const weights = state?.weights ?? {};
+  const finished = !!state?.finishedAt;
+  const weights = useMemo(() => state?.weights ?? {}, [state?.weights]);
   const doneCount = exercises.filter((e) => completed[e.id]).length;
   const total = exercises.length;
-  const loadKg = exercises.reduce((sum, e) => (!e.isCardio ? sum + (weights[e.id] || 0) : sum), 0);
+  const storedSets = state?.sets;
+
+  // Latest finished performance per move (matched by name across split
+  // days). Before today's session is logged, today's own entry is skipped.
+  const lastByMove = useMemo(() => {
+    const out: Record<string, ReturnType<typeof Training.lastPerformance>> = {};
+    for (const e of exercises) out[e.id] = Training.lastPerformance(sessions, e, finished ? undefined : localDateKey(now));
+    return out;
+  }, [sessions, exercises, finished, now]);
+
+  /** Today's sets for a rep-based move: stored ticks, else last time / the plan. */
+  const setsFor = useCallback(
+    (e: Training.Exercise): Training.SetEntry[] | undefined => {
+      if (!Training.isSetBased(e)) return undefined;
+      const stored = storedSets?.[e.id];
+      if (stored?.length) return stored;
+      const last = lastByMove[e.id];
+      return Training.planSets(e, last?.sets, weights[e.id] || lastWeights[e.id] || last?.weight || 0);
+    },
+    [storedSets, lastByMove, weights, lastWeights],
+  );
+
+  // Volume moved so far (Σ reps × kg over ticked sets).
+  const loadKg = exercises.reduce((sum, e) => sum + Training.setVolume((storedSets?.[e.id] ?? []).filter((x) => x.done)), 0);
+  const anySetDone = exercises.some((e) => storedSets?.[e.id]?.some((x) => x.done));
+  const todayLoad = useMemo(() => plannedLoad(exercises), [exercises]);
+  const todayHeat = useMemo(() => normalise(todayLoad), [todayLoad]);
   const doneDates = useMemo(() => Training.sessionDatesThisWeek(sessions, now), [sessions, now]);
   const streak = useMemo(() => Training.currentStreak(sessions, split.days, offset), [sessions, split.days, offset]);
   const isRestDay = day.isRecovery && total === 0;
-  const finished = !!state?.finishedAt;
 
   // ── Persistence ────────────────────────────────────────────────────────────
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -117,8 +147,33 @@ export default function TrainScreen() {
     });
   }, []);
 
+  /** The big check: ticking a set-based move ticks (or clears) all its sets. */
   const toggleDone = useCallback(
-    (id: string) => update((s) => ({ ...s, completed: { ...s.completed, [id]: !s.completed[id] } })),
+    (id: string, sets?: Training.SetEntry[]) =>
+      update((s) => {
+        const on = !s.completed[id];
+        return {
+          ...s,
+          startedAt: s.startedAt ?? (on ? Date.now() : undefined),
+          completed: { ...s.completed, [id]: on },
+          sets: sets ? { ...s.sets, [id]: sets.map((x) => ({ ...x, done: on })) } : s.sets,
+        };
+      }),
+    [update],
+  );
+
+  /** Set edits and ticks; the move counts as done once every set is ticked. */
+  const setSets = useCallback(
+    (id: string, next: Training.SetEntry[]) =>
+      update(
+        (s) => ({
+          ...s,
+          startedAt: s.startedAt ?? (next.some((x) => x.done) ? Date.now() : undefined),
+          sets: { ...s.sets, [id]: next },
+          completed: { ...s.completed, [id]: next.length > 0 && next.every((x) => x.done) },
+        }),
+        true,
+      ),
     [update],
   );
 
@@ -145,7 +200,7 @@ export default function TrainScreen() {
   };
 
   const finish = () => {
-    if (doneCount === 0) {
+    if (doneCount === 0 && !anySetDone) {
       Alert.alert('Nothing ticked yet', 'Tick the moves you did, then finish.');
       return;
     }
@@ -160,21 +215,30 @@ export default function TrainScreen() {
           onPress: async () => {
             setFinishing(true);
             try {
+              const logged: Training.SessionExercise[] = exercises.map((e) => {
+                const sets = Training.isSetBased(e)
+                  ? (setsFor(e) ?? []).filter((x) => x.done).map(({ reps, weight }) => ({ reps, weight }))
+                  : undefined;
+                return {
+                  id: e.id,
+                  name: e.name,
+                  isCompleted: !!completed[e.id] || !!sets?.length,
+                  weight: sets?.length ? Math.max(...sets.map((x) => x.weight)) : weights[e.id] || 0,
+                  isCardio: e.isCardio,
+                  catalogId: e.catalogId,
+                  muscles: musclesFor(e),
+                  sets: sets?.length ? sets : undefined,
+                };
+              });
+              const started = state?.startedAt;
               const log = await Training.logSession({
                 title: day.focus,
                 dayNumber: day.dayNumber,
-                totalLoadKg: loadKg,
-                exercises: exercises.map((e) => ({
-                  id: e.id,
-                  name: e.name,
-                  isCompleted: !!completed[e.id],
-                  weight: weights[e.id] || 0,
-                  isCardio: e.isCardio,
-                })),
+                totalLoadKg: logged.reduce((sum, e) => sum + Training.setVolume(e.sets ?? []), 0),
+                minutes: started ? Math.min(600, Math.max(1, Math.round((Date.now() - started) / 60_000))) : undefined,
+                exercises: logged,
               });
-              await Promise.all(
-                exercises.filter((e) => (weights[e.id] || 0) > 0).map((e) => Training.rememberWeight(e.id, weights[e.id])),
-              );
+              await Promise.all(logged.filter((e) => e.weight > 0).map((e) => Training.rememberWeight(e.id, e.weight)));
               setLastWeights(await Training.getLastWeights());
               setSessions((prev) => [log, ...prev]);
               update((s) => ({ ...s, finishedAt: log.completedAt, evening: 'yes' }));
@@ -279,9 +343,9 @@ export default function TrainScreen() {
                   </Text>
                   <View style={styles.chipRow}>
                     <Chip icon="fire" label={`${streak} day${streak === 1 ? '' : 's'}`} hue="train" solid={streak > 0} />
-                    {loadKg > 0 ? <Chip icon="weight-kilogram" label={`${Math.round(loadKg)} kg`} /> : null}
+                    {loadKg > 0 ? <Chip icon="weight-kilogram" label={`${Math.round(loadKg)} kg moved`} /> : null}
                   </View>
-                  {!!day.anatomyFocus?.length && (
+                  {Object.keys(todayLoad).length > 0 && (
                     <ChunkyButton
                       label="Muscles"
                       icon="human"
@@ -289,7 +353,7 @@ export default function TrainScreen() {
                       hue="train"
                       size="sm"
                       haptic="light"
-                      onPress={() => setAnatomyOpen(true)}
+                      onPress={() => setMusclesOpen(true)}
                       style={styles.selfStart}
                     />
                   )}
@@ -346,6 +410,37 @@ export default function TrainScreen() {
             />
           </EntranceView>
 
+          {/* ── Library · Progress ─────────────────────────────────────── */}
+          <EntranceView index={3} style={styles.bento}>
+            <Tile
+              hue="train"
+              containerStyle={styles.flex}
+              style={styles.bentoFace}
+              onPress={() => router.push('/train/explore' as any)}
+              haptic="light"
+              accessibilityLabel="Explore muscles and exercises"
+            >
+              <View style={styles.bentoArt}>
+                <BodyMap side="front" heat={todayHeat} plain width={34} />
+              </View>
+              <Text style={[Type.controlLabel, { color: C.textHi }]}>Explore</Text>
+              <Text style={[Type.subline, { color: C.textMid }]}>Muscles · moves</Text>
+            </Tile>
+            <Tile
+              containerStyle={styles.flex}
+              style={styles.bentoFace}
+              onPress={() => router.push('/train/progress' as any)}
+              haptic="light"
+              accessibilityLabel="Training progress, records and goals"
+            >
+              <View style={styles.bentoArt}>
+                <IconBlob name="chart-line" hue="train" size={44} />
+              </View>
+              <Text style={[Type.controlLabel, { color: C.textHi }]}>Progress</Text>
+              <Text style={[Type.subline, { color: C.textMid }]}>Records · goals</Text>
+            </Tile>
+          </EntranceView>
+
           {/* ── Moves ─────────────────────────────────────────────────── */}
           {!isRestDay && !loading && (
             <EntranceView index={4} style={styles.moves}>
@@ -367,21 +462,30 @@ export default function TrainScreen() {
                 </View>
               )}
 
-              {exercises.map((ex, i) => (
-                <ExerciseRow
-                  key={ex.id}
-                  exercise={ex}
-                  index={i}
-                  done={!!completed[ex.id]}
-                  weight={weights[ex.id] || undefined}
-                  lastWeight={lastWeights[ex.id]}
-                  expanded={expanded === ex.id}
-                  colors={C}
-                  onToggleExpand={() => setExpanded((cur) => (cur === ex.id ? null : ex.id))}
-                  onToggleDone={() => toggleDone(ex.id)}
-                  onWeight={(v) => setWeight(ex.id, v)}
-                />
-              ))}
+              {exercises.map((ex, i) => {
+                const sets = setsFor(ex);
+                const info = catalogFor(ex);
+                return (
+                  <ExerciseRow
+                    key={ex.id}
+                    exercise={ex}
+                    index={i}
+                    done={!!completed[ex.id]}
+                    weight={weights[ex.id] || undefined}
+                    lastWeight={lastWeights[ex.id]}
+                    sets={sets}
+                    last={lastByMove[ex.id]}
+                    muscles={musclesFor(ex)}
+                    expanded={expanded === ex.id}
+                    colors={C}
+                    onToggleExpand={() => setExpanded((cur) => (cur === ex.id ? null : ex.id))}
+                    onToggleDone={() => toggleDone(ex.id, sets)}
+                    onWeight={(v) => setWeight(ex.id, v)}
+                    onSets={(next) => setSets(ex.id, next)}
+                    onInfo={info ? () => router.push(`/train/exercise/${info.id}` as any) : undefined}
+                  />
+                );
+              })}
 
               {finished ? (
                 <Tile hue="train" style={styles.doneFace}>
@@ -397,7 +501,7 @@ export default function TrainScreen() {
                   hue="train"
                   onPress={finish}
                   loading={finishing}
-                  disabled={doneCount === 0}
+                  disabled={doneCount === 0 && !anySetDone}
                   style={styles.finish}
                 />
               )}
@@ -410,7 +514,15 @@ export default function TrainScreen() {
         </Animated.ScrollView>
       </SafeAreaView>
 
-      <AnatomySheet visible={anatomyOpen} onClose={() => setAnatomyOpen(false)} focus={day.anatomyFocus ?? []} />
+      <MusclesSheet
+        visible={musclesOpen}
+        onClose={() => setMusclesOpen(false)}
+        load={todayLoad}
+        onExplore={() => {
+          setMusclesOpen(false);
+          router.push('/train/explore' as any);
+        }}
+      />
     </View>
   );
 }
@@ -442,4 +554,7 @@ const styles = StyleSheet.create({
   finish: { marginTop: Spacing.three },
   doneFace: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: Spacing.two },
   footnote: { textAlign: 'center' },
+  bento: { flexDirection: 'row', gap: 10 },
+  bentoFace: { gap: 4, paddingVertical: 14 },
+  bentoArt: { height: 48, justifyContent: 'center' },
 });

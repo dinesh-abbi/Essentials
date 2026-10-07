@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.4.0] - 2026-10-07
+### Forma merged into Essentials
+- Muscle explorer (`train/explore`) and exercise library (`train/exercise/[id]`): 34 moves, 14 muscles, react-native-svg `BodyMap`/`ExerciseArt`/`MuscleChip`, favourites, "add to a day". Catalog in `data/training/exercises.json`, `muscles.json`, `poses.ts`; `utils/ExerciseCatalog.ts`.
+- Set-by-set logging in `ExerciseRow` (reps × kg per set, last-time fill, remaining-sets stepper, rest ring). Sessions gain optional `sets`/`minutes`; split exercises gain optional `catalogId`/`muscles`.
+- Split editor (`train/edit-day`), reached from the week plan.
+- Progress (`train/progress`): recap, muscle-load heat maps, sets per day, records (`TrainingRecords.ts`, e1RM, new-record callout on the finish brief), goals (`GoalStorage.ts`), weekly review (`ReviewStorage.ts`). Volume maths in `TrainingVolume.ts`.
+- New Firestore docs under `users/{uid}`: `goals/{id}`, `reviews/{monday}`, `training/favourites`. Map of what moved: `docs/FORMA_MERGE.md`.
+
+### Changed
+- Train's "Muscles" opens a body-map sheet (`MusclesSheet`) instead of PNG plates; `TrainingDay.anatomyFocus` is no longer used.
+
 ## [1.3.0] - 2026-10-04
 ### "Glance" redesign
 - New design system in `constants/theme.ts`: true-dark base, one hue per area (`Hue`), Nunito + Doto (dot-matrix) type, chunky `Tile`/`ChunkyButton`/`IconBlob`/`Chip` with a sinking lip, `LargeHeader`, `ProgressRing`, `DotMeter`/`LiveDot`, `SettingRow`.

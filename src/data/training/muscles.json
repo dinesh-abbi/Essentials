@@ -1,0 +1,142 @@
+[
+  {
+    "id": "chest",
+    "name": "Chest",
+    "anatomical_name": "Pectoralis major",
+    "side": "front",
+    "group": "Chest",
+    "movement": "Press & bring the arms together",
+    "description": "The chest helps move your upper arm forward and across your body. Explore horizontal and incline pressing movements.",
+    "cue": "Keep the movement controlled and your shoulders comfortable."
+  },
+  {
+    "id": "shoulders",
+    "name": "Shoulders",
+    "anatomical_name": "Deltoids",
+    "side": "both",
+    "group": "Shoulders",
+    "movement": "Raise & press",
+    "description": "The front, side, and rear deltoids help raise and position your arms. Different movement directions emphasize different portions.",
+    "cue": "Avoid shrugging or arching your back to finish a repetition."
+  },
+  {
+    "id": "biceps",
+    "name": "Biceps",
+    "anatomical_name": "Biceps brachii",
+    "side": "front",
+    "group": "Arms",
+    "movement": "Bend the elbow",
+    "description": "The biceps help bend your elbow and turn your palm upward. Curl variations change your grip and arm position.",
+    "cue": "Keep your upper arms steady instead of swinging the weight."
+  },
+  {
+    "id": "triceps",
+    "name": "Triceps",
+    "anatomical_name": "Triceps brachii",
+    "side": "back",
+    "group": "Arms",
+    "movement": "Straighten the elbow",
+    "description": "The triceps extend the elbow and assist pressing movements. Explore cable, dumbbell, and bodyweight options.",
+    "cue": "Move through a comfortable range without snapping the elbows."
+  },
+  {
+    "id": "forearms",
+    "name": "Forearms",
+    "anatomical_name": "Wrist & finger muscle groups",
+    "side": "both",
+    "group": "Arms",
+    "movement": "Grip & control the wrist",
+    "description": "Forearm muscles help control the wrist, fingers, and grip. Carries and controlled wrist movements provide different challenges.",
+    "cue": "Start light and keep the wrists in a comfortable position."
+  },
+  {
+    "id": "abs",
+    "name": "Abdominals",
+    "anatomical_name": "Rectus abdominis & deep core",
+    "side": "front",
+    "group": "Core",
+    "movement": "Control the trunk",
+    "description": "The abdominal muscles contribute to trunk movement and stability. Explore controlled movement and stability exercises.",
+    "cue": "Keep breathing rather than holding your breath for the whole set."
+  },
+  {
+    "id": "obliques",
+    "name": "Obliques",
+    "anatomical_name": "Internal & external obliques",
+    "side": "front",
+    "group": "Core",
+    "movement": "Resist rotation & side bending",
+    "description": "The obliques help rotate and support the trunk. Anti-rotation and side-support exercises challenge them in different ways.",
+    "cue": "Keep your torso steady and choose a range you can control."
+  },
+  {
+    "id": "quads",
+    "name": "Quadriceps",
+    "anatomical_name": "Quadriceps femoris",
+    "side": "front",
+    "group": "Legs",
+    "movement": "Extend the knee",
+    "description": "The quadriceps help straighten your knees. Squats, split squats, and supported machine movements offer different training options.",
+    "cue": "Keep your feet grounded and knees moving comfortably with your toes."
+  },
+  {
+    "id": "calves",
+    "name": "Calves",
+    "anatomical_name": "Gastrocnemius & soleus",
+    "side": "back",
+    "group": "Legs",
+    "movement": "Raise the heel",
+    "description": "The calf muscles help point the foot downward. Straight-knee and bent-knee variations challenge the region differently.",
+    "cue": "Use a controlled rise and descent without bouncing."
+  },
+  {
+    "id": "upper-back",
+    "name": "Upper back",
+    "anatomical_name": "Trapezius & rhomboids",
+    "side": "back",
+    "group": "Back",
+    "movement": "Control the shoulder blades",
+    "description": "These muscles help position and move your shoulder blades. Rows and pulling variations work this area alongside the arms.",
+    "cue": "Let your shoulder blades move naturally without jerking the torso."
+  },
+  {
+    "id": "lats",
+    "name": "Lats",
+    "anatomical_name": "Latissimus dorsi",
+    "side": "back",
+    "group": "Back",
+    "movement": "Pull the upper arm down & back",
+    "description": "The lats help move your upper arm toward your body. Explore vertical pulls and row variations.",
+    "cue": "Lead with your elbows and avoid using momentum."
+  },
+  {
+    "id": "lower-back",
+    "name": "Lower back",
+    "anatomical_name": "Erector spinae region",
+    "side": "back",
+    "group": "Back",
+    "movement": "Support & extend the trunk",
+    "description": "The muscles alongside your spine contribute to posture and trunk control. Start with supported, controlled stability work.",
+    "cue": "Keep the movement comfortable; do not force spinal extension."
+  },
+  {
+    "id": "glutes",
+    "name": "Glutes",
+    "anatomical_name": "Gluteal muscle group",
+    "side": "back",
+    "group": "Glutes",
+    "movement": "Extend & stabilize the hip",
+    "description": "Your glutes help extend and stabilize your hips. Bridges, hinges, and split-stance movements provide different options.",
+    "cue": "Move through the hips without overextending your lower back."
+  },
+  {
+    "id": "hamstrings",
+    "name": "Hamstrings",
+    "anatomical_name": "Posterior thigh muscle group",
+    "side": "back",
+    "group": "Legs",
+    "movement": "Bend the knee & extend the hip",
+    "description": "The hamstrings help bend your knees and extend your hips. Explore both curling and hip-hinge movements.",
+    "cue": "Move slowly and stop the range before you lose control."
+  }
+]

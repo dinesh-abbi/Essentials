@@ -9,6 +9,7 @@ import { Confetti } from '@/components/ui/confetti';
 import { EntranceView } from '@/components/ui/entrance-view';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { Colors, Hue, MaxContentWidth, Spacing, Type, type HueName } from '@/constants/theme';
+import { newRecords, type NewRecord } from '@/utils/TrainingRecords';
 import * as Training from '@/utils/TrainingStorage';
 import { localDateKey } from '@/utils/userDocs';
 import * as WaterStorage from '@/utils/WaterStorage';
@@ -31,6 +32,7 @@ export default function BriefScreen() {
   const [day, setDay] = useState<Training.TrainingDay | null>(null);
   const [session, setSession] = useState<Training.WorkoutSession | null>(null);
   const [streak, setStreak] = useState(0);
+  const [records, setRecords] = useState<NewRecord[]>([]);
   const [logging, setLogging] = useState(false);
   const [logged, setLogged] = useState(false);
 
@@ -40,7 +42,9 @@ export default function BriefScreen() {
       setDay(Training.dayForSlot(split.days, Training.splitSlotFor(new Date(), offset)));
       if (kind === 'complete') {
         const sessions = await Training.getRecentSessions();
-        setSession(sessions.find((s) => s.date === localDateKey()) ?? null);
+        const latest = sessions.find((s) => s.date === localDateKey()) ?? null;
+        setSession(latest);
+        if (latest) setRecords(newRecords(latest, sessions));
         setStreak(Training.currentStreak(sessions, split.days, offset));
       }
     })();
@@ -81,7 +85,7 @@ export default function BriefScreen() {
     complete: {
       eyebrow: 'Workout logged',
       headline: 'Done!',
-      line: session ? session.title : 'Nice work today.',
+      line: records.length ? `${records.length} new record${records.length === 1 ? '' : 's'} · ${session?.title ?? ''}` : session ? session.title : 'Nice work today.',
       icon: 'trophy',
       hue: 'train',
     },
@@ -125,8 +129,27 @@ export default function BriefScreen() {
           {kind === 'complete' && (
             <EntranceView index={2} style={styles.statRow}>
               <Stat icon="check-bold" hue="train" value={`${done}`} label="moves" />
-              <Stat icon="weight-kilogram" hue="profile" value={session?.totalLoadKg ? `${Math.round(session.totalLoadKg)}` : '--'} label="kg" />
+              <Stat icon="weight-kilogram" hue="profile" value={session?.totalLoadKg ? `${Math.round(session.totalLoadKg)}` : '--'} label="kg moved" />
               <Stat icon="fire" hue="spend" value={`${streak}`} label="streak" />
+            </EntranceView>
+          )}
+
+          {kind === 'complete' && records.length > 0 && (
+            <EntranceView index={3}>
+              <Tile hue="train" style={styles.list}>
+                <Text style={[Type.dotLabel, { color: Hue.train.main }]}>New records</Text>
+                {records.map((r) => (
+                  <View key={r.name} style={styles.line}>
+                    <MaterialCommunityIcons name="trophy" size={20} color={Hue.train.main} />
+                    <Text style={[Type.controlLabel, styles.flex, { color: C.textHi }]} numberOfLines={1}>
+                      {r.name}
+                    </Text>
+                    <Text style={[Type.subline, { color: C.textMid }]}>
+                      {r.kind === 'weight' ? `${r.value} kg` : `est. max ${Math.round(r.value)} kg`} · was {Math.round(r.previous)}
+                    </Text>
+                  </View>
+                ))}
+              </Tile>
             </EntranceView>
           )}
 

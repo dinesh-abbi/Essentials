@@ -2,7 +2,7 @@
 
 A personal Android app for the daily basics — **hydration, training, food, spend, check-in and a barcode alarm** — built to be read at a glance. Expo SDK 56 / React Native 0.85, Firebase, and the "Glance" design: one colour per area, rings and dot meters instead of paragraphs, chunky tappable tiles (Apple rings × One UI layout × Nothing dot-matrix).
 
-As of **v1.2.0** the separate **Catalyst** fitness app lives inside Essentials (Train, Fuel). v1.3.0 removed the AI coach and redesigned every main screen. The Catalyst repo is retired; see [`docs/CATALYST_MERGE.md`](docs/CATALYST_MERGE.md) for what moved where.
+As of **v1.2.0** the separate **Catalyst** fitness app lives inside Essentials (Train, Fuel). v1.3.0 removed the AI coach and redesigned every main screen. The Catalyst repo is retired; see [`docs/CATALYST_MERGE.md`](docs/CATALYST_MERGE.md) for what moved where. **v1.4.0** folds in the single-user features of **Forma** (muscle explorer, exercise library, set-by-set logging, records, goals, weekly review); see [`docs/FORMA_MERGE.md`](docs/FORMA_MERGE.md).
 
 ---
 
@@ -11,7 +11,7 @@ As of **v1.2.0** the separate **Catalyst** fitness app lives inside Essentials (
 | Area | Where | What it does |
 |---|---|---|
 | **Home** | `src/app/(tabs)/index.tsx` | Today's rings (water · meals · training), Drip the water mascot, bento tiles for Train / Fuel / Spend / Check-in, armed alarm |
-| **Train** | `src/app/(tabs)/train.tsx`, `src/app/train/*` | Today's session from the weekly split, load stepper with last-used weights, finish & log, streak, week plan, shift a day, anatomy plates |
+| **Train** | `src/app/(tabs)/train.tsx`, `src/app/train/*` | Today's session from the weekly split, set-by-set logging with last-time fill and rest timer, finish & log, streak, week plan, split editor, muscle explorer + exercise library, progress (records, goals, weekly review) |
 | **Fuel** | `src/app/(tabs)/fuel.tsx` | 28-day meal plan as a cycle field, eaten / swapped / skipped logging, restock list (logs real Groceries purchases) |
 | **Hydration** | `src/app/water/*` | Drip fills up as you drink; week bars vs goal line, month dot calendar, confetti on goal, home-screen widget |
 | **Spend** | `src/app/purchases/*`, `src/app/upi/*` | Expenses grouped by day with category pictures, week bars, month category donut, biometric gate, UPI QR pay |

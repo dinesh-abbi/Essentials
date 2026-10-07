@@ -1,0 +1,960 @@
+[
+  {
+    "id": "bench",
+    "name": "Barbell bench press",
+    "muscle": "Chest",
+    "secondary": "Triceps · shoulders",
+    "equipment": "Barbell",
+    "level": "Intermediate",
+    "sets": 3,
+    "reps": 10,
+    "weight": 40,
+    "cue": "Build a strong foundation.",
+    "steps": [
+      "Lie on the bench with feet firmly planted and eyes beneath the bar.",
+      "Grip slightly wider than shoulder width and keep your shoulder blades back.",
+      "Lower the bar with control toward your mid-chest, keeping wrists stacked.",
+      "Press upward without bouncing. Use a spotter or safety bars."
+    ],
+    "alternative": "Dumbbell floor press",
+    "muscle_ids": [
+      "chest",
+      "triceps",
+      "shoulders"
+    ],
+    "primary_muscle": "chest",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "incline",
+    "name": "Incline dumbbell press",
+    "muscle": "Chest",
+    "secondary": "Shoulders · triceps",
+    "equipment": "Dumbbells",
+    "level": "Beginner",
+    "sets": 3,
+    "reps": 12,
+    "weight": 12,
+    "cue": "Control every repetition.",
+    "steps": [
+      "Set the bench to a comfortable low incline.",
+      "Hold dumbbells beside your chest with wrists above elbows.",
+      "Press upward, then lower slowly through a comfortable range.",
+      "Keep your feet planted and avoid flaring your elbows excessively."
+    ],
+    "alternative": "Incline push-up",
+    "muscle_ids": [
+      "chest",
+      "shoulders",
+      "triceps"
+    ],
+    "primary_muscle": "chest",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "shoulder",
+    "name": "Seated shoulder press",
+    "muscle": "Shoulders",
+    "secondary": "Triceps",
+    "equipment": "Dumbbells",
+    "level": "Beginner",
+    "sets": 3,
+    "reps": 10,
+    "weight": 10,
+    "cue": "Steady posture. Strong press.",
+    "steps": [
+      "Sit on a supported bench with feet flat.",
+      "Start with dumbbells near shoulder height.",
+      "Brace your torso and press upward without arching your lower back.",
+      "Lower slowly and stop if the movement causes pain."
+    ],
+    "alternative": "Machine shoulder press",
+    "muscle_ids": [
+      "shoulders",
+      "triceps"
+    ],
+    "primary_muscle": "shoulders",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "lateral",
+    "name": "Lateral raise",
+    "muscle": "Shoulders",
+    "secondary": "Upper back",
+    "equipment": "Dumbbells",
+    "level": "Beginner",
+    "sets": 3,
+    "reps": 12,
+    "weight": 5,
+    "cue": "Small weights. Deliberate movement.",
+    "steps": [
+      "Stand tall with a light dumbbell in each hand.",
+      "Keep elbows softly bent and raise arms out to the sides.",
+      "Stop around shoulder height without shrugging or swinging.",
+      "Lower slowly back to your sides."
+    ],
+    "alternative": "Cable lateral raise",
+    "muscle_ids": [
+      "shoulders"
+    ],
+    "primary_muscle": "shoulders",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "triceps",
+    "name": "Cable triceps pushdown",
+    "muscle": "Arms",
+    "secondary": "Triceps",
+    "equipment": "Cable",
+    "level": "Beginner",
+    "sets": 3,
+    "reps": 12,
+    "weight": 15,
+    "cue": "Keep your elbows close.",
+    "steps": [
+      "Stand facing a high cable with elbows beside your torso.",
+      "Hold the rope or bar and keep shoulders relaxed.",
+      "Extend the elbows to move the handle down without moving your upper arms.",
+      "Return slowly, keeping the weight controlled."
+    ],
+    "alternative": "Dumbbell triceps extension",
+    "muscle_ids": [
+      "triceps"
+    ],
+    "primary_muscle": "triceps",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "squat",
+    "name": "Goblet squat",
+    "muscle": "Legs",
+    "secondary": "Glutes · core",
+    "equipment": "Dumbbells",
+    "level": "Beginner",
+    "sets": 3,
+    "reps": 12,
+    "weight": 16,
+    "cue": "Strong from the ground up.",
+    "steps": [
+      "Hold a dumbbell close to your chest and stand with feet comfortably apart.",
+      "Brace your torso, bend your knees, and sit down between your hips.",
+      "Keep your whole foot in contact with the ground.",
+      "Stand back up through a comfortable range without rushing."
+    ],
+    "alternative": "Bodyweight squat",
+    "muscle_ids": [
+      "quads",
+      "glutes"
+    ],
+    "primary_muscle": "quads",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "row",
+    "name": "Seated cable row",
+    "muscle": "Back",
+    "secondary": "Biceps · rear shoulders",
+    "equipment": "Cable",
+    "level": "Beginner",
+    "sets": 3,
+    "reps": 12,
+    "weight": 25,
+    "cue": "Pull with purpose.",
+    "steps": [
+      "Sit upright with feet supported and knees slightly bent.",
+      "Reach for the handle without rounding your lower back.",
+      "Pull toward your lower ribs, moving elbows backward.",
+      "Return with control without rocking your torso."
+    ],
+    "alternative": "One-arm dumbbell row",
+    "muscle_ids": [
+      "upper-back",
+      "lats",
+      "biceps"
+    ],
+    "primary_muscle": "upper-back",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "pulldown",
+    "name": "Lat pulldown",
+    "muscle": "Back",
+    "secondary": "Biceps",
+    "equipment": "Cable",
+    "level": "Beginner",
+    "sets": 3,
+    "reps": 10,
+    "weight": 30,
+    "cue": "Make every pull count.",
+    "steps": [
+      "Adjust the thigh pad and grip the bar comfortably.",
+      "Keep your chest upright with a small backward lean.",
+      "Pull the bar toward the front of your upper chest.",
+      "Let your arms extend slowly; avoid pulling behind your neck."
+    ],
+    "alternative": "Assisted pull-up",
+    "muscle_ids": [
+      "lats",
+      "biceps"
+    ],
+    "primary_muscle": "lats",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "curl",
+    "name": "Dumbbell biceps curl",
+    "muscle": "Arms",
+    "secondary": "Forearms",
+    "equipment": "Dumbbells",
+    "level": "Beginner",
+    "sets": 3,
+    "reps": 12,
+    "weight": 8,
+    "cue": "Leave the momentum behind.",
+    "steps": [
+      "Stand upright with dumbbells at your sides.",
+      "Keep elbows close to your torso and curl the weights.",
+      "Avoid swinging your shoulders or leaning backward.",
+      "Lower slowly until your arms return to the start."
+    ],
+    "alternative": "Cable biceps curl",
+    "muscle_ids": [
+      "biceps",
+      "forearms"
+    ],
+    "primary_muscle": "biceps",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "deadbug",
+    "name": "Dead bug",
+    "muscle": "Core",
+    "secondary": "Trunk stability",
+    "equipment": "Bodyweight",
+    "level": "Beginner",
+    "sets": 3,
+    "reps": 10,
+    "weight": 0,
+    "cue": "Stability starts here.",
+    "steps": [
+      "Lie on your back with arms up and hips and knees bent.",
+      "Gently brace your torso while breathing normally.",
+      "Extend one leg and the opposite arm only as far as you can control.",
+      "Return and alternate sides without arching your lower back."
+    ],
+    "alternative": "Heel taps",
+    "muscle_ids": [
+      "abs"
+    ],
+    "primary_muscle": "abs",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "rdl",
+    "name": "Dumbbell Romanian deadlift",
+    "muscle": "Legs",
+    "secondary": "Hamstrings · glutes",
+    "equipment": "Dumbbells",
+    "level": "Intermediate",
+    "sets": 3,
+    "reps": 10,
+    "weight": 16,
+    "cue": "Hinge, don’t reach.",
+    "steps": [
+      "Stand with dumbbells close to the front of your thighs.",
+      "Keep knees softly bent and push hips backward.",
+      "Lower the weights close to your legs while maintaining a steady back position.",
+      "Stand by bringing your hips forward; stop lowering when control is lost."
+    ],
+    "alternative": "Glute bridge",
+    "muscle_ids": [
+      "hamstrings",
+      "glutes",
+      "lower-back"
+    ],
+    "primary_muscle": "hamstrings",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "bridge",
+    "name": "Glute bridge",
+    "muscle": "Glutes",
+    "secondary": "Hamstrings",
+    "equipment": "Bodyweight",
+    "level": "Beginner",
+    "sets": 3,
+    "reps": 15,
+    "weight": 0,
+    "cue": "Find strength in the basics.",
+    "steps": [
+      "Lie on your back with knees bent and feet flat.",
+      "Brace gently and press through your feet to lift your hips.",
+      "Stop when shoulders, hips, and knees form a comfortable line.",
+      "Lower slowly without overextending your lower back."
+    ],
+    "alternative": "Bodyweight hip thrust",
+    "muscle_ids": [
+      "glutes",
+      "hamstrings"
+    ],
+    "primary_muscle": "glutes",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "pushup",
+    "name": "Incline push-up",
+    "muscle": "Chest",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Bodyweight",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "Find the angle that works for you.",
+    "steps": [
+      "Place hands on a stable elevated surface and step your feet back.",
+      "Keep your body aligned and lower your chest toward the surface.",
+      "Press away with control; use a higher surface to make it easier."
+    ],
+    "alternative": "Dumbbell floor press",
+    "muscle_ids": [
+      "chest",
+      "triceps"
+    ],
+    "primary_muscle": "chest",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "floor-press",
+    "name": "Dumbbell floor press",
+    "muscle": "Chest",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Dumbbells",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "A supported way to press.",
+    "steps": [
+      "Lie on the floor with bent knees and dumbbells held above your chest.",
+      "Lower slowly until the backs of your upper arms gently reach the floor.",
+      "Press upward without bouncing or flaring the elbows."
+    ],
+    "alternative": "Incline push-up",
+    "muscle_ids": [
+      "chest",
+      "triceps"
+    ],
+    "primary_muscle": "chest",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "rear-fly",
+    "name": "Bent-over reverse fly",
+    "muscle": "Shoulders",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Dumbbells",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "Give the rear shoulders some attention.",
+    "steps": [
+      "Hinge at your hips with light dumbbells and a steady torso.",
+      "Raise the arms out to the sides with softly bent elbows.",
+      "Lower slowly without swinging or shrugging."
+    ],
+    "alternative": "Seated cable row",
+    "muscle_ids": [
+      "shoulders",
+      "upper-back"
+    ],
+    "primary_muscle": "shoulders",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "hammer-curl",
+    "name": "Hammer curl",
+    "muscle": "Arms",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Dumbbells",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "A different grip, the same control.",
+    "steps": [
+      "Stand upright holding dumbbells with palms facing inward.",
+      "Bend the elbows while keeping the upper arms still.",
+      "Lower slowly and avoid leaning back."
+    ],
+    "alternative": "Dumbbell biceps curl",
+    "muscle_ids": [
+      "biceps",
+      "forearms"
+    ],
+    "primary_muscle": "biceps",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "overhead-triceps",
+    "name": "Overhead triceps extension",
+    "muscle": "Arms",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Dumbbells",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "Choose a comfortable overhead position.",
+    "steps": [
+      "Sit or stand in a stable position with a light dumbbell held overhead.",
+      "Bend the elbows to lower the weight through a comfortable range.",
+      "Extend the elbows without arching your lower back."
+    ],
+    "alternative": "Cable triceps pushdown",
+    "muscle_ids": [
+      "triceps"
+    ],
+    "primary_muscle": "triceps",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "close-pushup",
+    "name": "Close-grip incline push-up",
+    "muscle": "Arms",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Bodyweight",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "Bring pressing and triceps together.",
+    "steps": [
+      "Set your hands a little closer together on a stable elevated surface.",
+      "Keep your body straight and lower under control.",
+      "Press away while keeping the elbows comfortably near your body."
+    ],
+    "alternative": "Cable triceps pushdown",
+    "muscle_ids": [
+      "triceps",
+      "chest"
+    ],
+    "primary_muscle": "triceps",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "farmer-carry",
+    "name": "Farmer carry",
+    "muscle": "Arms",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Dumbbells",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "Steady steps. Strong grip.",
+    "steps": [
+      "Pick up manageable dumbbells and stand upright.",
+      "Walk a short clear path with small controlled steps.",
+      "Keep shoulders relaxed and set the weights down carefully. Count each controlled step as one rep in your log."
+    ],
+    "alternative": "Light dumbbell hold",
+    "muscle_ids": [
+      "forearms"
+    ],
+    "primary_muscle": "forearms",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "wrist-curl",
+    "name": "Supported wrist curl",
+    "muscle": "Arms",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Dumbbells",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "Small movement. Full control.",
+    "steps": [
+      "Sit with forearms supported and palms facing up.",
+      "Hold light dumbbells and bend your wrists through a small comfortable range.",
+      "Lower slowly without lifting the forearms."
+    ],
+    "alternative": "Hammer curl",
+    "muscle_ids": [
+      "forearms"
+    ],
+    "primary_muscle": "forearms",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "bird-dog",
+    "name": "Bird dog",
+    "muscle": "Core",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Bodyweight",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "Learn to stay steady.",
+    "steps": [
+      "Start on hands and knees with a comfortable neutral back.",
+      "Reach one arm and the opposite leg away without twisting your torso.",
+      "Return slowly and alternate sides; count each extension as one rep."
+    ],
+    "alternative": "Dead bug",
+    "muscle_ids": [
+      "lower-back",
+      "abs",
+      "glutes"
+    ],
+    "primary_muscle": "lower-back",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "pallof",
+    "name": "Pallof press",
+    "muscle": "Core",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Cable",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "Control the rotation.",
+    "steps": [
+      "Stand sideways to a chest-height cable, holding the handle near your chest.",
+      "Press the handle forward while resisting rotation.",
+      "Bring it back slowly and repeat on both sides."
+    ],
+    "alternative": "Side-lying bent-knee leg lift",
+    "muscle_ids": [
+      "obliques",
+      "abs"
+    ],
+    "primary_muscle": "obliques",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "side-knee",
+    "name": "Side-lying bent-knee leg lift",
+    "muscle": "Core",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Bodyweight",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "Start with a small, controlled range.",
+    "steps": [
+      "Lie on your side with knees bent and your head comfortably supported.",
+      "Brace gently and lift the bent legs slightly without rolling the torso.",
+      "Lower slowly and repeat on the other side."
+    ],
+    "alternative": "Pallof press",
+    "muscle_ids": [
+      "obliques"
+    ],
+    "primary_muscle": "obliques",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "split-squat",
+    "name": "Supported split squat",
+    "muscle": "Legs",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Bodyweight",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "Build one side at a time.",
+    "steps": [
+      "Stand in a split stance and hold a stable support.",
+      "Bend both knees to lower through a comfortable range.",
+      "Press through your front foot to stand; repeat on both sides."
+    ],
+    "alternative": "Goblet squat",
+    "muscle_ids": [
+      "quads",
+      "glutes"
+    ],
+    "primary_muscle": "quads",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "leg-extension",
+    "name": "Seated leg extension",
+    "muscle": "Legs",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Machine",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "A focused knee-extension movement.",
+    "steps": [
+      "Adjust the machine so its pivot aligns with your knees.",
+      "Keep your back supported and extend your knees with control.",
+      "Lower slowly without letting the weights slam."
+    ],
+    "alternative": "Supported split squat",
+    "muscle_ids": [
+      "quads"
+    ],
+    "primary_muscle": "quads",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "calf-raise",
+    "name": "Standing calf raise",
+    "muscle": "Legs",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Bodyweight",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "Give each step a stronger base.",
+    "steps": [
+      "Stand on level ground and hold a stable support.",
+      "Rise onto the balls of your feet through a comfortable range.",
+      "Lower your heels slowly without bouncing."
+    ],
+    "alternative": "Seated calf raise",
+    "muscle_ids": [
+      "calves"
+    ],
+    "primary_muscle": "calves",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "seated-calf",
+    "name": "Seated calf raise",
+    "muscle": "Legs",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Dumbbells",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "A bent-knee calf variation.",
+    "steps": [
+      "Sit with feet flat and knees bent.",
+      "Place a light dumbbell securely across your thighs if needed.",
+      "Raise and lower your heels slowly while keeping the balls of your feet down."
+    ],
+    "alternative": "Standing calf raise",
+    "muscle_ids": [
+      "calves"
+    ],
+    "primary_muscle": "calves",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "one-arm-row",
+    "name": "Supported dumbbell row",
+    "muscle": "Back",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Dumbbells",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "A steady base for a stronger pull.",
+    "steps": [
+      "Support one hand on a stable bench with your back steady.",
+      "Pull a dumbbell toward your hip without twisting your torso.",
+      "Lower slowly and repeat on the other side."
+    ],
+    "alternative": "Seated cable row",
+    "muscle_ids": [
+      "lats",
+      "upper-back",
+      "biceps"
+    ],
+    "primary_muscle": "lats",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "band-pull",
+    "name": "Band pull-apart",
+    "muscle": "Back",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Resistance band",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "A simple way to practice shoulder control.",
+    "steps": [
+      "Hold a light resistance band in front of your chest.",
+      "Move your arms apart without shrugging or arching your back.",
+      "Return slowly; keep the band away from your face."
+    ],
+    "alternative": "Bent-over reverse fly",
+    "muscle_ids": [
+      "upper-back",
+      "shoulders"
+    ],
+    "primary_muscle": "upper-back",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "band-pulldown",
+    "name": "Kneeling band pulldown",
+    "muscle": "Back",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Resistance band",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "Explore a lighter pulling option.",
+    "steps": [
+      "Secure a resistance band to a suitable overhead anchor.",
+      "Kneel upright and pull your elbows down toward your sides.",
+      "Return with control and verify the anchor before each set."
+    ],
+    "alternative": "Lat pulldown",
+    "muscle_ids": [
+      "lats"
+    ],
+    "primary_muscle": "lats",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "hip-hinge",
+    "name": "Bodyweight hip hinge",
+    "muscle": "Back",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Bodyweight",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "Practice the pattern before adding load.",
+    "steps": [
+      "Stand with feet comfortably apart and knees softly bent.",
+      "Push your hips backward while keeping your torso steady.",
+      "Stand by bringing your hips forward; avoid rounding or overextending your back."
+    ],
+    "alternative": "Bird dog",
+    "muscle_ids": [
+      "lower-back",
+      "hamstrings",
+      "glutes"
+    ],
+    "primary_muscle": "lower-back",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "hip-thrust",
+    "name": "Bodyweight hip thrust",
+    "muscle": "Glutes",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Bodyweight",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "Drive through the hips.",
+    "steps": [
+      "Support your upper back on a stable bench and place feet flat.",
+      "Raise your hips until your torso is approximately level.",
+      "Lower slowly without pushing into an excessive back arch."
+    ],
+    "alternative": "Glute bridge",
+    "muscle_ids": [
+      "glutes"
+    ],
+    "primary_muscle": "glutes",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "leg-curl",
+    "name": "Seated leg curl",
+    "muscle": "Legs",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Machine",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "Train the hamstrings through knee bending.",
+    "steps": [
+      "Adjust the seat, thigh pad, and ankle pad to fit comfortably.",
+      "Bend your knees to draw the pad down and back.",
+      "Return slowly while staying supported against the seat."
+    ],
+    "alternative": "Heel-dig bridge",
+    "muscle_ids": [
+      "hamstrings"
+    ],
+    "primary_muscle": "hamstrings",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  },
+  {
+    "id": "heel-bridge",
+    "name": "Heel-dig bridge",
+    "muscle": "Legs",
+    "secondary": "Supporting muscles vary with technique",
+    "equipment": "Bodyweight",
+    "level": "Beginner",
+    "sets": 2,
+    "reps": 10,
+    "weight": 0,
+    "cue": "Find a controlled posterior-chain movement.",
+    "steps": [
+      "Lie on your back with knees bent and heels on the floor.",
+      "Press through your heels and raise the hips a comfortable distance.",
+      "Lower slowly, keeping the movement controlled."
+    ],
+    "alternative": "Seated leg curl",
+    "muscle_ids": [
+      "hamstrings",
+      "glutes"
+    ],
+    "primary_muscle": "hamstrings",
+    "breathing": "Breathe steadily. Exhale during the effort and inhale during the controlled return when comfortable.",
+    "mistakes": [
+      "Using momentum instead of controlling the movement.",
+      "Choosing a range or load you cannot comfortably control."
+    ]
+  }
+]

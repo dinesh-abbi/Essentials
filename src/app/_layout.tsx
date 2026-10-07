@@ -255,6 +255,24 @@ function AppStack() {
         name="train/brief"
         options={{ headerShown: false, animation: 'fade' }}
       />
+
+      {/* Explore · Progress (merged from Forma) */}
+      <Stack.Screen
+        name="train/explore"
+        options={{ headerShown: false, animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="train/exercise/[id]"
+        options={{ headerShown: false, animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="train/edit-day"
+        options={{ headerShown: false, animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="train/progress"
+        options={{ headerShown: false, animation: 'slide_from_right' }}
+      />
     </Stack>
     {showLock && <AppLock onUnlock={() => setLocked(false)} />}
     </>
